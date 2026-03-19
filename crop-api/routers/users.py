@@ -31,13 +31,17 @@ def send_email(to: str, subject: str, body: str):
         raise HTTPException(500, f"メール送信に失敗しました: {e}")
 
 
-def require_owner_or_manager(field_id: int, current_user: models.User, db: Session):
-    """owner または manager のみユーザー管理操作可"""
+def get_my_field_role(field_id: int, user_id: int, db: Session) -> models.UserFieldRole | None:
     uf = db.query(models.UserField).filter(
-        models.UserField.user_id == current_user.id,
+        models.UserField.user_id == user_id,
         models.UserField.field_id == field_id
     ).first()
-    if not uf or uf.role not in (models.UserFieldRole.owner, models.UserFieldRole.manager):
+    return uf.role if uf else None
+
+
+def require_owner_or_manager(field_id: int, current_user: models.User, db: Session):
+    role = get_my_field_role(field_id, current_user.id, db)
+    if role not in (models.UserFieldRole.owner, models.UserFieldRole.manager):
         raise HTTPException(403, "圃場のoownerまたはmanagerのみ操作できます")
 
 
@@ -153,19 +157,34 @@ def update_user(
 
 
 @router.delete("/{user_id}")
-def remove_user_from_field_by_owner(
+def remove_user_from_field(
     user_id: int,
     field_id: int,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    """owner or manager のみ操作可"""
-    require_owner_or_manager(field_id, current_user, db)
-    uf = db.query(models.UserField).filter(
+    """
+    圃場からユーザーを削除。権限ルール：
+    - owner: 全ユーザー削除可
+    - manager: managerとmemberのみ削除可（ownerは削除不可）
+    """
+    my_role = get_my_field_role(field_id, current_user.id, db)
+    if my_role not in (models.UserFieldRole.owner, models.UserFieldRole.manager):
+        raise HTTPException(403, "圃場のoownerまたはmanagerのみ操作できます")
+
+    # 削除対象ユーザーのロールを取得
+    target_uf = db.query(models.UserField).filter(
         models.UserField.user_id == user_id,
         models.UserField.field_id == field_id
     ).first()
-    if uf:
-        db.delete(uf)
-        db.commit()
+
+    if not target_uf:
+        return {"ok": True}
+
+    # manager は owner を削除できない
+    if my_role == models.UserFieldRole.manager and target_uf.role == models.UserFieldRole.owner:
+        raise HTTPException(403, "managerはoownerを圃場から削除できません")
+
+    db.delete(target_uf)
+    db.commit()
     return {"ok": True}
