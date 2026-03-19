@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Environment variables - CRITICAL
+.env
+.env.*
+*.env
+crop-api/.env
+crop-api/.env.*
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Uploads/Media
+uploads/
+media/
+static/uploads/
+crop-api/static/uploads/
+
+# Build artifacts
+crop-frontend/dist/
+crop-frontend/build/
+
+# Test coverage
+.coverage
+htmlcov/
