@@ -1,7 +1,7 @@
 from datetime import datetime, date
 from typing import Optional, List
 from pydantic import BaseModel
-from models import UserRole, ItemStatus
+from models import UserFieldRole, ItemStatus
 
 # --- Auth ---
 class Token(BaseModel):
@@ -27,24 +27,27 @@ class VerifyEmailRequest(BaseModel):
     token: str
     password: str
 
+class AcceptInviteRequest(BaseModel):
+    token: str
+    password: str
+
 # --- User ---
 class UserOut(BaseModel):
     id: int
     name: str
     email: Optional[str] = None
-    role: UserRole
+    is_owner_of_any: bool = False
     model_config = {"from_attributes": True}
 
 class UserInvite(BaseModel):
-    """管理者がメンバーを招待する際の入力"""
     name: str
     email: str
-    role: UserRole = UserRole.member
+    field_id: int
+    field_role: UserFieldRole = UserFieldRole.member
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
-    role: Optional[UserRole] = None
 
 # --- Field ---
 class FieldCreate(BaseModel):
@@ -54,6 +57,7 @@ class FieldCreate(BaseModel):
 
 class FieldOut(FieldCreate):
     id: int
+    my_role: Optional[UserFieldRole] = None
     model_config = {"from_attributes": True}
 
 # --- WorkType ---

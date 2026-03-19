@@ -1,27 +1,32 @@
 from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, Text, DateTime, Date,
-    Boolean, Numeric, ForeignKey, Enum, Table
+    Boolean, Numeric, ForeignKey, Enum
 )
 from sqlalchemy.orm import relationship
 from database import Base
 import enum
 
-class UserRole(str, enum.Enum):
-    admin = "admin"
+
+class UserFieldRole(str, enum.Enum):
+    owner = "owner"
     member = "member"
+
 
 class ItemStatus(str, enum.Enum):
     growing = "growing"
     finished = "finished"
 
-# User と Field の中間テーブル（多対多）
-user_fields = Table(
-    "user_fields",
-    Base.metadata,
-    Column("user_id", Integer, ForeignKey("users.id"), primary_key=True),
-    Column("field_id", Integer, ForeignKey("fields.id"), primary_key=True),
-)
+
+class UserField(Base):
+    """User と Field の中間テーブル（圃場ごとの権限付き）"""
+    __tablename__ = "user_fields"
+    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    field_id = Column(Integer, ForeignKey("fields.id"), primary_key=True)
+    role = Column(Enum(UserFieldRole), default=UserFieldRole.member, nullable=False)
+    user = relationship("User", back_populates="user_fields")
+    field = relationship("Field", back_populates="user_fields")
+
 
 class User(Base):
     __tablename__ = "users"
@@ -29,11 +34,26 @@ class User(Base):
     name = Column(String(100), nullable=False)
     email = Column(String(255), nullable=True, unique=True)
     password_hash = Column(String(255), nullable=False)
-    role = Column(Enum(UserRole), default=UserRole.member)
     created_at = Column(DateTime, default=datetime.utcnow)
     work_logs = relationship("WorkLog", back_populates="user")
-    fields = relationship("Field", secondary=user_fields, back_populates="users")
+    user_fields = relationship("UserField", back_populates="user", cascade="all, delete-orphan")
     reset_tokens = relationship("PasswordResetToken", back_populates="user", cascade="all, delete-orphan")
+
+    @property
+    def fields(self):
+        return [uf.field for uf in self.user_fields]
+
+    def get_field_role(self, field_id: int):
+        for uf in self.user_fields:
+            if uf.field_id == field_id:
+                return uf.role
+        return None
+
+    @property
+    def is_owner_of_any(self):
+        """1つでもownerの圃場を持っているか"""
+        return any(uf.role == UserFieldRole.owner for uf in self.user_fields)
+
 
 class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
@@ -45,8 +65,9 @@ class PasswordResetToken(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     user = relationship("User", back_populates="reset_tokens")
 
+
 class EmailVerification(Base):
-    """新規ユーザー仮登録テーブル"""
+    """\u65b0\u898f\u30e6\u30fc\u30b6\u30fc\u4eee\u767b\u9332\u30c6\u30fc\u30d6\u30eb"""
     __tablename__ = "email_verifications"
     id = Column(Integer, primary_key=True)
     name = Column(String(100), nullable=False)
@@ -56,6 +77,22 @@ class EmailVerification(Base):
     used = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+
+class InviteVerification(Base):
+    """\u62db\u5f85\u7528\u4eee\u767b\u9332\u30c6\u30fc\u30d6\u30eb\uff08\u5703\u5834\u3078\u306e\u7d10\u3065\u3051\u60c5\u5831\u3082\u4fdd\u6301\uff09"""
+    __tablename__ = "invite_verifications"
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False)
+    email = Column(String(255), nullable=False)
+    field_id = Column(Integer, ForeignKey("fields.id"), nullable=False)
+    field_role = Column(Enum(UserFieldRole), default=UserFieldRole.member, nullable=False)
+    token = Column(String(64), nullable=False, unique=True)
+    expires_at = Column(DateTime, nullable=False)
+    used = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    field = relationship("Field")
+
+
 class Field(Base):
     __tablename__ = "fields"
     id = Column(Integer, primary_key=True)
@@ -64,7 +101,12 @@ class Field(Base):
     location_note = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     items = relationship("Item", back_populates="field")
-    users = relationship("User", secondary=user_fields, back_populates="fields")
+    user_fields = relationship("UserField", back_populates="field", cascade="all, delete-orphan")
+
+    @property
+    def users(self):
+        return [uf.user for uf in self.user_fields]
+
 
 class WorkType(Base):
     __tablename__ = "work_types"
@@ -72,6 +114,7 @@ class WorkType(Base):
     name = Column(String(50), nullable=False)
     color = Column(String(7), default="#888888")
     work_logs = relationship("WorkLog", back_populates="work_type")
+
 
 class Item(Base):
     __tablename__ = "items"
@@ -85,6 +128,7 @@ class Item(Base):
     field = relationship("Field", back_populates="items")
     work_logs = relationship("WorkLog", back_populates="item", order_by="WorkLog.worked_at.desc()", cascade="all, delete-orphan")
     harvests = relationship("Harvest", back_populates="item", order_by="Harvest.harvested_at.desc()", cascade="all, delete-orphan")
+
 
 class WorkLog(Base):
     __tablename__ = "work_logs"
@@ -101,6 +145,7 @@ class WorkLog(Base):
     agro_inputs = relationship("AgroInput", back_populates="work_log", cascade="all, delete-orphan")
     photos = relationship("Photo", back_populates="work_log", cascade="all, delete-orphan")
 
+
 class AgroInput(Base):
     __tablename__ = "agro_inputs"
     id = Column(Integer, primary_key=True)
@@ -111,6 +156,7 @@ class AgroInput(Base):
     unit = Column(String(20), nullable=True)
     work_log = relationship("WorkLog", back_populates="agro_inputs")
 
+
 class Photo(Base):
     __tablename__ = "photos"
     id = Column(Integer, primary_key=True)
@@ -119,6 +165,7 @@ class Photo(Base):
     taken_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     work_log = relationship("WorkLog", back_populates="photos")
+
 
 class Harvest(Base):
     __tablename__ = "harvests"
