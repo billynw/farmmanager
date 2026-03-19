@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { usersApi, fieldsApi } from '../api'
-import type { UserFieldRole, Field } from '../api'
+import type { UserFieldRole, Field, FieldInviteItem } from '../api'
 import { useAuth } from '../store'
 
 type Tab = 'users' | 'fields'
@@ -13,7 +13,6 @@ export default function AdminUsers() {
   const currentUser = useAuth((s) => s.user)
   const [tab, setTab] = useState<Tab>('fields')
   const [selectedFieldId, setSelectedFieldId] = useState<number | null>(null)
-
   const [showUserForm, setShowUserForm] = useState(false)
   const [showFieldForm, setShowFieldForm] = useState(false)
   const [editField, setEditField] = useState<Field | null>(null)
@@ -139,9 +138,9 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {showUserForm && selectedFieldId && (
+      {showUserForm && (
         <UserInviteModal
-          fieldId={selectedFieldId}
+          ownerFields={ownerFields}
           onClose={() => setShowUserForm(false)}
           onSaved={() => { refetchUsers(); setShowUserForm(false) }}
         />
@@ -158,19 +157,60 @@ export default function AdminUsers() {
   )
 }
 
-function UserInviteModal({ fieldId, onClose, onSaved }: { fieldId: number; onClose: () => void; onSaved: () => void }) {
+// --- ユーザー招待モーダル(複数圃場対応・すべて選択付き) ---
+function UserInviteModal({ ownerFields, onClose, onSaved }: {
+  ownerFields: Field[]
+  onClose: () => void
+  onSaved: () => void
+}) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [fieldRole, setFieldRole] = useState<UserFieldRole>('member')
+  const [fieldSelections, setFieldSelections] = useState<Record<number, { checked: boolean; role: UserFieldRole }>>(
+    Object.fromEntries(ownerFields.map(f => [f.id, { checked: false, role: 'member' as UserFieldRole }]))
+  )
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
 
+  const allChecked = ownerFields.every(f => fieldSelections[f.id]?.checked)
+  const someChecked = ownerFields.some(f => fieldSelections[f.id]?.checked)
+
+  const toggleAll = () => {
+    const next = !allChecked
+    setFieldSelections(prev => {
+      const updated = { ...prev }
+      ownerFields.forEach(f => { updated[f.id] = { ...updated[f.id], checked: next } })
+      return updated
+    })
+  }
+
+  const toggleField = (fieldId: number) => {
+    setFieldSelections(prev => ({
+      ...prev,
+      [fieldId]: { ...prev[fieldId], checked: !prev[fieldId].checked }
+    }))
+  }
+
+  const setRole = (fieldId: number, role: UserFieldRole) => {
+    setFieldSelections(prev => ({
+      ...prev,
+      [fieldId]: { ...prev[fieldId], role }
+    }))
+  }
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const selectedFields: FieldInviteItem[] = ownerFields
+      .filter(f => fieldSelections[f.id]?.checked)
+      .map(f => ({ field_id: f.id, field_role: fieldSelections[f.id].role }))
+
+    if (selectedFields.length === 0) {
+      setError('圃場を少なくとも1つ選択してください')
+      return
+    }
     setLoading(true); setError('')
     try {
-      await usersApi.invite({ name, email, field_id: fieldId, field_role: fieldRole })
+      await usersApi.invite({ name, email, fields: selectedFields })
       setDone(true)
     } catch (err: any) {
       setError(err.response?.data?.detail ?? '保存に失敗しました')
@@ -199,20 +239,70 @@ function UserInviteModal({ fieldId, onClose, onSaved }: { fieldId: number; onClo
       <div style={modalStyle} onClick={e => e.stopPropagation()}>
         <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700 }}>ユーザーを招待</h3>
         <p style={{ color: '#888', fontSize: 13, marginBottom: 16 }}>
-          登録済みのユーザーは即座に追加、未登録の場合は招待メールを送信します。
+          登録済みの場合は即座に追加、未登録の場合は招待メールを送信します。
         </p>
         {error && <p style={{ color: '#c0392b', fontSize: 13, marginBottom: 10 }}>{error}</p>}
         <form onSubmit={submit}>
           <label style={labelStyle}>ユーザー名 <span style={{ color: '#c0392b' }}>*</span></label>
           <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} required />
+
           <label style={{ ...labelStyle, marginTop: 12 }}>メールアドレス <span style={{ color: '#c0392b' }}>*</span></label>
           <input style={inputStyle} type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="example@email.com" />
-          <label style={{ ...labelStyle, marginTop: 12 }}>圃場での権限</label>
-          <select style={inputStyle} value={fieldRole} onChange={e => setFieldRole(e.target.value as UserFieldRole)}>
-            <option value="member">メンバー（作業ログのみ）</option>
-            <option value="owner">オーナー（管理権限あり）</option>
-          </select>
-          <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+
+          {/* 圃場選択 */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 6 }}>
+            <label style={labelStyle}>圃場と権限 <span style={{ color: '#c0392b' }}>*</span></label>
+            <button
+              type="button"
+              style={{ fontSize: 12, padding: '2px 10px', border: '1px solid #ddd', borderRadius: 6, background: '#fff', cursor: 'pointer', color: '#666' }}
+              onClick={toggleAll}
+            >
+              {allChecked ? 'すべて解除' : 'すべて選択'}
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto', marginBottom: 16 }}>
+            {ownerFields.map(field => {
+              const sel = fieldSelections[field.id]
+              return (
+                <div key={field.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '10px 12px', border: `1px solid ${sel.checked ? '#2d7a4f' : '#eee'}`,
+                  borderRadius: 8, background: sel.checked ? '#f0faf4' : '#fff',
+                  transition: 'all 0.15s',
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={sel.checked}
+                    onChange={() => toggleField(field.id)}
+                    style={{ width: 18, height: 18, cursor: 'pointer', flexShrink: 0 }}
+                  />
+                  <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: sel.checked ? '#1a1a1a' : '#888' }}>
+                    {field.name}
+                  </span>
+                  <select
+                    value={sel.role}
+                    onChange={e => setRole(field.id, e.target.value as UserFieldRole)}
+                    disabled={!sel.checked}
+                    style={{
+                      fontSize: 12, padding: '3px 6px', borderRadius: 6,
+                      border: '1px solid #ddd', background: '#fff',
+                      opacity: sel.checked ? 1 : 0.4, cursor: sel.checked ? 'pointer' : 'default',
+                    }}
+                  >
+                    <option value="member">メンバー</option>
+                    <option value="owner">オーナー</option>
+                  </select>
+                </div>
+              )
+            })}
+          </div>
+
+          {!someChecked && (
+            <p style={{ fontSize: 12, color: '#c0392b', marginBottom: 8 }}>圃場を少なくとも1つ選択してください</p>
+          )}
+
+          <div style={{ display: 'flex', gap: 8 }}>
             <button type="button" style={{ ...btnStyle, background: '#eee', color: '#444' }} onClick={onClose}>キャンセル</button>
             <button type="submit" style={{ ...btnStyle, opacity: loading ? 0.6 : 1 }} disabled={loading}>
               {loading ? '送信中...' : '招待する'}
@@ -224,6 +314,7 @@ function UserInviteModal({ fieldId, onClose, onSaved }: { fieldId: number; onClo
   )
 }
 
+// --- 圃場追加/編集モーダル ---
 function FieldFormModal({ field, onClose, onSaved }: { field: Field | null; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(field?.name ?? '')
   const [area, setArea] = useState(field?.area?.toString() ?? '')

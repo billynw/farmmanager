@@ -27,7 +27,7 @@ export interface User {
   id: number
   name: string
   email?: string
-  is_owner_of_any: boolean  // ownerの圃場を持っているか
+  is_owner_of_any: boolean
 }
 
 export interface Field {
@@ -35,7 +35,12 @@ export interface Field {
   name: string
   area?: number
   location_note?: string
-  my_role?: UserFieldRole  // ログインユーザーのこの圃場でのロール
+  my_role?: UserFieldRole
+}
+
+export interface FieldInviteItem {
+  field_id: number
+  field_role: UserFieldRole
 }
 
 export interface WorkType { id: number; name: string; color: string }
@@ -91,14 +96,12 @@ export const authApi = {
 
 export const usersApi = {
   list: (field_id: number) => api.get<User[]>('/users', { params: { field_id } }),
-  invite: (data: { name: string; email: string; field_id: number; field_role: UserFieldRole }) =>
+  invite: (data: { name: string; email: string; fields: FieldInviteItem[] }) =>
     api.post<User>('/users', data),
   update: (id: number, data: { name?: string; email?: string }) =>
     api.put<User>(`/users/${id}`, data),
   removeFromField: (user_id: number, field_id: number) =>
     api.delete(`/users/${user_id}`, { params: { field_id } }),
-  getUserFields: (user_id: number, field_id: number) =>
-    api.get<Field[]>(`/users/${user_id}/fields`, { params: { field_id } }),
   assignField: (field_id: number, user_id: number, field_role: UserFieldRole = 'member') =>
     api.post(`/fields/${field_id}/users/${user_id}`, null, { params: { field_role } }),
   removeField: (field_id: number, user_id: number) =>
