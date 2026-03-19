@@ -20,6 +20,15 @@ def list_users(db: Session = Depends(get_db), _=Depends(require_admin)):
     return db.query(models.User).order_by(models.User.name).all()
 
 
+@router.get("/{user_id}/fields", response_model=List[schemas.FieldOut])
+def get_user_fields(user_id: int, db: Session = Depends(get_db), _=Depends(require_admin)):
+    """指定ユーザーの圃場一覧（admin専用）"""
+    user = db.get(models.User, user_id)
+    if not user:
+        raise HTTPException(404, "ユーザーが見つかりません")
+    return user.fields
+
+
 @router.post("", response_model=schemas.UserOut)
 def create_user(data: schemas.UserCreate, db: Session = Depends(get_db), _=Depends(require_admin)):
     """ユーザー新規作成（admin専用）"""

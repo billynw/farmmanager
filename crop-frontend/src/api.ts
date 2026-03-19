@@ -77,6 +77,7 @@ export const usersApi = {
   update: (id: number, data: { name?: string; email?: string; role?: UserRole }) =>
     api.put<User>(`/users/${id}`, data),
   delete: (id: number) => api.delete(`/users/${id}`),
+  getFields: (user_id: number) => api.get<Field[]>(`/users/${user_id}/fields`),
   assignField: (field_id: number, user_id: number) =>
     api.post(`/fields/${field_id}/users/${user_id}`),
   removeField: (field_id: number, user_id: number) =>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { usersApi, fieldsApi } from '../api'
@@ -155,6 +155,16 @@ function FieldAssignModal({ user, fields, onClose }: { user: User; fields: Field
   const qc = useQueryClient()
   const [assigned, setAssigned] = useState<Set<number>>(new Set())
   const [loading, setLoading] = useState(false)
+  const [initializing, setInitializing] = useState(true)
+
+  // モーダルを開いた時にそのユーザーの現在の紐づき圃場を取得して初期状態にセット
+  useEffect(() => {
+    usersApi.getFields(user.id)
+      .then(r => {
+        setAssigned(new Set(r.data.map(f => f.id)))
+      })
+      .finally(() => setInitializing(false))
+  }, [user.id])
 
   const toggle = async (field: Field) => {
     setLoading(true)
@@ -179,22 +189,28 @@ function FieldAssignModal({ user, fields, onClose }: { user: User; fields: Field
       <div style={modalStyle} onClick={e => e.stopPropagation()}>
         <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700 }}>圃場の紐づけ</h3>
         <p style={{ color: '#666', fontSize: 13, marginBottom: 16 }}>{user.name} がアクセスできる圃場を選択</p>
-        {fields.length === 0 && <p style={{ color: '#aaa', fontSize: 14 }}>圃場が登録されていません</p>}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 300, overflowY: 'auto' }}>
-          {fields.map(field => (
-            <div key={field.id} style={{ display: 'flex', alignItems: 'center', gap: 12,
-              padding: '10px 12px', border: '1px solid #eee', borderRadius: 8,
-              background: assigned.has(field.id) ? '#f0faf4' : '#fff' }}>
-              <input type="checkbox" checked={assigned.has(field.id)}
-                onChange={() => toggle(field)} disabled={loading}
-                style={{ width: 18, height: 18, cursor: 'pointer' }} />
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{field.name}</div>
-                {field.area && <div style={{ fontSize: 12, color: '#888' }}>{field.area}a</div>}
-              </div>
+        {initializing ? (
+          <p style={{ color: '#aaa', fontSize: 14, textAlign: 'center', padding: '20px 0' }}>読み込み中...</p>
+        ) : (
+          <>
+            {fields.length === 0 && <p style={{ color: '#aaa', fontSize: 14 }}>圃場が登録されていません</p>}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 300, overflowY: 'auto' }}>
+              {fields.map(field => (
+                <div key={field.id} style={{ display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '10px 12px', border: '1px solid #eee', borderRadius: 8,
+                  background: assigned.has(field.id) ? '#f0faf4' : '#fff' }}>
+                  <input type="checkbox" checked={assigned.has(field.id)}
+                    onChange={() => toggle(field)} disabled={loading}
+                    style={{ width: 18, height: 18, cursor: 'pointer' }} />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{field.name}</div>
+                    {field.area && <div style={{ fontSize: 12, color: '#888' }}>{field.area}a</div>}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        )}
         <button style={{ ...btnStyle, marginTop: 16, background: '#eee', color: '#444' }} onClick={onClose}>閉じる</button>
       </div>
     </div>
