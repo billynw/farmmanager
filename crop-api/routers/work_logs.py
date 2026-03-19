@@ -44,6 +44,17 @@ def list_logs(
     if item_id: q = q.filter(models.WorkLog.item_id == item_id)
     return q.order_by(models.WorkLog.worked_at.desc()).offset(offset).limit(limit).all()
 
+@router.get("/{log_id}", response_model=schemas.WorkLogOut)
+def get_log(log_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    log = db.query(models.WorkLog).options(
+        joinedload(models.WorkLog.work_type),
+        joinedload(models.WorkLog.user),
+        joinedload(models.WorkLog.agro_inputs),
+        joinedload(models.WorkLog.photos),
+    ).get(log_id)
+    if not log: raise HTTPException(404, "Log not found")
+    return log
+
 @router.post("", response_model=schemas.WorkLogOut)
 def create_log(
     data: schemas.WorkLogCreate,
@@ -69,6 +80,37 @@ def create_log(
         joinedload(models.WorkLog.photos),
     ).get(log.id)
 
+@router.put("/{log_id}", response_model=schemas.WorkLogOut)
+def update_log(
+    log_id: int,
+    data: schemas.WorkLogCreate,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user)
+):
+    log = db.get(models.WorkLog, log_id)
+    if not log: raise HTTPException(404, "Log not found")
+    
+    # 基本情報を更新
+    log.work_type_id = data.work_type_id
+    log.worked_at = data.worked_at or log.worked_at
+    log.memo = data.memo
+    
+    # 既存の農薬・肥料を削除して新しいものを追加
+    for ai in log.agro_inputs:
+        db.delete(ai)
+    db.flush()
+    
+    for ai in data.agro_inputs:
+        db.add(models.AgroInput(log_id=log.id, **ai.model_dump()))
+    
+    db.commit()
+    return db.query(models.WorkLog).options(
+        joinedload(models.WorkLog.work_type),
+        joinedload(models.WorkLog.user),
+        joinedload(models.WorkLog.agro_inputs),
+        joinedload(models.WorkLog.photos),
+    ).get(log.id)
+
 @router.post("/{log_id}/photos", response_model=schemas.PhotoOut)
 def upload_photo(
     log_id: int,
@@ -82,6 +124,20 @@ def upload_photo(
     photo = models.Photo(log_id=log_id, file_path=path)
     db.add(photo); db.commit(); db.refresh(photo)
     return photo
+
+@router.delete("/{log_id}/photos/{photo_id}")
+def delete_photo(log_id: int, photo_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    photo = db.get(models.Photo, photo_id)
+    if not photo or photo.log_id != log_id: raise HTTPException(404, "Photo not found")
+    # ファイル削除
+    try:
+        file_path = os.path.join(settings.PHOTO_DIR, os.path.basename(photo.file_path))
+        if os.path.exists(file_path):
+            os.remove(file_path)
+    except Exception:
+        pass
+    db.delete(photo); db.commit()
+    return {"ok": True}
 
 @router.delete("/{log_id}")
 def delete_log(log_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
