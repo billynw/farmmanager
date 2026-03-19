@@ -28,7 +28,7 @@ export interface User {
   name: string
   email?: string
   is_owner_of_any: boolean
-  field_role?: UserFieldRole  // 圃場一覧取得時に圃場でのロール
+  field_role?: UserFieldRole
 }
 
 export interface Field {
@@ -101,6 +101,8 @@ export const usersApi = {
     api.post<User>('/users', data),
   update: (id: number, data: { name?: string; email?: string }) =>
     api.put<User>(`/users/${id}`, data),
+  updateFieldRole: (user_id: number, field_id: number, field_role: UserFieldRole) =>
+    api.patch(`/users/${user_id}/field-role`, null, { params: { field_id, field_role } }),
   removeFromField: (user_id: number, field_id: number) =>
     api.delete(`/users/${user_id}`, { params: { field_id } }),
   assignField: (field_id: number, user_id: number, field_role: UserFieldRole = 'member') =>

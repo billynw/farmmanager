@@ -56,14 +56,13 @@ def list_users(
     user_fields = db.query(models.UserField).filter(models.UserField.field_id == field_id).all()
     result = []
     for uf in user_fields:
-        user_out = schemas.UserOut(
+        result.append(schemas.UserOut(
             id=uf.user.id,
             name=uf.user.name,
             email=uf.user.email,
             is_owner_of_any=uf.user.is_owner_of_any,
             field_role=uf.role
-        )
-        result.append(user_out)
+        ))
     return result
 
 
@@ -143,6 +142,43 @@ def invite_user(
     return schemas.UserOut(id=0, name=data.name, email=data.email, is_owner_of_any=False)
 
 
+@router.patch("/{user_id}/field-role")
+def update_field_role(
+    user_id: int,
+    field_id: int,
+    field_role: models.UserFieldRole,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    圃場でのユーザーのロールを変更。
+    - owner: 全メンバーのロール変更可
+    - manager: managerとmemberのみ変更可（ownerは不可）
+    """
+    my_role = get_my_field_role(field_id, current_user.id, db)
+    if my_role not in (models.UserFieldRole.owner, models.UserFieldRole.manager):
+        raise HTTPException(403, "圃場のoownerまたはmanagerのみ操作できます")
+
+    target_uf = db.query(models.UserField).filter(
+        models.UserField.user_id == user_id,
+        models.UserField.field_id == field_id
+    ).first()
+    if not target_uf:
+        raise HTTPException(404, "ユーザーがこの圃場に属していません")
+
+    # managerはoownerのロールを変更できない
+    if my_role == models.UserFieldRole.manager and target_uf.role == models.UserFieldRole.owner:
+        raise HTTPException(403, "managerはoownerの権限を変更できません")
+
+    # 自分自身のロール変更は不可（自分をownerから降格できないように）
+    if user_id == current_user.id:
+        raise HTTPException(403, "自分自身の権限は変更できません")
+
+    target_uf.role = field_role
+    db.commit()
+    return {"ok": True, "field_role": field_role}
+
+
 @router.put("/{user_id}", response_model=schemas.UserOut)
 def update_user(
     user_id: int,
@@ -184,7 +220,6 @@ def remove_user_from_field(
         models.UserField.user_id == user_id,
         models.UserField.field_id == field_id
     ).first()
-
     if not target_uf:
         return {"ok": True}
 

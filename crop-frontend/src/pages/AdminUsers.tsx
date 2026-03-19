@@ -19,10 +19,17 @@ const ROLE_COLOR: Record<UserFieldRole, string> = {
   member: '#888',
 }
 
-// managerはoownerを削除できない
 function canDelete(myRole: UserFieldRole | undefined, targetRole: UserFieldRole | undefined): boolean {
   if (!myRole) return false
   if (myRole === 'owner') return true
+  if (myRole === 'manager') return targetRole !== 'owner'
+  return false
+}
+
+function canChangeRole(myRole: UserFieldRole | undefined, targetRole: UserFieldRole | undefined): boolean {
+  if (!myRole) return false
+  if (myRole === 'owner') return true
+  // managerはoownerのロールは変更不可
   if (myRole === 'manager') return targetRole !== 'owner'
   return false
 }
@@ -39,8 +46,6 @@ export default function AdminUsers() {
 
   const { data: fields = [] } = useQuery({ queryKey: ['fields'], queryFn: () => fieldsApi.list().then(r => r.data) })
   const manageableFields = fields.filter(f => f.my_role === 'owner' || f.my_role === 'manager')
-
-  // 選択中の圃場での自分のロール
   const myRoleInSelectedField = manageableFields.find(f => f.id === selectedFieldId)?.my_role
 
   const { data: fieldUsers = [], refetch: refetchUsers } = useQuery({
@@ -60,6 +65,17 @@ export default function AdminUsers() {
       setSelectedFieldId(manageableFields[0].id)
     }
   }, [manageableFields.length])
+
+  const handleRoleChange = async (userId: number, newRole: UserFieldRole) => {
+    if (!selectedFieldId) return
+    try {
+      await usersApi.updateFieldRole(userId, selectedFieldId, newRole)
+      refetchUsers()
+    } catch (err: any) {
+      alert(err.response?.data?.detail ?? '権限変更に失敗しました')
+      refetchUsers()  // 失敗時は元の値に戻す
+    }
+  }
 
   return (
     <div style={pageStyle}>
@@ -138,31 +154,50 @@ export default function AdminUsers() {
               </div>
               <div style={{ padding: '12px 16px', overflowY: 'auto', flex: 1 }}>
                 {fieldUsers.map(user => {
-                  const showDelete = user.id !== currentUser?.id && canDelete(myRoleInSelectedField, user.field_role)
+                  const isSelf = user.id === currentUser?.id
+                  const showDelete = !isSelf && canDelete(myRoleInSelectedField, user.field_role)
+                  const showRoleSelect = !isSelf && canChangeRole(myRoleInSelectedField, user.field_role)
                   return (
                     <div key={user.id} style={cardStyle}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontWeight: 600, fontSize: 15 }}>{user.name}</span>
-                          {user.field_role && (
+                        <div style={{ fontWeight: 600, fontSize: 15 }}>{user.name}</div>
+                        {user.email && <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{user.email}</div>}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {showRoleSelect ? (
+                          <select
+                            value={user.field_role ?? 'member'}
+                            onChange={e => handleRoleChange(user.id, e.target.value as UserFieldRole)}
+                            style={{
+                              fontSize: 12, padding: '4px 6px', borderRadius: 6,
+                              border: '1px solid #ddd', background: '#fff', cursor: 'pointer',
+                              color: ROLE_COLOR[user.field_role ?? 'member'],
+                              fontWeight: 600,
+                            }}
+                          >
+                            <option value="member">メンバー</option>
+                            <option value="manager">マネージャー</option>
+                            <option value="owner">オーナー</option>
+                          </select>
+                        ) : (
+                          user.field_role && (
                             <span style={{
-                              fontSize: 11, padding: '1px 7px', borderRadius: 20,
+                              fontSize: 11, padding: '2px 8px', borderRadius: 20,
                               background: ROLE_COLOR[user.field_role] + '22',
                               color: ROLE_COLOR[user.field_role], fontWeight: 600,
                             }}>{ROLE_LABEL[user.field_role]}</span>
-                          )}
-                        </div>
-                        {user.email && <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{user.email}</div>}
+                          )
+                        )}
+                        {showDelete && (
+                          <button
+                            style={{ ...smallBtnStyle, color: '#c0392b', borderColor: '#c0392b' }}
+                            onClick={() => {
+                              if (selectedFieldId && confirm(`${user.name}をこの圃場から削除しますか？`))
+                                usersApi.removeFromField(user.id, selectedFieldId).then(() => refetchUsers())
+                            }}
+                          >削除</button>
+                        )}
                       </div>
-                      {showDelete && (
-                        <button
-                          style={{ ...smallBtnStyle, color: '#c0392b', borderColor: '#c0392b' }}
-                          onClick={() => {
-                            if (selectedFieldId && confirm(`${user.name}をこの圃場から削除しますか？`))
-                              usersApi.removeFromField(user.id, selectedFieldId).then(() => refetchUsers())
-                          }}
-                        >削除</button>
-                      )}
                     </div>
                   )
                 })}
