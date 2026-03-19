@@ -50,8 +50,8 @@ class Item(Base):
     status = Column(Enum(ItemStatus), default=ItemStatus.growing)
     created_at = Column(DateTime, default=datetime.utcnow)
     field = relationship("Field", back_populates="items")
-    work_logs = relationship("WorkLog", back_populates="item", order_by="WorkLog.worked_at.desc()")
-    harvests = relationship("Harvest", back_populates="item", order_by="Harvest.harvested_at.desc()")
+    work_logs = relationship("WorkLog", back_populates="item", order_by="WorkLog.worked_at.desc()", cascade="all, delete-orphan")
+    harvests = relationship("Harvest", back_populates="item", order_by="Harvest.harvested_at.desc()", cascade="all, delete-orphan")
 
 class WorkLog(Base):
     __tablename__ = "work_logs"

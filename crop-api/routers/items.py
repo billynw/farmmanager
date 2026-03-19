@@ -69,3 +69,11 @@ def update_item(item_id: int, data: schemas.ItemCreate, db: Session = Depends(ge
     for k, v in data.model_dump().items(): setattr(item, k, v)
     db.commit(); db.refresh(item)
     return item
+
+@router.delete("/items/{item_id}")
+def delete_item(item_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    item = db.get(models.Item, item_id)
+    if not item: raise HTTPException(404, "Item not found")
+    db.delete(item)
+    db.commit()
+    return {"ok": True}
