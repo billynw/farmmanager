@@ -28,8 +28,8 @@ function canDelete(myRole: UserFieldRole | undefined, targetRole: UserFieldRole 
 
 function canChangeRole(myRole: UserFieldRole | undefined, targetRole: UserFieldRole | undefined): boolean {
   if (!myRole) return false
-  if (myRole === 'owner') return targetRole !== 'owner'  // owner同士は変更不可
-  if (myRole === 'manager') return targetRole !== 'owner' // managerはoownerは変更不可
+  if (myRole === 'owner') return targetRole !== 'owner'
+  if (myRole === 'manager') return targetRole !== 'owner'
   return false
 }
 
@@ -42,6 +42,7 @@ export default function AdminUsers() {
   const [showUserForm, setShowUserForm] = useState(false)
   const [showFieldForm, setShowFieldForm] = useState(false)
   const [editField, setEditField] = useState<Field | null>(null)
+  const [togglingUserId, setTogglingUserId] = useState<number | null>(null)
 
   const { data: fields = [] } = useQuery({ queryKey: ['fields'], queryFn: () => fieldsApi.list().then(r => r.data) })
   const manageableFields = fields.filter(f => f.my_role === 'owner' || f.my_role === 'manager')
@@ -65,14 +66,18 @@ export default function AdminUsers() {
     }
   }, [manageableFields.length])
 
-  const handleRoleChange = async (userId: number, newRole: UserFieldRole) => {
-    if (!selectedFieldId) return
+  const handleRoleToggle = async (userId: number, currentRole: UserFieldRole) => {
+    if (!selectedFieldId || togglingUserId === userId) return
+    const newRole: UserFieldRole = currentRole === 'manager' ? 'member' : 'manager'
+    setTogglingUserId(userId)
     try {
       await usersApi.updateFieldRole(userId, selectedFieldId, newRole)
       refetchUsers()
     } catch (err: any) {
       alert(err.response?.data?.detail ?? '権限変更に失敗しました')
       refetchUsers()
+    } finally {
+      setTogglingUserId(null)
     }
   }
 
@@ -155,7 +160,8 @@ export default function AdminUsers() {
                 {fieldUsers.map(user => {
                   const isSelf = user.id === currentUser?.id
                   const showDelete = !isSelf && canDelete(myRoleInSelectedField, user.field_role)
-                  const showRoleSelect = !isSelf && canChangeRole(myRoleInSelectedField, user.field_role)
+                  const toggleable = !isSelf && canChangeRole(myRoleInSelectedField, user.field_role)
+                  const isToggling = togglingUserId === user.id
                   return (
                     <div key={user.id} style={cardStyle}>
                       <div style={{ flex: 1 }}>
@@ -163,28 +169,22 @@ export default function AdminUsers() {
                         {user.email && <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{user.email}</div>}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        {showRoleSelect ? (
-                          <select
-                            value={user.field_role ?? 'member'}
-                            onChange={e => handleRoleChange(user.id, e.target.value as UserFieldRole)}
+                        {user.field_role && (
+                          <span
+                            onClick={() => toggleable && !isToggling && handleRoleToggle(user.id, user.field_role!)}
+                            title={toggleable ? 'タップして切り替え' : undefined}
                             style={{
-                              fontSize: 12, padding: '4px 6px', borderRadius: 6,
-                              border: '1px solid #ddd', background: '#fff', cursor: 'pointer',
-                              color: ROLE_COLOR[user.field_role ?? 'member'],
-                              fontWeight: 600,
+                              fontSize: 11, padding: '3px 9px', borderRadius: 20, fontWeight: 600,
+                              background: ROLE_COLOR[user.field_role] + '22',
+                              color: ROLE_COLOR[user.field_role],
+                              cursor: toggleable ? 'pointer' : 'default',
+                              opacity: isToggling ? 0.5 : 1,
+                              border: toggleable ? `1px solid ${ROLE_COLOR[user.field_role]}55` : '1px solid transparent',
+                              transition: 'opacity 0.15s',
                             }}
                           >
-                            <option value="manager">マネージャー</option>
-                            <option value="member">メンバー</option>
-                          </select>
-                        ) : (
-                          user.field_role && (
-                            <span style={{
-                              fontSize: 11, padding: '2px 8px', borderRadius: 20,
-                              background: ROLE_COLOR[user.field_role] + '22',
-                              color: ROLE_COLOR[user.field_role], fontWeight: 600,
-                            }}>{ROLE_LABEL[user.field_role]}</span>
-                          )
+                            {isToggling ? '…' : ROLE_LABEL[user.field_role]}
+                          </span>
                         )}
                         {showDelete && (
                           <button
@@ -260,10 +260,10 @@ function UserInviteModal({ manageableFields, onClose, onSaved }: {
     }))
   }
 
-  const setRole = (fieldId: number, role: UserFieldRole) => {
+  const toggleRole = (fieldId: number) => {
     setFieldSelections(prev => ({
       ...prev,
-      [fieldId]: { ...prev[fieldId], role }
+      [fieldId]: { ...prev[fieldId], role: prev[fieldId].role === 'manager' ? 'member' : 'manager' }
     }))
   }
 
@@ -343,19 +343,19 @@ function UserInviteModal({ manageableFields, onClose, onSaved }: {
                       </span>
                     )}
                   </div>
-                  <select
-                    value={sel.role}
-                    onChange={e => setRole(field.id, e.target.value as UserFieldRole)}
-                    disabled={!sel.checked}
+                  <span
+                    onClick={() => sel.checked && toggleRole(field.id)}
                     style={{
-                      fontSize: 12, padding: '3px 6px', borderRadius: 6,
-                      border: '1px solid #ddd', background: '#fff',
-                      opacity: sel.checked ? 1 : 0.4,
+                      fontSize: 11, padding: '3px 9px', borderRadius: 20, fontWeight: 600,
+                      background: sel.checked ? ROLE_COLOR[sel.role] + '22' : '#eee',
+                      color: sel.checked ? ROLE_COLOR[sel.role] : '#bbb',
+                      border: sel.checked ? `1px solid ${ROLE_COLOR[sel.role]}55` : '1px solid transparent',
+                      cursor: sel.checked ? 'pointer' : 'default',
+                      transition: 'all 0.15s',
                     }}
                   >
-                    <option value="manager">マネージャー</option>
-                    <option value="member">メンバー</option>
-                  </select>
+                    {ROLE_LABEL[sel.role]}
+                  </span>
                 </div>
               )
             })}
