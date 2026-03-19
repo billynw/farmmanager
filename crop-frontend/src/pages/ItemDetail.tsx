@@ -64,11 +64,13 @@ export default function ItemDetail() {
           {logs.map(log => (
             <LogCard 
               key={log.id} 
-              log={log} 
+              log={log}
+              itemId={itemId}
               onDelete={() => {
                 if (confirm('この記録を削除しますか？')) deleteLog.mutate(log.id)
               }}
               onImageClick={setModalImage}
+              onEdit={() => navigate(`/items/${itemId}/log/${log.id}/edit`)}
             />
           ))}
         </div>
@@ -129,7 +131,13 @@ export default function ItemDetail() {
   )
 }
 
-function LogCard({ log, onDelete, onImageClick }: { log: WorkLog; onDelete: () => void; onImageClick: (url: string) => void }) {
+function LogCard({ log, itemId, onDelete, onImageClick, onEdit }: { 
+  log: WorkLog; 
+  itemId: number;
+  onDelete: () => void; 
+  onImageClick: (url: string) => void;
+  onEdit: () => void;
+}) {
   const dt = new Date(log.worked_at)
   const dateStr = `${dt.getFullYear()}/${dt.getMonth()+1}/${dt.getDate()} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`
   const color = log.work_type?.color ?? '#888'
@@ -137,7 +145,7 @@ function LogCard({ log, onDelete, onImageClick }: { log: WorkLog; onDelete: () =
   return (
     <div style={{ background: '#fff', borderRadius: 12, padding: '12px 14px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', borderLeft: `4px solid ${color}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 1 }}>
           {log.work_type && (
             <span style={{ fontSize: 12, background: color + '22', color, padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>
               {log.work_type.name}
@@ -145,7 +153,10 @@ function LogCard({ log, onDelete, onImageClick }: { log: WorkLog; onDelete: () =
           )}
           <span style={{ fontSize: 12, color: '#999' }}>{dateStr}</span>
         </div>
-        <button onClick={onDelete} style={{ background: 'none', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: 16 }}>×</button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={onEdit} style={{ background: 'none', border: 'none', color: '#2d7a4f', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>編集</button>
+          <button onClick={onDelete} style={{ background: 'none', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: 16 }}>×</button>
+        </div>
       </div>
       {log.memo && <p style={{ margin: '8px 0 0', fontSize: 14, color: '#333', lineHeight: 1.5 }}>{log.memo}</p>}
       {log.agro_inputs.length > 0 && (
