@@ -88,15 +88,21 @@ export const itemsApi = {
 export const workLogsApi = {
   list: (params?: { item_id?: number; limit?: number; offset?: number }) =>
     api.get<WorkLog[]>('/work-logs', { params }),
+  get: (id: number) => api.get<WorkLog>(`/work-logs/${id}`),
   create: (data: {
     item_id: number; work_type_id?: number; worked_at?: string
     memo?: string; agro_inputs?: Omit<AgroInput, 'id'>[]
   }) => api.post<WorkLog>('/work-logs', data),
+  update: (id: number, data: {
+    item_id: number; work_type_id?: number; worked_at?: string
+    memo?: string; agro_inputs?: Omit<AgroInput, 'id'>[]
+  }) => api.put<WorkLog>(`/work-logs/${id}`, data),
   uploadPhoto: (log_id: number, file: File) => {
     const form = new FormData()
     form.append('file', file)
     return api.post<Photo>(`/work-logs/${log_id}/photos`, form)
   },
+  deletePhoto: (log_id: number, photo_id: number) => api.delete(`/work-logs/${log_id}/photos/${photo_id}`),
   delete: (id: number) => api.delete(`/work-logs/${id}`),
 }
 

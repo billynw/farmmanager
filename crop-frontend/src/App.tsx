@@ -7,6 +7,7 @@ import ItemList from './pages/ItemList'
 import ItemDetail from './pages/ItemDetail'
 import ItemForm from './pages/ItemForm'
 import WorkLogNew from './pages/WorkLogNew'
+import WorkLogEdit from './pages/WorkLogEdit'
 import Harvests from './pages/Harvests'
 
 const qc = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000 } } })
@@ -31,6 +32,7 @@ export default function App() {
           <Route path="/items/:id" element={<RequireAuth><ItemDetail /></RequireAuth>} />
           <Route path="/items/:id/edit" element={<RequireAuth><ItemForm /></RequireAuth>} />
           <Route path="/items/:id/log/new" element={<RequireAuth><WorkLogNew /></RequireAuth>} />
+          <Route path="/items/:id/log/:logId/edit" element={<RequireAuth><WorkLogEdit /></RequireAuth>} />
           <Route path="/items/:id/harvests" element={<RequireAuth><Harvests /></RequireAuth>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
