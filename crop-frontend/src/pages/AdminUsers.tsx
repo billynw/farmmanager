@@ -19,6 +19,14 @@ const ROLE_COLOR: Record<UserFieldRole, string> = {
   member: '#888',
 }
 
+// managerはoownerを削除できない
+function canDelete(myRole: UserFieldRole | undefined, targetRole: UserFieldRole | undefined): boolean {
+  if (!myRole) return false
+  if (myRole === 'owner') return true
+  if (myRole === 'manager') return targetRole !== 'owner'
+  return false
+}
+
 export default function AdminUsers() {
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -31,6 +39,9 @@ export default function AdminUsers() {
 
   const { data: fields = [] } = useQuery({ queryKey: ['fields'], queryFn: () => fieldsApi.list().then(r => r.data) })
   const manageableFields = fields.filter(f => f.my_role === 'owner' || f.my_role === 'manager')
+
+  // 選択中の圃場での自分のロール
+  const myRoleInSelectedField = manageableFields.find(f => f.id === selectedFieldId)?.my_role
 
   const { data: fieldUsers = [], refetch: refetchUsers } = useQuery({
     queryKey: ['fieldUsers', selectedFieldId],
@@ -126,23 +137,35 @@ export default function AdminUsers() {
                 </select>
               </div>
               <div style={{ padding: '12px 16px', overflowY: 'auto', flex: 1 }}>
-                {fieldUsers.map(user => (
-                  <div key={user.id} style={cardStyle}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, fontSize: 15 }}>{user.name}</div>
-                      {user.email && <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{user.email}</div>}
+                {fieldUsers.map(user => {
+                  const showDelete = user.id !== currentUser?.id && canDelete(myRoleInSelectedField, user.field_role)
+                  return (
+                    <div key={user.id} style={cardStyle}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontWeight: 600, fontSize: 15 }}>{user.name}</span>
+                          {user.field_role && (
+                            <span style={{
+                              fontSize: 11, padding: '1px 7px', borderRadius: 20,
+                              background: ROLE_COLOR[user.field_role] + '22',
+                              color: ROLE_COLOR[user.field_role], fontWeight: 600,
+                            }}>{ROLE_LABEL[user.field_role]}</span>
+                          )}
+                        </div>
+                        {user.email && <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{user.email}</div>}
+                      </div>
+                      {showDelete && (
+                        <button
+                          style={{ ...smallBtnStyle, color: '#c0392b', borderColor: '#c0392b' }}
+                          onClick={() => {
+                            if (selectedFieldId && confirm(`${user.name}をこの圃場から削除しますか？`))
+                              usersApi.removeFromField(user.id, selectedFieldId).then(() => refetchUsers())
+                          }}
+                        >削除</button>
+                      )}
                     </div>
-                    {user.id !== currentUser?.id && (
-                      <button
-                        style={{ ...smallBtnStyle, color: '#c0392b', borderColor: '#c0392b' }}
-                        onClick={() => {
-                          if (selectedFieldId && confirm(`${user.name}をこの圃場から削除しますか？`))
-                            usersApi.removeFromField(user.id, selectedFieldId).then(() => refetchUsers())
-                        }}
-                      >削除</button>
-                    )}
-                  </div>
-                ))}
+                  )
+                })}
                 {fieldUsers.length === 0 && (
                   <p style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>ユーザーがいません</p>
                 )}
