@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import select
 from typing import List, Optional
 from database import get_db
 import models, schemas
@@ -48,7 +49,18 @@ def list_items(
     q = db.query(models.Item).options(joinedload(models.Item.field))
     if field_id: q = q.filter(models.Item.field_id == field_id)
     if status: q = q.filter(models.Item.status == status)
-    return q.order_by(models.Item.name).all()
+    items = q.order_by(models.Item.name).all()
+    
+    # 各アイテムの最新作業ログを取得
+    for item in items:
+        latest_log = db.query(models.WorkLog).filter(
+            models.WorkLog.item_id == item.id
+        ).options(
+            joinedload(models.WorkLog.work_type)
+        ).order_by(models.WorkLog.worked_at.desc()).first()
+        item.latest_work_log = latest_log
+    
+    return items
 
 @router.get("/items/{item_id}", response_model=schemas.ItemOut)
 def get_item(item_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):

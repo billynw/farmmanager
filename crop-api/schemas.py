@@ -38,24 +38,6 @@ class WorkTypeOut(WorkTypeCreate):
     id: int
     model_config = {"from_attributes": True}
 
-# --- Item ---
-class ItemCreate(BaseModel):
-    name: str
-    variety: Optional[str] = None
-    field_id: Optional[int] = None
-    planted_at: Optional[date] = None
-    status: ItemStatus = ItemStatus.growing
-
-class ItemOut(BaseModel):
-    id: int
-    name: str
-    variety: Optional[str]
-    field_id: Optional[int]
-    planted_at: Optional[date]
-    status: ItemStatus
-    field: Optional[FieldOut] = None
-    model_config = {"from_attributes": True}
-
 # --- AgroInput ---
 class AgroInputCreate(BaseModel):
     product_name: str
@@ -72,6 +54,33 @@ class PhotoOut(BaseModel):
     id: int
     file_path: str
     taken_at: Optional[datetime]
+    model_config = {"from_attributes": True}
+
+# --- WorkLog (簡易版 - ItemOutで使用) ---
+class WorkLogSimple(BaseModel):
+    id: int
+    worked_at: datetime
+    memo: Optional[str]
+    work_type: Optional[WorkTypeOut] = None
+    model_config = {"from_attributes": True}
+
+# --- Item ---
+class ItemCreate(BaseModel):
+    name: str
+    variety: Optional[str] = None
+    field_id: Optional[int] = None
+    planted_at: Optional[date] = None
+    status: ItemStatus = ItemStatus.growing
+
+class ItemOut(BaseModel):
+    id: int
+    name: str
+    variety: Optional[str]
+    field_id: Optional[int]
+    planted_at: Optional[date]
+    status: ItemStatus
+    field: Optional[FieldOut] = None
+    latest_work_log: Optional[WorkLogSimple] = None
     model_config = {"from_attributes": True}
 
 # --- WorkLog ---
