@@ -1,0 +1,24 @@
+[Unit]
+Description=CropWorks FastAPI
+After=network.target mariadb.service
+
+[Service]
+Type=simple
+User=cropworks
+Group=cropworks
+WorkingDirectory=/opt/cropworks
+EnvironmentFile=/opt/cropworks/.env
+ExecStart=/opt/cropworks/venv/bin/uvicorn main:app \
+    --host 127.0.0.1 \
+    --port 8000 \
+    --workers 2
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/cropworks/app.log
+StandardError=append:/var/log/cropworks/error.log
+# ファイル・ネットワーク保護
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
