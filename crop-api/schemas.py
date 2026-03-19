@@ -1,6 +1,6 @@
 from datetime import datetime, date
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from models import UserRole, ItemStatus
 
 # --- Auth ---
@@ -12,12 +12,31 @@ class LoginRequest(BaseModel):
     name: str
     password: str
 
+class PasswordResetRequest(BaseModel):
+    email: str
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    new_password: str
+
 # --- User ---
 class UserOut(BaseModel):
     id: int
     name: str
+    email: Optional[str] = None
     role: UserRole
     model_config = {"from_attributes": True}
+
+class UserCreate(BaseModel):
+    name: str
+    email: Optional[str] = None
+    password: str
+    role: UserRole = UserRole.member
+
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    role: Optional[UserRole] = None
 
 # --- Field ---
 class FieldCreate(BaseModel):
