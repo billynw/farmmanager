@@ -13,12 +13,9 @@ export default function AdminUsers() {
   const currentUser = useAuth((s) => s.user)
   const [tab, setTab] = useState<Tab>('users')
 
-  // --- User state ---
   const [showUserForm, setShowUserForm] = useState(false)
   const [editUser, setEditUser] = useState<User | null>(null)
   const [showFieldModal, setShowFieldModal] = useState<User | null>(null)
-
-  // --- Field state ---
   const [showFieldForm, setShowFieldForm] = useState(false)
   const [editField, setEditField] = useState<Field | null>(null)
 
@@ -41,7 +38,6 @@ export default function AdminUsers() {
 
   return (
     <div style={pageStyle}>
-      {/* ヘッダー */}
       <div style={headerStyle}>
         <button onClick={() => navigate('/')} style={backBtnStyle}>← 戻る</button>
         <span style={{ fontWeight: 700, fontSize: 16 }}>管理メニュー</span>
@@ -51,7 +47,6 @@ export default function AdminUsers() {
         }}>＋ 追加</button>
       </div>
 
-      {/* タブ */}
       <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #eee' }}>
         {(['users', 'fields'] as Tab[]).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
@@ -65,7 +60,6 @@ export default function AdminUsers() {
         ))}
       </div>
 
-      {/* ユーザータブ */}
       {tab === 'users' && (
         <div style={{ padding: '12px 16px', overflowY: 'auto', flex: 1 }}>
           {users.map(user => (
@@ -94,7 +88,6 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {/* 圃場タブ */}
       {tab === 'fields' && (
         <div style={{ padding: '12px 16px', overflowY: 'auto', flex: 1 }}>
           {fields.length === 0 && (
@@ -122,7 +115,6 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {/* ユーザー追加/編集モーダル */}
       {showUserForm && (
         <UserFormModal
           user={editUser}
@@ -131,7 +123,6 @@ export default function AdminUsers() {
         />
       )}
 
-      {/* 圃場追加/編集モーダル */}
       {showFieldForm && (
         <FieldFormModal
           field={editField}
@@ -140,7 +131,6 @@ export default function AdminUsers() {
         />
       )}
 
-      {/* 圃場紐づけモーダル */}
       {showFieldModal && (
         <FieldAssignModal
           user={showFieldModal}
@@ -152,14 +142,14 @@ export default function AdminUsers() {
   )
 }
 
-// --- ユーザー追加/編集モーダル ---
+// --- ユーザー招待/編集モーダル ---
 function UserFormModal({ user, onClose, onSaved }: { user: User | null; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(user?.name ?? '')
   const [email, setEmail] = useState(user?.email ?? '')
-  const [password, setPassword] = useState('')
   const [role, setRole] = useState<UserRole>(user?.role ?? 'member')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [invited, setInvited] = useState(false)
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -167,10 +157,11 @@ function UserFormModal({ user, onClose, onSaved }: { user: User | null; onClose:
     try {
       if (user) {
         await usersApi.update(user.id, { name, email: email || undefined, role })
+        onSaved()
       } else {
-        await usersApi.create({ name, email: email || undefined, password, role })
+        await usersApi.invite({ name, email, role })
+        setInvited(true)
       }
-      onSaved()
     } catch (err: any) {
       setError(err.response?.data?.detail ?? '保存に失敗しました')
     } finally {
@@ -178,26 +169,47 @@ function UserFormModal({ user, onClose, onSaved }: { user: User | null; onClose:
     }
   }
 
+  if (invited) {
+    return (
+      <div style={overlayStyle} onClick={onClose}>
+        <div style={modalStyle} onClick={e => e.stopPropagation()}>
+          <p style={{ color: '#2d7a4f', fontWeight: 600, marginBottom: 8 }}>📧 招待メールを送信しました</p>
+          <p style={{ color: '#666', fontSize: 14, marginBottom: 20, lineHeight: 1.6 }}>
+            <strong>{email}</strong> にパスワード設定リンクを送りました。<br />
+            ユーザーがリンクを踏んで登録を完了すると一覧に表示されます。
+          </p>
+          <button style={btnStyle} onClick={onSaved}>閉じる</button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={modalStyle} onClick={e => e.stopPropagation()}>
-        <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700 }}>
-          {user ? 'ユーザー編集' : 'ユーザー追加'}
+        <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700 }}>
+          {user ? 'ユーザー編集' : 'ユーザー招待'}
         </h3>
+        {!user && (
+          <p style={{ color: '#888', fontSize: 13, marginBottom: 16 }}>
+            メールアドレスにパスワード設定用のリンクを送ります。
+          </p>
+        )}
         {error && <p style={{ color: '#c0392b', fontSize: 13, marginBottom: 10 }}>{error}</p>}
         <form onSubmit={submit}>
           <label style={labelStyle}>ユーザー名 <span style={{ color: '#c0392b' }}>*</span></label>
           <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} required />
-          <label style={{ ...labelStyle, marginTop: 12 }}>メールアドレス</label>
-          <input style={inputStyle} type="email" value={email} onChange={e => setEmail(e.target.value)}
-            placeholder="password reset用（任意）" />
-          {!user && (
-            <>
-              <label style={{ ...labelStyle, marginTop: 12 }}>パスワード <span style={{ color: '#c0392b' }}>*</span></label>
-              <input style={inputStyle} type="password" value={password} onChange={e => setPassword(e.target.value)}
-                required minLength={6} placeholder="6文字以上" />
-            </>
-          )}
+          <label style={{ ...labelStyle, marginTop: 12 }}>
+            メールアドレス {!user && <span style={{ color: '#c0392b' }}>*</span>}
+          </label>
+          <input
+            style={inputStyle}
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            required={!user}
+            placeholder={user ? '変更する場合のみ入力' : 'example@email.com'}
+          />
           <label style={{ ...labelStyle, marginTop: 12 }}>権限</label>
           <select style={inputStyle} value={role} onChange={e => setRole(e.target.value as UserRole)}>
             <option value="member">メンバー</option>
@@ -206,7 +218,7 @@ function UserFormModal({ user, onClose, onSaved }: { user: User | null; onClose:
           <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
             <button type="button" style={{ ...btnStyle, background: '#eee', color: '#444' }} onClick={onClose}>キャンセル</button>
             <button type="submit" style={{ ...btnStyle, opacity: loading ? 0.6 : 1 }} disabled={loading}>
-              {loading ? '保存中...' : '保存'}
+              {loading ? '送信中...' : user ? '保存' : '招待メールを送る'}
             </button>
           </div>
         </form>

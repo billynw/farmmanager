@@ -35,10 +35,10 @@ class UserOut(BaseModel):
     role: UserRole
     model_config = {"from_attributes": True}
 
-class UserCreate(BaseModel):
+class UserInvite(BaseModel):
+    """管理者がメンバーを招待する際の入力"""
     name: str
-    email: Optional[str] = None
-    password: str
+    email: str
     role: UserRole = UserRole.member
 
 class UserUpdate(BaseModel):

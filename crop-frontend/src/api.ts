@@ -61,7 +61,6 @@ export interface Harvest {
 
 // --- API calls ---
 export const authApi = {
-  // メールアドレス + パスワードでログイン
   login: (email: string, password: string) =>
     api.post<{ access_token: string }>('/auth/login', { email, password }),
   me: () => api.get<User>('/auth/me'),
@@ -77,7 +76,8 @@ export const authApi = {
 
 export const usersApi = {
   list: () => api.get<User[]>('/users'),
-  create: (data: { name: string; email?: string; password: string; role: UserRole }) =>
+  // 招待：メールでパスワード設定リンクを送信
+  invite: (data: { name: string; email: string; role: UserRole }) =>
     api.post<User>('/users', data),
   update: (id: number, data: { name?: string; email?: string; role?: UserRole }) =>
     api.put<User>(`/users/${id}`, data),
