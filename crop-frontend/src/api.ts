@@ -74,6 +74,7 @@ export const itemsApi = {
   get: (id: number) => api.get<Item>(`/items/${id}`),
   create: (data: Omit<Item, 'id' | 'field'>) => api.post<Item>('/items', data),
   update: (id: number, data: Omit<Item, 'id' | 'field'>) => api.put<Item>(`/items/${id}`, data),
+  delete: (id: number) => api.delete(`/items/${id}`),
 }
 
 export const workLogsApi = {

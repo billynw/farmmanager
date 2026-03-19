@@ -11,6 +11,7 @@ export default function ItemDetail() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [modalImage, setModalImage] = useState<string | null>(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   const { data: item } = useQuery({ queryKey: ['item', itemId], queryFn: () => itemsApi.get(itemId).then(r => r.data) })
   const { data: logs = [], isLoading } = useQuery({
@@ -21,6 +22,14 @@ export default function ItemDetail() {
   const deleteLog = useMutation({
     mutationFn: workLogsApi.delete,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['work-logs', itemId] }),
+  })
+
+  const deleteItem = useMutation({
+    mutationFn: itemsApi.delete,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['items'] })
+      navigate('/')
+    },
   })
 
   if (!item) return <div style={{ padding: 24, color: '#888' }}>読み込み中...</div>
@@ -38,6 +47,7 @@ export default function ItemDetail() {
           </div>
         </div>
         <button onClick={() => navigate(`/items/${itemId}/edit`)} style={smallBtnStyle}>編集</button>
+        <button onClick={() => setShowDeleteModal(true)} style={{...smallBtnStyle, color: '#d32f2f', borderColor: '#d32f2f'}}>削除</button>
       </div>
 
       {/* タブライン */}
@@ -85,6 +95,33 @@ export default function ItemDetail() {
             >
               ×
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 削除確認モーダル */}
+      {showDeleteModal && (
+        <div style={modalOverlayStyle} onClick={() => setShowDeleteModal(false)}>
+          <div style={deleteModalStyle} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 12px', fontSize: 18, fontWeight: 600 }}>作物を削除</h3>
+            <p style={{ margin: '0 0 20px', fontSize: 14, color: '#666', lineHeight: 1.6 }}>
+              「{item.name}」を削除しますか？<br />
+              <strong style={{ color: '#d32f2f' }}>この作物に紐づくすべての作業ログと収穫記録も削除されます。</strong>
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button 
+                style={{ flex: 1, padding: '12px', border: '1px solid #ddd', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 14 }}
+                onClick={() => setShowDeleteModal(false)}
+              >
+                キャンセル
+              </button>
+              <button 
+                style={{ flex: 1, padding: '12px', border: 'none', borderRadius: 8, background: '#d32f2f', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
+                onClick={() => deleteItem.mutate(itemId)}
+              >
+                削除する
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -191,4 +228,12 @@ const modalCloseStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   lineHeight: 1,
+}
+
+const deleteModalStyle: React.CSSProperties = {
+  background: '#fff',
+  borderRadius: 12,
+  padding: 24,
+  maxWidth: 400,
+  width: '90%',
 }
