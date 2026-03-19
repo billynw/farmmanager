@@ -23,7 +23,7 @@ api.interceptors.response.use(
 export type UserRole = 'admin' | 'member'
 export type ItemStatus = 'growing' | 'finished'
 
-export interface User { id: number; name: string; role: UserRole }
+export interface User { id: number; name: string; email?: string; role: UserRole }
 export interface Field { id: number; name: string; area?: number; location_note?: string }
 export interface WorkType { id: number; name: string; color: string }
 
@@ -64,6 +64,23 @@ export const authApi = {
   login: (name: string, password: string) =>
     api.post<{ access_token: string }>('/auth/login', { name, password }),
   me: () => api.get<User>('/auth/me'),
+  requestPasswordReset: (email: string) =>
+    api.post('/auth/password-reset/request', { email }),
+  confirmPasswordReset: (token: string, new_password: string) =>
+    api.post('/auth/password-reset/confirm', { token, new_password }),
+}
+
+export const usersApi = {
+  list: () => api.get<User[]>('/users'),
+  create: (data: { name: string; email?: string; password: string; role: UserRole }) =>
+    api.post<User>('/users', data),
+  update: (id: number, data: { name?: string; email?: string; role?: UserRole }) =>
+    api.put<User>(`/users/${id}`, data),
+  delete: (id: number) => api.delete(`/users/${id}`),
+  assignField: (field_id: number, user_id: number) =>
+    api.post(`/fields/${field_id}/users/${user_id}`),
+  removeField: (field_id: number, user_id: number) =>
+    api.delete(`/fields/${field_id}/users/${user_id}`),
 }
 
 export const fieldsApi = {

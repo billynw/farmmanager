@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../store'
 import logoImg from '../assets/logo.png'
 
@@ -41,6 +41,11 @@ export default function Login() {
             {loading ? 'ログイン中...' : 'ログイン'}
           </button>
         </form>
+        <div style={{ textAlign: 'center', marginTop: 16 }}>
+          <Link to="/forgot-password" style={{ fontSize: 13, color: '#2d7a4f', textDecoration: 'none' }}>
+            パスワードをお忘れですか？
+          </Link>
+        </div>
       </div>
     </div>
   )

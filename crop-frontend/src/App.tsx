@@ -3,12 +3,15 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useAuth } from './store'
 import Login from './pages/Login'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 import ItemList from './pages/ItemList'
 import ItemDetail from './pages/ItemDetail'
 import ItemForm from './pages/ItemForm'
 import WorkLogNew from './pages/WorkLogNew'
 import WorkLogEdit from './pages/WorkLogEdit'
 import Harvests from './pages/Harvests'
+import AdminUsers from './pages/AdminUsers'
 
 const qc = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000 } } })
 
@@ -27,7 +30,10 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/" element={<RequireAuth><ItemList /></RequireAuth>} />
+          <Route path="/admin/users" element={<RequireAuth><AdminUsers /></RequireAuth>} />
           <Route path="/items/new" element={<RequireAuth><ItemForm /></RequireAuth>} />
           <Route path="/items/:id" element={<RequireAuth><ItemDetail /></RequireAuth>} />
           <Route path="/items/:id/edit" element={<RequireAuth><ItemForm /></RequireAuth>} />
