@@ -8,6 +8,7 @@ interface AuthState {
   login: (name: string, password: string) => Promise<void>
   logout: () => void
   init: () => Promise<void>
+  setToken: (token: string) => Promise<void>
 }
 
 export const useAuth = create<AuthState>((set) => ({
@@ -37,5 +38,13 @@ export const useAuth = create<AuthState>((set) => ({
       localStorage.removeItem('token')
       set({ token: null })
     }
+  },
+
+  // 登録完了後にそのままログイン状態にする
+  setToken: async (token: string) => {
+    localStorage.setItem('token', token)
+    set({ token })
+    const me = await authApi.me()
+    set({ user: me.data })
   },
 }))
