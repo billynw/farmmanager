@@ -88,6 +88,7 @@ export const fieldsApi = {
   list: () => api.get<Field[]>('/fields'),
   create: (data: Omit<Field, 'id'>) => api.post<Field>('/fields', data),
   update: (id: number, data: Omit<Field, 'id'>) => api.put<Field>(`/fields/${id}`, data),
+  delete: (id: number) => api.delete(`/fields/${id}`),
 }
 
 export const workTypesApi = {
