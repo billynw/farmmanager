@@ -9,7 +9,7 @@ class Token(BaseModel):
     token_type: str
 
 class LoginRequest(BaseModel):
-    name: str
+    email: str
     password: str
 
 class PasswordResetRequest(BaseModel):

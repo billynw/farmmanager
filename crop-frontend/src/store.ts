@@ -5,7 +5,7 @@ import type { User } from './api'
 interface AuthState {
   user: User | null
   token: string | null
-  login: (name: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<void>
   logout: () => void
   init: () => Promise<void>
   setToken: (token: string) => Promise<void>
@@ -15,8 +15,9 @@ export const useAuth = create<AuthState>((set) => ({
   user: null,
   token: localStorage.getItem('token'),
 
-  login: async (name, password) => {
-    const { data } = await authApi.login(name, password)
+  // メールアドレス + パスワードでログイン
+  login: async (email, password) => {
+    const { data } = await authApi.login(email, password)
     localStorage.setItem('token', data.access_token)
     set({ token: data.access_token })
     const me = await authApi.me()

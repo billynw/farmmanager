@@ -32,9 +32,13 @@ def send_email(to: str, subject: str, body: str):
 
 @router.post("/login", response_model=schemas.Token)
 def login(req: schemas.LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.name == req.name).first()
+    """メールアドレス + パスワードでログイン"""
+    user = db.query(models.User).filter(models.User.email == req.email).first()
     if not user or not verify_password(req.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="メールアドレスまたはパスワードが違います"
+        )
     return {"access_token": create_access_token(user.id, user.role), "token_type": "bearer"}
 
 
@@ -47,15 +51,12 @@ def me(current_user=Depends(get_current_user)):
 
 @router.post("/register")
 def register(req: schemas.RegisterRequest, db: Session = Depends(get_db)):
-    """ユーザー名・メールアドレスを受け付けて確認メールを送信"""
-    # ユーザー名の重複チェック
-    if db.query(models.User).filter(models.User.name == req.name).first():
-        raise HTTPException(400, "このユーザー名はすでに使われています")
+    """メールアドレスをキーに仮登録して確認メールを送信"""
     # メールアドレスの重複チェック（本登録済み）
     if db.query(models.User).filter(models.User.email == req.email).first():
         raise HTTPException(400, "このメールアドレスはすでに登録されています")
 
-    # 既存の仮登録があれば上書き
+    # 既存の仮登録があれば上書き（再送信対応）
     existing = db.query(models.EmailVerification).filter(
         models.EmailVerification.email == req.email
     ).first()
@@ -90,7 +91,7 @@ def register(req: schemas.RegisterRequest, db: Session = Depends(get_db)):
 
 @router.post("/verify-email", response_model=schemas.Token)
 def verify_email(req: schemas.VerifyEmailRequest, db: Session = Depends(get_db)):
-    """トークンを検証してパスワードを設定し本登録完了 → JWTを返してそのままログイン"""
+    """トークンを検証してパスワードを設定し本登録完了 → JWTを返しそのままログイン"""
     verification = db.query(models.EmailVerification).filter(
         models.EmailVerification.token == req.token,
         models.EmailVerification.used == False,
@@ -115,7 +116,6 @@ def verify_email(req: schemas.VerifyEmailRequest, db: Session = Depends(get_db))
     db.commit()
     db.refresh(user)
 
-    # そのままログイン状態にする
     return {"access_token": create_access_token(user.id, user.role), "token_type": "bearer"}
 
 

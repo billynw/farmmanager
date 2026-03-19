@@ -61,8 +61,9 @@ export interface Harvest {
 
 // --- API calls ---
 export const authApi = {
-  login: (name: string, password: string) =>
-    api.post<{ access_token: string }>('/auth/login', { name, password }),
+  // メールアドレス + パスワードでログイン
+  login: (email: string, password: string) =>
+    api.post<{ access_token: string }>('/auth/login', { email, password }),
   me: () => api.get<User>('/auth/me'),
   register: (name: string, email: string) =>
     api.post('/auth/register', { name, email }),

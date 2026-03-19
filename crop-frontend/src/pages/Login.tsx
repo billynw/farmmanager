@@ -4,7 +4,7 @@ import { useAuth } from '../store'
 import logoImg from '../assets/logo.png'
 
 export default function Login() {
-  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -15,10 +15,10 @@ export default function Login() {
     e.preventDefault()
     setError(''); setLoading(true)
     try {
-      await login(name, password)
+      await login(email, password)
       navigate('/')
     } catch {
-      setError('ユーザー名またはパスワードが違います')
+      setError('メールアドレスまたはパスワードが違います')
     } finally {
       setLoading(false)
     }
@@ -33,10 +33,24 @@ export default function Login() {
         <p style={{ color: '#666', marginBottom: 24, fontSize: 14 }}>農作物管理システム</p>
         {error && <p style={{ color: '#c0392b', fontSize: 14, marginBottom: 12 }}>{error}</p>}
         <form onSubmit={submit}>
-          <label style={labelStyle}>ユーザー名</label>
-          <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} autoComplete="username" required />
+          <label style={labelStyle}>メールアドレス</label>
+          <input
+            style={inputStyle}
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            autoComplete="email"
+            required
+          />
           <label style={{ ...labelStyle, marginTop: 12 }}>パスワード</label>
-          <input style={inputStyle} type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" required />
+          <input
+            style={inputStyle}
+            type="password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            autoComplete="current-password"
+            required
+          />
           <button style={{ ...btnStyle, marginTop: 20, opacity: loading ? 0.6 : 1 }} type="submit" disabled={loading}>
             {loading ? 'ログイン中...' : 'ログイン'}
           </button>
