@@ -153,11 +153,6 @@ function UserFormModal({ user, onClose, onSaved }: { user: User | null; onClose:
 // --- 圃場紐づけモーダル ---
 function FieldAssignModal({ user, fields, onClose }: { user: User; fields: Field[]; onClose: () => void }) {
   const qc = useQueryClient()
-  const { data: allUsers = [] } = useQuery({ queryKey: ['users'], queryFn: () => usersApi.list().then(r => r.data) })
-
-  // バックエンドから圃場ごとのユーザーリストを取得する代わりに、
-  // admin は全圃場を見えるので fields から紐づけを管理する
-  // ここでは楽観的UIで toggle する
   const [assigned, setAssigned] = useState<Set<number>>(new Set())
   const [loading, setLoading] = useState(false)
 
