@@ -65,7 +65,6 @@ export default function ItemDetail() {
             <LogCard 
               key={log.id} 
               log={log}
-              itemId={itemId}
               onDelete={() => {
                 if (confirm('この記録を削除しますか？')) deleteLog.mutate(log.id)
               }}
@@ -131,9 +130,8 @@ export default function ItemDetail() {
   )
 }
 
-function LogCard({ log, itemId, onDelete, onImageClick, onEdit }: { 
+function LogCard({ log, onDelete, onImageClick, onEdit }: { 
   log: WorkLog; 
-  itemId: number;
   onDelete: () => void; 
   onImageClick: (url: string) => void;
   onEdit: () => void;
