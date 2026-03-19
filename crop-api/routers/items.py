@@ -16,26 +16,32 @@ def get_field_role(db: Session, user_id: int, field_id: int) -> Optional[models.
     return uf.role if uf else None
 
 
+def is_owner(db: Session, user_id: int, field_id: int) -> bool:
+    return get_field_role(db, user_id, field_id) == models.UserFieldRole.owner
+
+
+def is_owner_or_manager(db: Session, user_id: int, field_id: int) -> bool:
+    role = get_field_role(db, user_id, field_id)
+    return role in (models.UserFieldRole.owner, models.UserFieldRole.manager)
+
+
 # --- Fields ---
 @router.get("/fields", response_model=List[schemas.FieldOut])
 def list_fields(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    """\u81ea\u5206\u306b\u7d10\u3065\u3044\u305f\u5703\u5834\u306e\u307f\u8fd4\u3059\uff08role\u60c5\u5831\u4ed8\u304d\uff09"""
     result = []
     for uf in current_user.user_fields:
         field = uf.field
-        field_out = schemas.FieldOut(
+        result.append(schemas.FieldOut(
             id=field.id, name=field.name,
             area=float(field.area) if field.area else None,
             location_note=field.location_note,
             my_role=uf.role
-        )
-        result.append(field_out)
+        ))
     return result
 
 
 @router.post("/fields", response_model=schemas.FieldOut)
 def create_field(data: schemas.FieldCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    """\u5703\u5834\u4f5c\u6210\uff1a\u4f5c\u6210\u8005\u306f\u81ea\u52d5\u7684\u306b owner \u3068\u3057\u3066\u7d10\u3065\u304f"""
     field = models.Field(**data.model_dump())
     db.add(field)
     db.flush()
@@ -52,25 +58,25 @@ def create_field(data: schemas.FieldCreate, db: Session = Depends(get_db), curre
 
 @router.put("/fields/{field_id}", response_model=schemas.FieldOut)
 def update_field(field_id: int, data: schemas.FieldCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    """owner のみ編集可"""
+    if not is_owner(db, current_user.id, field_id):
+        raise HTTPException(403, "圃場のoownerのみ編集できます")
     field = db.get(models.Field, field_id)
     if not field: raise HTTPException(404, "Field not found")
-    role = get_field_role(db, current_user.id, field_id)
-    if role != models.UserFieldRole.owner:
-        raise HTTPException(403, "圃場のoownerのみ編集できます")
     for k, v in data.model_dump().items(): setattr(field, k, v)
     db.commit(); db.refresh(field)
     return schemas.FieldOut(
         id=field.id, name=field.name,
         area=float(field.area) if field.area else None,
         location_note=field.location_note,
-        my_role=role
+        my_role=models.UserFieldRole.owner
     )
 
 
 @router.delete("/fields/{field_id}")
 def delete_field(field_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    role = get_field_role(db, current_user.id, field_id)
-    if role != models.UserFieldRole.owner:
+    """owner のみ削除可"""
+    if not is_owner(db, current_user.id, field_id):
         raise HTTPException(403, "圃場のoownerのみ削除できます")
     field = db.get(models.Field, field_id)
     if not field: raise HTTPException(404, "Field not found")
@@ -81,7 +87,7 @@ def delete_field(field_id: int, db: Session = Depends(get_db), current_user: mod
     return {"ok": True}
 
 
-# --- ユーザーと圃場の紐づけ管理 (owner only) ---
+# --- ユーザーと圃場の紐づけ管理 (owner or manager) ---
 @router.post("/fields/{field_id}/users/{user_id}")
 def assign_user_to_field(
     field_id: int, user_id: int,
@@ -89,8 +95,9 @@ def assign_user_to_field(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    if get_field_role(db, current_user.id, field_id) != models.UserFieldRole.owner:
-        raise HTTPException(403, "圃場のoownerのみ操作できます")
+    """owner or manager のみ操作可"""
+    if not is_owner_or_manager(db, current_user.id, field_id):
+        raise HTTPException(403, "圃場のoownerまたはmanagerのみ操作できます")
     field = db.get(models.Field, field_id)
     if not field: raise HTTPException(404, "Field not found")
     user = db.get(models.User, user_id)
@@ -113,8 +120,9 @@ def remove_user_from_field(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    if get_field_role(db, current_user.id, field_id) != models.UserFieldRole.owner:
-        raise HTTPException(403, "圃場のoownerのみ操作できます")
+    """owner or manager のみ操作可"""
+    if not is_owner_or_manager(db, current_user.id, field_id):
+        raise HTTPException(403, "圃場のoownerまたはmanagerのみ操作できます")
     uf = db.query(models.UserField).filter(
         models.UserField.user_id == user_id,
         models.UserField.field_id == field_id

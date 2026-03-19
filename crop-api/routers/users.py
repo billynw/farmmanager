@@ -31,13 +31,14 @@ def send_email(to: str, subject: str, body: str):
         raise HTTPException(500, f"メール送信に失敗しました: {e}")
 
 
-def require_field_owner(field_id: int, current_user: models.User, db: Session):
+def require_owner_or_manager(field_id: int, current_user: models.User, db: Session):
+    """owner または manager のみユーザー管理操作可"""
     uf = db.query(models.UserField).filter(
         models.UserField.user_id == current_user.id,
         models.UserField.field_id == field_id
     ).first()
-    if not uf or uf.role != models.UserFieldRole.owner:
-        raise HTTPException(403, "圃場のownerのみ操作できます")
+    if not uf or uf.role not in (models.UserFieldRole.owner, models.UserFieldRole.manager):
+        raise HTTPException(403, "圃場のoownerまたはmanagerのみ操作できます")
 
 
 @router.get("", response_model=List[schemas.UserOut])
@@ -46,8 +47,8 @@ def list_users(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    """指定圃場のユーザー一覧（この圃場の owner のみ利用可）"""
-    require_field_owner(field_id, current_user, db)
+    """指定圃場のユーザー一覧（owner or manager のみ）"""
+    require_owner_or_manager(field_id, current_user, db)
     user_fields = db.query(models.UserField).filter(models.UserField.field_id == field_id).all()
     return [uf.user for uf in user_fields]
 
@@ -58,15 +59,13 @@ def invite_user(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    """複数圃場へユーザーを一括招待。登録済みなら即座に紐づけ、未登録ならメール送信"""
+    """複数圃場へユーザーを一括招待（owner or manager のみ）"""
     if not data.fields:
         raise HTTPException(400, "圃場を少なくとも1つ選択してください")
 
-    # 全圃場のoowner権限を確認
     for fi in data.fields:
-        require_field_owner(fi.field_id, current_user, db)
+        require_owner_or_manager(fi.field_id, current_user, db)
 
-    # 登録済みユーザーの場合 → 全圃場に即座に紐づけ
     existing_user = db.query(models.User).filter(models.User.email == data.email).first()
     if existing_user:
         for fi in data.fields:
@@ -85,7 +84,6 @@ def invite_user(
         db.commit()
         return existing_user
 
-    # 未登録の場合 → email_verifications をチェック
     if db.query(models.EmailVerification).filter(
         models.EmailVerification.email == data.email,
         models.EmailVerification.used == False,
@@ -93,16 +91,10 @@ def invite_user(
     ).first():
         raise HTTPException(400, "このメールアドレスはメール確認待ちです")
 
-    # 圃場ごとに招待トークンを作成しメール送信（1通のメールにまとめる）
-    # 圃場ごとに別々のトークンを作成（accept-inviteで圃場ごとの結びつき処理のため）
-    field_names = []
     tokens = []
     for fi in data.fields:
         field = db.get(models.Field, fi.field_id)
         if not field: continue
-        field_names.append(field.name)
-
-        # 既存招待があれば上書き
         existing_invite = db.query(models.InviteVerification).filter(
             models.InviteVerification.email == data.email,
             models.InviteVerification.field_id == fi.field_id
@@ -110,7 +102,6 @@ def invite_user(
         if existing_invite:
             db.delete(existing_invite)
             db.flush()
-
         token = secrets.token_hex(32)
         expires_at = datetime.utcnow() + timedelta(hours=24)
         db.add(models.InviteVerification(
@@ -122,8 +113,6 @@ def invite_user(
 
     db.commit()
 
-    # 圃場名を並べたメールを送信
-    # 複数圃場がある場合は圃場ごとにリンクを記載
     field_lines = "\n".join(
         [f"  ・{name}\n   {settings.FRONTEND_URL}/set-password?token={tok}&type=invite"
          for name, tok in tokens]
@@ -131,7 +120,7 @@ def invite_user(
     body = f"""{data.name} さん、CropWorksの圃場管理へ招待されました。
 
 以下のリンクから圃場の設定を行ってください。
-リンクの有効期限は各24時間です。
+リンクの有効期限は24時間です。
 
 {field_lines}
 
@@ -148,7 +137,6 @@ def update_user(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    """ユーザー情報更新（自分のみ）"""
     if user_id != current_user.id:
         raise HTTPException(403, "自分の情報のみ変更できます")
     user = db.get(models.User, user_id)
@@ -171,8 +159,8 @@ def remove_user_from_field_by_owner(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    """圃場からユーザーを削除（owner専用）"""
-    require_field_owner(field_id, current_user, db)
+    """owner or manager のみ操作可"""
+    require_owner_or_manager(field_id, current_user, db)
     uf = db.query(models.UserField).filter(
         models.UserField.user_id == user_id,
         models.UserField.field_id == field_id

@@ -7,6 +7,18 @@ import { useAuth } from '../store'
 
 type Tab = 'users' | 'fields'
 
+const ROLE_LABEL: Record<UserFieldRole, string> = {
+  owner: 'オーナー',
+  manager: 'マネージャー',
+  member: 'メンバー',
+}
+
+const ROLE_COLOR: Record<UserFieldRole, string> = {
+  owner: '#2d7a4f',
+  manager: '#1a5fa8',
+  member: '#888',
+}
+
 export default function AdminUsers() {
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -18,6 +30,8 @@ export default function AdminUsers() {
   const [editField, setEditField] = useState<Field | null>(null)
 
   const { data: fields = [] } = useQuery({ queryKey: ['fields'], queryFn: () => fieldsApi.list().then(r => r.data) })
+  // owner or manager の圃場はユーザー招待可能
+  const manageableFields = fields.filter(f => f.my_role === 'owner' || f.my_role === 'manager')
   const ownerFields = fields.filter(f => f.my_role === 'owner')
 
   const { data: fieldUsers = [], refetch: refetchUsers } = useQuery({
@@ -33,10 +47,10 @@ export default function AdminUsers() {
   })
 
   useEffect(() => {
-    if (ownerFields.length > 0 && !selectedFieldId) {
-      setSelectedFieldId(ownerFields[0].id)
+    if (manageableFields.length > 0 && !selectedFieldId) {
+      setSelectedFieldId(manageableFields[0].id)
     }
-  }, [ownerFields.length])
+  }, [manageableFields.length])
 
   return (
     <div style={pageStyle}>
@@ -72,11 +86,13 @@ export default function AdminUsers() {
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontWeight: 600, fontSize: 15 }}>{field.name}</span>
-                  <span style={{
-                    fontSize: 11, padding: '1px 7px', borderRadius: 20,
-                    background: field.my_role === 'owner' ? '#2d7a4f22' : '#88888822',
-                    color: field.my_role === 'owner' ? '#2d7a4f' : '#666', fontWeight: 600,
-                  }}>{field.my_role === 'owner' ? 'オーナー' : 'メンバー'}</span>
+                  {field.my_role && (
+                    <span style={{
+                      fontSize: 11, padding: '1px 7px', borderRadius: 20,
+                      background: ROLE_COLOR[field.my_role] + '22',
+                      color: ROLE_COLOR[field.my_role], fontWeight: 600,
+                    }}>{ROLE_LABEL[field.my_role]}</span>
+                  )}
                 </div>
                 <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
                   {field.area ? `${field.area}a` : ''}{field.area && field.location_note ? '　' : ''}{field.location_note ?? ''}
@@ -96,9 +112,9 @@ export default function AdminUsers() {
 
       {tab === 'users' && (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          {ownerFields.length === 0 ? (
+          {manageableFields.length === 0 ? (
             <p style={{ color: '#aaa', textAlign: 'center', marginTop: 40, padding: '0 16px' }}>
-              圃場を作成するとユーザーを招待できます。
+              圃場を作成するか、manager以上の圃場に属するとユーザーを招待できます。
             </p>
           ) : (
             <>
@@ -108,7 +124,7 @@ export default function AdminUsers() {
                   value={selectedFieldId ?? ''}
                   onChange={e => setSelectedFieldId(Number(e.target.value))}
                 >
-                  {ownerFields.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                  {manageableFields.map(f => <option key={f.id} value={f.id}>{f.name}（{ROLE_LABEL[f.my_role!]}）</option>)}
                 </select>
               </div>
               <div style={{ padding: '12px 16px', overflowY: 'auto', flex: 1 }}>
@@ -140,7 +156,7 @@ export default function AdminUsers() {
 
       {showUserForm && (
         <UserInviteModal
-          ownerFields={ownerFields}
+          manageableFields={manageableFields}
           onClose={() => setShowUserForm(false)}
           onSaved={() => { refetchUsers(); setShowUserForm(false) }}
         />
@@ -157,29 +173,28 @@ export default function AdminUsers() {
   )
 }
 
-// --- ユーザー招待モーダル(複数圃場対応・すべて選択付き) ---
-function UserInviteModal({ ownerFields, onClose, onSaved }: {
-  ownerFields: Field[]
+function UserInviteModal({ manageableFields, onClose, onSaved }: {
+  manageableFields: Field[]
   onClose: () => void
   onSaved: () => void
 }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [fieldSelections, setFieldSelections] = useState<Record<number, { checked: boolean; role: UserFieldRole }>>(
-    Object.fromEntries(ownerFields.map(f => [f.id, { checked: false, role: 'member' as UserFieldRole }]))
+    Object.fromEntries(manageableFields.map(f => [f.id, { checked: false, role: 'member' as UserFieldRole }]))
   )
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
 
-  const allChecked = ownerFields.every(f => fieldSelections[f.id]?.checked)
-  const someChecked = ownerFields.some(f => fieldSelections[f.id]?.checked)
+  const allChecked = manageableFields.every(f => fieldSelections[f.id]?.checked)
+  const someChecked = manageableFields.some(f => fieldSelections[f.id]?.checked)
 
   const toggleAll = () => {
     const next = !allChecked
     setFieldSelections(prev => {
       const updated = { ...prev }
-      ownerFields.forEach(f => { updated[f.id] = { ...updated[f.id], checked: next } })
+      manageableFields.forEach(f => { updated[f.id] = { ...updated[f.id], checked: next } })
       return updated
     })
   }
@@ -200,14 +215,10 @@ function UserInviteModal({ ownerFields, onClose, onSaved }: {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const selectedFields: FieldInviteItem[] = ownerFields
+    const selectedFields: FieldInviteItem[] = manageableFields
       .filter(f => fieldSelections[f.id]?.checked)
       .map(f => ({ field_id: f.id, field_role: fieldSelections[f.id].role }))
-
-    if (selectedFields.length === 0) {
-      setError('圃場を少なくとも1つ選択してください')
-      return
-    }
+    if (selectedFields.length === 0) { setError('圃場を少なくとも1つ選択してください'); return }
     setLoading(true); setError('')
     try {
       await usersApi.invite({ name, email, fields: selectedFields })
@@ -245,41 +256,39 @@ function UserInviteModal({ ownerFields, onClose, onSaved }: {
         <form onSubmit={submit}>
           <label style={labelStyle}>ユーザー名 <span style={{ color: '#c0392b' }}>*</span></label>
           <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} required />
-
           <label style={{ ...labelStyle, marginTop: 12 }}>メールアドレス <span style={{ color: '#c0392b' }}>*</span></label>
           <input style={inputStyle} type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="example@email.com" />
 
-          {/* 圃場選択 */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 6 }}>
             <label style={labelStyle}>圃場と権限 <span style={{ color: '#c0392b' }}>*</span></label>
-            <button
-              type="button"
-              style={{ fontSize: 12, padding: '2px 10px', border: '1px solid #ddd', borderRadius: 6, background: '#fff', cursor: 'pointer', color: '#666' }}
-              onClick={toggleAll}
-            >
+            <button type="button" style={smallBtnStyle} onClick={toggleAll}>
               {allChecked ? 'すべて解除' : 'すべて選択'}
             </button>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto', marginBottom: 16 }}>
-            {ownerFields.map(field => {
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto', marginBottom: 4 }}>
+            {manageableFields.map(field => {
               const sel = fieldSelections[field.id]
               return (
                 <div key={field.id} style={{
                   display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '10px 12px', border: `1px solid ${sel.checked ? '#2d7a4f' : '#eee'}`,
-                  borderRadius: 8, background: sel.checked ? '#f0faf4' : '#fff',
-                  transition: 'all 0.15s',
+                  padding: '10px 12px',
+                  border: `1px solid ${sel.checked ? '#2d7a4f' : '#eee'}`,
+                  borderRadius: 8,
+                  background: sel.checked ? '#f0faf4' : '#fff',
                 }}>
-                  <input
-                    type="checkbox"
-                    checked={sel.checked}
-                    onChange={() => toggleField(field.id)}
-                    style={{ width: 18, height: 18, cursor: 'pointer', flexShrink: 0 }}
-                  />
-                  <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: sel.checked ? '#1a1a1a' : '#888' }}>
-                    {field.name}
-                  </span>
+                  <input type="checkbox" checked={sel.checked} onChange={() => toggleField(field.id)}
+                    style={{ width: 18, height: 18, cursor: 'pointer', flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontSize: 14, fontWeight: 500, color: sel.checked ? '#1a1a1a' : '#888' }}>
+                      {field.name}
+                    </span>
+                    {field.my_role && (
+                      <span style={{ fontSize: 11, marginLeft: 6, color: ROLE_COLOR[field.my_role] }}>
+                        ({ROLE_LABEL[field.my_role]})
+                      </span>
+                    )}
+                  </div>
                   <select
                     value={sel.role}
                     onChange={e => setRole(field.id, e.target.value as UserFieldRole)}
@@ -287,10 +296,11 @@ function UserInviteModal({ ownerFields, onClose, onSaved }: {
                     style={{
                       fontSize: 12, padding: '3px 6px', borderRadius: 6,
                       border: '1px solid #ddd', background: '#fff',
-                      opacity: sel.checked ? 1 : 0.4, cursor: sel.checked ? 'pointer' : 'default',
+                      opacity: sel.checked ? 1 : 0.4,
                     }}
                   >
                     <option value="member">メンバー</option>
+                    <option value="manager">マネージャー</option>
                     <option value="owner">オーナー</option>
                   </select>
                 </div>
@@ -302,7 +312,7 @@ function UserInviteModal({ ownerFields, onClose, onSaved }: {
             <p style={{ fontSize: 12, color: '#c0392b', marginBottom: 8 }}>圃場を少なくとも1つ選択してください</p>
           )}
 
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <button type="button" style={{ ...btnStyle, background: '#eee', color: '#444' }} onClick={onClose}>キャンセル</button>
             <button type="submit" style={{ ...btnStyle, opacity: loading ? 0.6 : 1 }} disabled={loading}>
               {loading ? '送信中...' : '招待する'}
@@ -314,7 +324,6 @@ function UserInviteModal({ ownerFields, onClose, onSaved }: {
   )
 }
 
-// --- 圃場追加/編集モーダル ---
 function FieldFormModal({ field, onClose, onSaved }: { field: Field | null; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(field?.name ?? '')
   const [area, setArea] = useState(field?.area?.toString() ?? '')

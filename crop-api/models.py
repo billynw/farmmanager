@@ -10,6 +10,7 @@ import enum
 
 class UserFieldRole(str, enum.Enum):
     owner = "owner"
+    manager = "manager"
     member = "member"
 
 
@@ -51,7 +52,6 @@ class User(Base):
 
     @property
     def is_owner_of_any(self):
-        """1つでもownerの圃場を持っているか"""
         return any(uf.role == UserFieldRole.owner for uf in self.user_fields)
 
 
@@ -67,7 +67,6 @@ class PasswordResetToken(Base):
 
 
 class EmailVerification(Base):
-    """\u65b0\u898f\u30e6\u30fc\u30b6\u30fc\u4eee\u767b\u9332\u30c6\u30fc\u30d6\u30eb"""
     __tablename__ = "email_verifications"
     id = Column(Integer, primary_key=True)
     name = Column(String(100), nullable=False)
@@ -79,7 +78,6 @@ class EmailVerification(Base):
 
 
 class InviteVerification(Base):
-    """\u62db\u5f85\u7528\u4eee\u767b\u9332\u30c6\u30fc\u30d6\u30eb\uff08\u5703\u5834\u3078\u306e\u7d10\u3065\u3051\u60c5\u5831\u3082\u4fdd\u6301\uff09"""
     __tablename__ = "invite_verifications"
     id = Column(Integer, primary_key=True)
     name = Column(String(100), nullable=False)

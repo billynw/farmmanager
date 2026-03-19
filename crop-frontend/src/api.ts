@@ -20,7 +20,7 @@ api.interceptors.response.use(
 )
 
 // --- Types ---
-export type UserFieldRole = 'owner' | 'member'
+export type UserFieldRole = 'owner' | 'manager' | 'member'
 export type ItemStatus = 'growing' | 'finished'
 
 export interface User {
