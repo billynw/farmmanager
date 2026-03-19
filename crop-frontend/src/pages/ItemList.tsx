@@ -35,22 +35,21 @@ export default function ItemList() {
     queryFn: () => itemsApi.list({ field_id: fieldFilter, status: statusFilter || undefined }).then(r => r.data),
   })
 
+  // ownerの圃場が1つでもあれば管理メニューを表示
+  const hasOwnerField = fields.some(f => f.my_role === 'owner')
+
   return (
     <div style={pageStyle}>
-      {/* ヘッダー */}
       <div style={headerStyle}>
         <img src={logoImg} alt="ロゴ" style={{ height: 32, objectFit: 'contain' }} />
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span style={{ fontSize: 13, color: '#666' }}>{user?.name}</span>
-          {user?.role === 'admin' && (
-            <button onClick={() => navigate('/admin/users')} style={{ ...smallBtnStyle, color: '#2d7a4f', borderColor: '#2d7a4f' }}>管理</button>
-          )}
+          <button onClick={() => navigate('/admin/users')} style={{ ...smallBtnStyle, color: '#2d7a4f', borderColor: '#2d7a4f' }}>管理</button>
           <button onClick={() => setShowExport(true)} style={{ ...smallBtnStyle, color: '#2d7a4f', borderColor: '#2d7a4f' }}>CSV</button>
           <button onClick={logout} style={smallBtnStyle}>ログアウト</button>
         </div>
       </div>
 
-      {/* フィルター */}
       <div style={{ display: 'flex', gap: 8, padding: '12px 16px', background: '#fff', borderBottom: '1px solid #eee' }}>
         <select style={selectStyle} value={fieldFilter ?? ''} onChange={e => setFieldFilter(e.target.value ? Number(e.target.value) : undefined)}>
           <option value="">全圃場</option>
@@ -63,7 +62,6 @@ export default function ItemList() {
         </select>
       </div>
 
-      {/* 作物リスト */}
       <div style={{ padding: '12px 16px', flex: 1, overflowY: 'auto' }}>
         {isLoading && <p style={{ color: '#888', textAlign: 'center', marginTop: 40 }}>読み込み中...</p>}
         {!isLoading && items.length === 0 && (
@@ -74,7 +72,6 @@ export default function ItemList() {
         </div>
       </div>
 
-      {/* CSV エクスポートモーダル */}
       {showExport && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}
           onClick={() => setShowExport(false)}>
@@ -98,22 +95,17 @@ export default function ItemList() {
                 onClick={() => downloadCsv(
                   () => exportApi.workLogsCsv({ from: exportFrom || undefined, to: exportTo || undefined }),
                   `work_logs_${exportFrom || 'all'}.csv`
-                )}>
-                📋 作業ログをダウンロード
-              </button>
+                )}>作業ログをダウンロード</button>
               <button style={{ padding: '13px', background: '#1a5c38', color: '#fff', border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}
                 onClick={() => downloadCsv(
                   () => exportApi.harvestsCsv({ from: exportFrom || undefined, to: exportTo || undefined }),
                   `harvests_${exportFrom || 'all'}.csv`
-                )}>
-                🌾 収穫記録をダウンロード
-              </button>
+                )}>収穫記録をダウンロード</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* FAB: 作物追加 */}
       <button style={fabStyle} onClick={() => navigate('/items/new')}>＋ 作物を追加</button>
     </div>
   )
@@ -124,7 +116,6 @@ function ItemCard({ item, onClick }: { item: Item; onClick: () => void }) {
     const d = new Date(dateStr)
     return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`
   }
-
   return (
     <div onClick={onClick} style={cardStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

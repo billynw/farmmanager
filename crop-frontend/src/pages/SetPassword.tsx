@@ -7,6 +7,7 @@ import logoImg from '../assets/logo.png'
 export default function SetPassword() {
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token') ?? ''
+  const type = searchParams.get('type') ?? 'register'  // 'register' or 'invite'
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [loading, setLoading] = useState(false)
@@ -24,9 +25,11 @@ export default function SetPassword() {
     if (password.length < 6) { setError('パスワードは6文字以上で入力してください'); return }
     setLoading(true); setError('')
     try {
-      const res = await authApi.verifyEmail(token, password)
-      // 登録完了 → そのままログイン状態にする
-      setToken(res.data.access_token)
+      // inviteトークンの場合はaccept-invite、通常登録はverify-email
+      const res = type === 'invite'
+        ? await authApi.acceptInvite(token, password)
+        : await authApi.verifyEmail(token, password)
+      await setToken(res.data.access_token)
       navigate('/', { replace: true })
     } catch (err: any) {
       setError(err.response?.data?.detail ?? '無効または期限切れのリンクです。登録をやり直してください。')
@@ -46,20 +49,16 @@ export default function SetPassword() {
         {error && (
           <div style={{ color: '#c0392b', fontSize: 14, marginBottom: 12 }}>
             <p>{error}</p>
-            {!token && (
-              <a href="/register" style={{ color: '#2d7a4f', fontSize: 13 }}>新規登録ページへ</a>
-            )}
+            {!token && <a href="/register" style={{ color: '#2d7a4f', fontSize: 13 }}>新規登録ページへ</a>}
           </div>
         )}
         <form onSubmit={submit}>
           <label style={labelStyle}>パスワード</label>
           <input style={inputStyle} type="password" value={password}
-            onChange={e => setPassword(e.target.value)} required minLength={6}
-            disabled={!token} />
+            onChange={e => setPassword(e.target.value)} required minLength={6} disabled={!token} />
           <label style={{ ...labelStyle, marginTop: 12 }}>パスワード（確認）</label>
           <input style={inputStyle} type="password" value={confirm}
-            onChange={e => setConfirm(e.target.value)} required minLength={6}
-            disabled={!token} />
+            onChange={e => setConfirm(e.target.value)} required minLength={6} disabled={!token} />
           <button
             style={{ ...btnStyle, marginTop: 20, opacity: (loading || !token) ? 0.6 : 1 }}
             type="submit" disabled={loading || !token}

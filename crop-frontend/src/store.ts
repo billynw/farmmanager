@@ -15,7 +15,6 @@ export const useAuth = create<AuthState>((set) => ({
   user: null,
   token: localStorage.getItem('token'),
 
-  // メールアドレス + パスワードでログイン
   login: async (email, password) => {
     const { data } = await authApi.login(email, password)
     localStorage.setItem('token', data.access_token)
@@ -41,7 +40,6 @@ export const useAuth = create<AuthState>((set) => ({
     }
   },
 
-  // 登録完了後にそのままログイン状態にする
   setToken: async (token: string) => {
     localStorage.setItem('token', token)
     set({ token })

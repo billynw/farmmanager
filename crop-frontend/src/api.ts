@@ -20,11 +20,24 @@ api.interceptors.response.use(
 )
 
 // --- Types ---
-export type UserRole = 'admin' | 'member'
+export type UserFieldRole = 'owner' | 'member'
 export type ItemStatus = 'growing' | 'finished'
 
-export interface User { id: number; name: string; email?: string; role: UserRole }
-export interface Field { id: number; name: string; area?: number; location_note?: string }
+export interface User {
+  id: number
+  name: string
+  email?: string
+  is_owner_of_any: boolean  // ownerの圃場を持っているか
+}
+
+export interface Field {
+  id: number
+  name: string
+  area?: number
+  location_note?: string
+  my_role?: UserFieldRole  // ログインユーザーのこの圃場でのロール
+}
+
 export interface WorkType { id: number; name: string; color: string }
 
 export interface WorkLogSimple {
@@ -68,6 +81,8 @@ export const authApi = {
     api.post('/auth/register', { name, email }),
   verifyEmail: (token: string, password: string) =>
     api.post<{ access_token: string }>('/auth/verify-email', { token, password }),
+  acceptInvite: (token: string, password: string) =>
+    api.post<{ access_token: string }>('/auth/accept-invite', { token, password }),
   requestPasswordReset: (email: string) =>
     api.post('/auth/password-reset/request', { email }),
   confirmPasswordReset: (token: string, new_password: string) =>
@@ -75,24 +90,25 @@ export const authApi = {
 }
 
 export const usersApi = {
-  list: () => api.get<User[]>('/users'),
-  // 招待：メールでパスワード設定リンクを送信
-  invite: (data: { name: string; email: string; role: UserRole }) =>
+  list: (field_id: number) => api.get<User[]>('/users', { params: { field_id } }),
+  invite: (data: { name: string; email: string; field_id: number; field_role: UserFieldRole }) =>
     api.post<User>('/users', data),
-  update: (id: number, data: { name?: string; email?: string; role?: UserRole }) =>
+  update: (id: number, data: { name?: string; email?: string }) =>
     api.put<User>(`/users/${id}`, data),
-  delete: (id: number) => api.delete(`/users/${id}`),
-  getFields: (user_id: number) => api.get<Field[]>(`/users/${user_id}/fields`),
-  assignField: (field_id: number, user_id: number) =>
-    api.post(`/fields/${field_id}/users/${user_id}`),
+  removeFromField: (user_id: number, field_id: number) =>
+    api.delete(`/users/${user_id}`, { params: { field_id } }),
+  getUserFields: (user_id: number, field_id: number) =>
+    api.get<Field[]>(`/users/${user_id}/fields`, { params: { field_id } }),
+  assignField: (field_id: number, user_id: number, field_role: UserFieldRole = 'member') =>
+    api.post(`/fields/${field_id}/users/${user_id}`, null, { params: { field_role } }),
   removeField: (field_id: number, user_id: number) =>
     api.delete(`/fields/${field_id}/users/${user_id}`),
 }
 
 export const fieldsApi = {
   list: () => api.get<Field[]>('/fields'),
-  create: (data: Omit<Field, 'id'>) => api.post<Field>('/fields', data),
-  update: (id: number, data: Omit<Field, 'id'>) => api.put<Field>(`/fields/${id}`, data),
+  create: (data: Omit<Field, 'id' | 'my_role'>) => api.post<Field>('/fields', data),
+  update: (id: number, data: Omit<Field, 'id' | 'my_role'>) => api.put<Field>(`/fields/${id}`, data),
   delete: (id: number) => api.delete(`/fields/${id}`),
 }
 
@@ -144,9 +160,7 @@ export const exportApi = {
     if (params?.to) q.set('to', params.to)
     if (params?.item_id) q.set('item_id', String(params.item_id))
     const token = localStorage.getItem('token')
-    return fetch(`/api/v1/export/work-logs?${q}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    return fetch(`/api/v1/export/work-logs?${q}`, { headers: { Authorization: `Bearer ${token}` } })
   },
   harvestsCsv: (params?: { from?: string; to?: string; item_id?: number }) => {
     const q = new URLSearchParams()
@@ -154,8 +168,6 @@ export const exportApi = {
     if (params?.to) q.set('to', params.to)
     if (params?.item_id) q.set('item_id', String(params.item_id))
     const token = localStorage.getItem('token')
-    return fetch(`/api/v1/export/harvests?${q}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    return fetch(`/api/v1/export/harvests?${q}`, { headers: { Authorization: `Bearer ${token}` } })
   },
 }
