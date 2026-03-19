@@ -51,7 +51,6 @@ def list_users(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    """指定圃場のユーザー一覧（圃場でのロール付き）"""
     require_owner_or_manager(field_id, current_user, db)
     user_fields = db.query(models.UserField).filter(models.UserField.field_id == field_id).all()
     result = []
@@ -152,12 +151,20 @@ def update_field_role(
 ):
     """
     圃場でのユーザーのロールを変更。
-    - owner: 全メンバーのロール変更可
-    - manager: managerとmemberのみ変更可（ownerは不可）
+    - ownerへの変更は不可（招待時にのみ付与される）
+    - managerはoownerのロール変更不可
+    - 自分自身のロール変更不可
     """
     my_role = get_my_field_role(field_id, current_user.id, db)
     if my_role not in (models.UserFieldRole.owner, models.UserFieldRole.manager):
         raise HTTPException(403, "圃場のoownerまたはmanagerのみ操作できます")
+
+    if user_id == current_user.id:
+        raise HTTPException(403, "自分自身の権限は変更できません")
+
+    # ownerへの変更は常に不可
+    if field_role == models.UserFieldRole.owner:
+        raise HTTPException(400, "ownerは招待時にのみ設定できます")
 
     target_uf = db.query(models.UserField).filter(
         models.UserField.user_id == user_id,
@@ -166,13 +173,9 @@ def update_field_role(
     if not target_uf:
         raise HTTPException(404, "ユーザーがこの圃場に属していません")
 
-    # managerはoownerのロールを変更できない
+    # managerはoownerのロール変更不可
     if my_role == models.UserFieldRole.manager and target_uf.role == models.UserFieldRole.owner:
         raise HTTPException(403, "managerはoownerの権限を変更できません")
-
-    # 自分自身のロール変更は不可（自分をownerから降格できないように）
-    if user_id == current_user.id:
-        raise HTTPException(403, "自分自身の権限は変更できません")
 
     target_uf.role = field_role
     db.commit()
@@ -208,10 +211,6 @@ def remove_user_from_field(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    """
-    owner: 全ユーザー削除可
-    manager: managerとmemberのみ削除可（ownerは不可）
-    """
     my_role = get_my_field_role(field_id, current_user.id, db)
     if my_role not in (models.UserFieldRole.owner, models.UserFieldRole.manager):
         raise HTTPException(403, "圃場のoownerまたはmanagerのみ操作できます")

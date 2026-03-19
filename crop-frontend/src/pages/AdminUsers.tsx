@@ -28,9 +28,8 @@ function canDelete(myRole: UserFieldRole | undefined, targetRole: UserFieldRole 
 
 function canChangeRole(myRole: UserFieldRole | undefined, targetRole: UserFieldRole | undefined): boolean {
   if (!myRole) return false
-  if (myRole === 'owner') return true
-  // managerはoownerのロールは変更不可
-  if (myRole === 'manager') return targetRole !== 'owner'
+  if (myRole === 'owner') return targetRole !== 'owner'  // owner同士は変更不可
+  if (myRole === 'manager') return targetRole !== 'owner' // managerはoownerは変更不可
   return false
 }
 
@@ -73,7 +72,7 @@ export default function AdminUsers() {
       refetchUsers()
     } catch (err: any) {
       alert(err.response?.data?.detail ?? '権限変更に失敗しました')
-      refetchUsers()  // 失敗時は元の値に戻す
+      refetchUsers()
     }
   }
 
@@ -175,9 +174,8 @@ export default function AdminUsers() {
                               fontWeight: 600,
                             }}
                           >
-                            <option value="member">メンバー</option>
                             <option value="manager">マネージャー</option>
-                            <option value="owner">オーナー</option>
+                            <option value="member">メンバー</option>
                           </select>
                         ) : (
                           user.field_role && (
@@ -355,9 +353,8 @@ function UserInviteModal({ manageableFields, onClose, onSaved }: {
                       opacity: sel.checked ? 1 : 0.4,
                     }}
                   >
-                    <option value="member">メンバー</option>
                     <option value="manager">マネージャー</option>
-                    <option value="owner">オーナー</option>
+                    <option value="member">メンバー</option>
                   </select>
                 </div>
               )
