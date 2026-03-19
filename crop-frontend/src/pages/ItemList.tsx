@@ -116,6 +116,11 @@ export default function ItemList() {
 }
 
 function ItemCard({ item, onClick }: { item: Item; onClick: () => void }) {
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr)
+    return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`
+  }
+
   return (
     <div onClick={onClick} style={cardStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -128,8 +133,20 @@ function ItemCard({ item, onClick }: { item: Item; onClick: () => void }) {
           {STATUS_LABEL[item.status]}
         </span>
       </div>
-      {item.planted_at && (
-        <div style={{ fontSize: 12, color: '#aaa', marginTop: 8 }}>定植: {item.planted_at}</div>
+      {item.latest_work_log && (
+        <div style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
+          <span style={{ color: '#888' }}>{formatDate(item.latest_work_log.worked_at)}</span>
+          {item.latest_work_log.work_type && (
+            <span style={{ marginLeft: 6, color: item.latest_work_log.work_type.color, fontWeight: 600 }}>
+              {item.latest_work_log.work_type.name}
+            </span>
+          )}
+          {item.latest_work_log.memo && (
+            <span style={{ marginLeft: 6, color: '#aaa' }}>
+              {item.latest_work_log.memo.length > 20 ? item.latest_work_log.memo.substring(0, 20) + '...' : item.latest_work_log.memo}
+            </span>
+          )}
+        </div>
       )}
     </div>
   )

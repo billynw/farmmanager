@@ -27,10 +27,18 @@ export interface User { id: number; name: string; role: UserRole }
 export interface Field { id: number; name: string; area?: number; location_note?: string }
 export interface WorkType { id: number; name: string; color: string }
 
+export interface WorkLogSimple {
+  id: number
+  worked_at: string
+  memo?: string
+  work_type?: WorkType
+}
+
 export interface Item {
   id: number; name: string; variety?: string
   field_id?: number; planted_at?: string; status: ItemStatus
   field?: Field
+  latest_work_log?: WorkLogSimple
 }
 
 export interface AgroInput {
@@ -72,8 +80,8 @@ export const itemsApi = {
   list: (params?: { field_id?: number; status?: string }) =>
     api.get<Item[]>('/items', { params }),
   get: (id: number) => api.get<Item>(`/items/${id}`),
-  create: (data: Omit<Item, 'id' | 'field'>) => api.post<Item>('/items', data),
-  update: (id: number, data: Omit<Item, 'id' | 'field'>) => api.put<Item>(`/items/${id}`, data),
+  create: (data: Omit<Item, 'id' | 'field' | 'latest_work_log'>) => api.post<Item>('/items', data),
+  update: (id: number, data: Omit<Item, 'id' | 'field' | 'latest_work_log'>) => api.put<Item>(`/items/${id}`, data),
   delete: (id: number) => api.delete(`/items/${id}`),
 }
 
