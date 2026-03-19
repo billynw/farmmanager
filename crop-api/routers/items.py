@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import select
 from typing import List, Optional
 from database import get_db
 import models, schemas
@@ -10,22 +9,67 @@ router = APIRouter(prefix="/api/v1", tags=["items"])
 
 # --- Fields ---
 @router.get("/fields", response_model=List[schemas.FieldOut])
-def list_fields(db: Session = Depends(get_db), _=Depends(get_current_user)):
-    return db.query(models.Field).all()
+def list_fields(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # admin は全圃場、member は自分に紐づく圃場のみ
+    if current_user.role == models.UserRole.admin:
+        return db.query(models.Field).all()
+    return current_user.fields
 
 @router.post("/fields", response_model=schemas.FieldOut)
-def create_field(data: schemas.FieldCreate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def create_field(data: schemas.FieldCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     field = models.Field(**data.model_dump())
-    db.add(field); db.commit(); db.refresh(field)
+    db.add(field)
+    db.flush()  # IDを確定させる
+    # 作成者を自動的に紐づける
+    field.users.append(current_user)
+    db.commit(); db.refresh(field)
     return field
 
 @router.put("/fields/{field_id}", response_model=schemas.FieldOut)
-def update_field(field_id: int, data: schemas.FieldCreate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def update_field(field_id: int, data: schemas.FieldCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     field = db.get(models.Field, field_id)
     if not field: raise HTTPException(404, "Field not found")
+    # 権限チェック: admin または自分の圃場のみ編集可
+    if current_user.role != models.UserRole.admin and field not in current_user.fields:
+        raise HTTPException(403, "Permission denied")
     for k, v in data.model_dump().items(): setattr(field, k, v)
     db.commit(); db.refresh(field)
     return field
+
+# --- ユーザーと圃場の紐づけ管理 (admin only) ---
+@router.post("/fields/{field_id}/users/{user_id}")
+def assign_user_to_field(
+    field_id: int, user_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.role != models.UserRole.admin:
+        raise HTTPException(403, "Admin only")
+    field = db.get(models.Field, field_id)
+    if not field: raise HTTPException(404, "Field not found")
+    user = db.get(models.User, user_id)
+    if not user: raise HTTPException(404, "User not found")
+    if user not in field.users:
+        field.users.append(user)
+        db.commit()
+    return {"ok": True}
+
+@router.delete("/fields/{field_id}/users/{user_id}")
+def remove_user_from_field(
+    field_id: int, user_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.role != models.UserRole.admin:
+        raise HTTPException(403, "Admin only")
+    field = db.get(models.Field, field_id)
+    if not field: raise HTTPException(404, "Field not found")
+    user = db.get(models.User, user_id)
+    if not user: raise HTTPException(404, "User not found")
+    if user in field.users:
+        field.users.remove(user)
+        db.commit()
+    return {"ok": True}
 
 # --- WorkTypes ---
 @router.get("/work-types", response_model=List[schemas.WorkTypeOut])
@@ -44,14 +88,22 @@ def list_items(
     field_id: Optional[int] = None,
     status: Optional[str] = None,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     q = db.query(models.Item).options(joinedload(models.Item.field))
+
+    # member はアクセスできる圃場の作物のみ
+    if current_user.role != models.UserRole.admin:
+        accessible_field_ids = [f.id for f in current_user.fields]
+        q = q.filter(
+            (models.Item.field_id == None) |
+            (models.Item.field_id.in_(accessible_field_ids))
+        )
+
     if field_id: q = q.filter(models.Item.field_id == field_id)
     if status: q = q.filter(models.Item.status == status)
     items = q.order_by(models.Item.name).all()
-    
-    # 各アイテムの最新作業ログを取得
+
     for item in items:
         latest_log = db.query(models.WorkLog).filter(
             models.WorkLog.item_id == item.id
@@ -59,13 +111,18 @@ def list_items(
             joinedload(models.WorkLog.work_type)
         ).order_by(models.WorkLog.worked_at.desc()).first()
         item.latest_work_log = latest_log
-    
+
     return items
 
 @router.get("/items/{item_id}", response_model=schemas.ItemOut)
-def get_item(item_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def get_item(item_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     item = db.query(models.Item).options(joinedload(models.Item.field)).get(item_id)
     if not item: raise HTTPException(404, "Item not found")
+    # 権限チェック
+    if current_user.role != models.UserRole.admin and item.field_id is not None:
+        accessible_field_ids = [f.id for f in current_user.fields]
+        if item.field_id not in accessible_field_ids:
+            raise HTTPException(403, "Permission denied")
     return item
 
 @router.post("/items", response_model=schemas.ItemOut)

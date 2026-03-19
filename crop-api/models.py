@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, Text, DateTime, Date,
-    Boolean, Numeric, ForeignKey, Enum
+    Boolean, Numeric, ForeignKey, Enum, Table
 )
 from sqlalchemy.orm import relationship
 from database import Base
@@ -15,6 +15,14 @@ class ItemStatus(str, enum.Enum):
     growing = "growing"
     finished = "finished"
 
+# User と Field の中間テーブル（多対多）
+user_fields = Table(
+    "user_fields",
+    Base.metadata,
+    Column("user_id", Integer, ForeignKey("users.id"), primary_key=True),
+    Column("field_id", Integer, ForeignKey("fields.id"), primary_key=True),
+)
+
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True)
@@ -23,6 +31,7 @@ class User(Base):
     role = Column(Enum(UserRole), default=UserRole.member)
     created_at = Column(DateTime, default=datetime.utcnow)
     work_logs = relationship("WorkLog", back_populates="user")
+    fields = relationship("Field", secondary=user_fields, back_populates="users")
 
 class Field(Base):
     __tablename__ = "fields"
@@ -32,6 +41,7 @@ class Field(Base):
     location_note = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     items = relationship("Item", back_populates="field")
+    users = relationship("User", secondary=user_fields, back_populates="fields")
 
 class WorkType(Base):
     __tablename__ = "work_types"
