@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { itemsApi, fieldsApi, exportApi } from '../api'
 import type { Item } from '../api'
 import { useAuth } from '../store'
+import logoImg from '../assets/logo.png'
 
 const STATUS_LABEL: Record<string, string> = { growing: '栽培中', finished: '終了' }
 const STATUS_COLOR: Record<string, string> = { growing: '#2d7a4f', finished: '#888' }
@@ -38,7 +39,7 @@ export default function ItemList() {
     <div style={pageStyle}>
       {/* ヘッダー */}
       <div style={headerStyle}>
-        <span style={{ fontSize: 20, fontWeight: 700, color: '#1a1a1a' }}>🌱 CropWorks</span>
+        <img src={logoImg} alt="ロゴ" style={{ height: 32, objectFit: 'contain' }} />
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span style={{ fontSize: 13, color: '#666' }}>{user?.name}</span>
           <button onClick={() => setShowExport(true)} style={{ ...smallBtnStyle, color: '#2d7a4f', borderColor: '#2d7a4f' }}>CSV</button>
