@@ -41,9 +41,12 @@ export default function Login() {
             {loading ? 'ログイン中...' : 'ログイン'}
           </button>
         </form>
-        <div style={{ textAlign: 'center', marginTop: 16 }}>
-          <Link to="/forgot-password" style={{ fontSize: 13, color: '#2d7a4f', textDecoration: 'none' }}>
+        <div style={{ textAlign: 'center', marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <Link to="/forgot-password" style={{ fontSize: 13, color: '#888', textDecoration: 'none' }}>
             パスワードをお忘れですか？
+          </Link>
+          <Link to="/register" style={{ fontSize: 13, color: '#2d7a4f', textDecoration: 'none', fontWeight: 600 }}>
+            新規アカウント登録
           </Link>
         </div>
       </div>

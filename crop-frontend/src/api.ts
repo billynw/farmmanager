@@ -64,6 +64,10 @@ export const authApi = {
   login: (name: string, password: string) =>
     api.post<{ access_token: string }>('/auth/login', { name, password }),
   me: () => api.get<User>('/auth/me'),
+  register: (name: string, email: string) =>
+    api.post('/auth/register', { name, email }),
+  verifyEmail: (token: string, password: string) =>
+    api.post<{ access_token: string }>('/auth/verify-email', { token, password }),
   requestPasswordReset: (email: string) =>
     api.post('/auth/password-reset/request', { email }),
   confirmPasswordReset: (token: string, new_password: string) =>

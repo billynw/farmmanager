@@ -45,11 +45,22 @@ class PasswordResetToken(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     user = relationship("User", back_populates="reset_tokens")
 
+class EmailVerification(Base):
+    """新規ユーザー仮登録テーブル"""
+    __tablename__ = "email_verifications"
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False)
+    email = Column(String(255), nullable=False, unique=True)
+    token = Column(String(64), nullable=False, unique=True)
+    expires_at = Column(DateTime, nullable=False)
+    used = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 class Field(Base):
     __tablename__ = "fields"
     id = Column(Integer, primary_key=True)
     name = Column(String(100), nullable=False)
-    area = Column(Numeric(6, 2), nullable=True)  # アール
+    area = Column(Numeric(6, 2), nullable=True)
     location_note = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     items = relationship("Item", back_populates="field")
@@ -59,7 +70,7 @@ class WorkType(Base):
     __tablename__ = "work_types"
     id = Column(Integer, primary_key=True)
     name = Column(String(50), nullable=False)
-    color = Column(String(7), default="#888888")  # UIカラー(hex)
+    color = Column(String(7), default="#888888")
     work_logs = relationship("WorkLog", back_populates="work_type")
 
 class Item(Base):

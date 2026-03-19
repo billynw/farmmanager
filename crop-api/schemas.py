@@ -1,6 +1,6 @@
 from datetime import datetime, date
 from typing import Optional, List
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from models import UserRole, ItemStatus
 
 # --- Auth ---
@@ -18,6 +18,14 @@ class PasswordResetRequest(BaseModel):
 class PasswordResetConfirm(BaseModel):
     token: str
     new_password: str
+
+class RegisterRequest(BaseModel):
+    name: str
+    email: str
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+    password: str
 
 # --- User ---
 class UserOut(BaseModel):
@@ -75,7 +83,7 @@ class PhotoOut(BaseModel):
     taken_at: Optional[datetime]
     model_config = {"from_attributes": True}
 
-# --- WorkLog (簡易版 - ItemOutで使用) ---
+# --- WorkLog (簡易版) ---
 class WorkLogSimple(BaseModel):
     id: int
     worked_at: datetime
