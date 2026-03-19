@@ -1,6 +1,7 @@
 
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { itemsApi, workLogsApi } from '../api'
 import type { WorkLog } from '../api'
 
@@ -9,6 +10,7 @@ export default function ItemDetail() {
   const itemId = Number(id)
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const [modalImage, setModalImage] = useState<string | null>(null)
 
   const { data: item } = useQuery({ queryKey: ['item', itemId], queryFn: () => itemsApi.get(itemId).then(r => r.data) })
   const { data: logs = [], isLoading } = useQuery({
@@ -50,9 +52,14 @@ export default function ItemDetail() {
         {!isLoading && logs.length === 0 && <p style={{ color: '#aaa', textAlign: 'center', marginTop: 30 }}>作業記録がありません</p>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {logs.map(log => (
-            <LogCard key={log.id} log={log} onDelete={() => {
-              if (confirm('この記録を削除しますか？')) deleteLog.mutate(log.id)
-            }} />
+            <LogCard 
+              key={log.id} 
+              log={log} 
+              onDelete={() => {
+                if (confirm('この記録を削除しますか？')) deleteLog.mutate(log.id)
+              }}
+              onImageClick={setModalImage}
+            />
           ))}
         </div>
       </div>
@@ -63,11 +70,29 @@ export default function ItemDetail() {
           ＋ 作業を記録する
         </button>
       </div>
+
+      {/* 画像モーダル */}
+      {modalImage && (
+        <div 
+          style={modalOverlayStyle} 
+          onClick={() => setModalImage(null)}
+        >
+          <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
+            <img src={modalImage} alt="" style={modalImageStyle} />
+            <button 
+              style={modalCloseStyle}
+              onClick={() => setModalImage(null)}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-function LogCard({ log, onDelete }: { log: WorkLog; onDelete: () => void }) {
+function LogCard({ log, onDelete, onImageClick }: { log: WorkLog; onDelete: () => void; onImageClick: (url: string) => void }) {
   const dt = new Date(log.worked_at)
   const dateStr = `${dt.getFullYear()}/${dt.getMonth()+1}/${dt.getDate()} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`
   const color = log.work_type?.color ?? '#888'
@@ -94,7 +119,22 @@ function LogCard({ log, onDelete }: { log: WorkLog; onDelete: () => void }) {
       {log.photos.length > 0 && (
         <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
           {log.photos.map(p => (
-            <img key={p.id} src={p.file_path} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 6 }} />
+            <img 
+              key={p.id} 
+              src={p.file_path} 
+              alt="" 
+              style={{ 
+                width: 72, 
+                height: 72, 
+                objectFit: 'cover', 
+                borderRadius: 6,
+                cursor: 'pointer',
+                transition: 'opacity 0.2s'
+              }}
+              onClick={() => onImageClick(p.file_path)}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+            />
           ))}
         </div>
       )}
@@ -107,3 +147,48 @@ const tabStyle: React.CSSProperties = { flex: 1, textAlign: 'center', padding: '
 const activeTabStyle: React.CSSProperties = { ...tabStyle, color: '#2d7a4f', borderBottom: '2px solid #2d7a4f', fontWeight: 600 }
 const addBtnStyle: React.CSSProperties = { display: 'block', width: '100%', padding: '14px', background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 10, fontSize: 16, fontWeight: 600, cursor: 'pointer' }
 const smallBtnStyle: React.CSSProperties = { fontSize: 12, padding: '4px 10px', border: '1px solid #ddd', borderRadius: 6, background: '#fff', cursor: 'pointer', color: '#666' }
+
+const modalOverlayStyle: React.CSSProperties = {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  background: 'rgba(0, 0, 0, 0.9)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 1000,
+  padding: 20,
+}
+
+const modalContentStyle: React.CSSProperties = {
+  position: 'relative',
+  maxWidth: '90vw',
+  maxHeight: '90vh',
+}
+
+const modalImageStyle: React.CSSProperties = {
+  maxWidth: '100%',
+  maxHeight: '90vh',
+  objectFit: 'contain',
+  borderRadius: 8,
+}
+
+const modalCloseStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: -40,
+  right: 0,
+  background: 'rgba(255, 255, 255, 0.2)',
+  border: 'none',
+  color: '#fff',
+  fontSize: 32,
+  width: 40,
+  height: 40,
+  borderRadius: '50%',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  lineHeight: 1,
+}
