@@ -37,17 +37,17 @@ class UserOut(BaseModel):
     name: str
     email: Optional[str] = None
     is_owner_of_any: bool = False
+    field_role: Optional[UserFieldRole] = None  # 圃場一覧取得時にセットされる
     model_config = {"from_attributes": True}
 
 class FieldInviteItem(BaseModel):
-    """招待時の圃場と権限のペア"""
     field_id: int
     field_role: UserFieldRole = UserFieldRole.member
 
 class UserInvite(BaseModel):
     name: str
     email: str
-    fields: List[FieldInviteItem]  # 複数圃場に一括招待
+    fields: List[FieldInviteItem]
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None

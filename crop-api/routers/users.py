@@ -31,7 +31,7 @@ def send_email(to: str, subject: str, body: str):
         raise HTTPException(500, f"メール送信に失敗しました: {e}")
 
 
-def get_my_field_role(field_id: int, user_id: int, db: Session) -> models.UserFieldRole | None:
+def get_my_field_role(field_id: int, user_id: int, db: Session):
     uf = db.query(models.UserField).filter(
         models.UserField.user_id == user_id,
         models.UserField.field_id == field_id
@@ -51,10 +51,20 @@ def list_users(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    """指定圃場のユーザー一覧（owner or manager のみ）"""
+    """指定圃場のユーザー一覧（圃場でのロール付き）"""
     require_owner_or_manager(field_id, current_user, db)
     user_fields = db.query(models.UserField).filter(models.UserField.field_id == field_id).all()
-    return [uf.user for uf in user_fields]
+    result = []
+    for uf in user_fields:
+        user_out = schemas.UserOut(
+            id=uf.user.id,
+            name=uf.user.name,
+            email=uf.user.email,
+            is_owner_of_any=uf.user.is_owner_of_any,
+            field_role=uf.role
+        )
+        result.append(user_out)
+    return result
 
 
 @router.post("", response_model=schemas.UserOut)
@@ -63,7 +73,6 @@ def invite_user(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    """複数圃場へユーザーを一括招待（owner or manager のみ）"""
     if not data.fields:
         raise HTTPException(400, "圃場を少なくとも1つ選択してください")
 
@@ -164,15 +173,13 @@ def remove_user_from_field(
     current_user: models.User = Depends(get_current_user)
 ):
     """
-    圃場からユーザーを削除。権限ルール：
-    - owner: 全ユーザー削除可
-    - manager: managerとmemberのみ削除可（ownerは削除不可）
+    owner: 全ユーザー削除可
+    manager: managerとmemberのみ削除可（ownerは不可）
     """
     my_role = get_my_field_role(field_id, current_user.id, db)
     if my_role not in (models.UserFieldRole.owner, models.UserFieldRole.manager):
         raise HTTPException(403, "圃場のoownerまたはmanagerのみ操作できます")
 
-    # 削除対象ユーザーのロールを取得
     target_uf = db.query(models.UserField).filter(
         models.UserField.user_id == user_id,
         models.UserField.field_id == field_id
@@ -181,7 +188,6 @@ def remove_user_from_field(
     if not target_uf:
         return {"ok": True}
 
-    # manager は owner を削除できない
     if my_role == models.UserFieldRole.manager and target_uf.role == models.UserFieldRole.owner:
         raise HTTPException(403, "managerはoownerを圃場から削除できません")
 
