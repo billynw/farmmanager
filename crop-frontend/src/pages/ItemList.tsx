@@ -35,9 +35,6 @@ export default function ItemList() {
     queryFn: () => itemsApi.list({ field_id: fieldFilter, status: statusFilter || undefined }).then(r => r.data),
   })
 
-  // ownerの圃場が1つでもあれば管理メニューを表示
-  const hasOwnerField = fields.some(f => f.my_role === 'owner')
-
   return (
     <div style={pageStyle}>
       <div style={headerStyle}>

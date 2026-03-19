@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { usersApi, fieldsApi } from '../api'
-import type { User, UserFieldRole, Field } from '../api'
+import type { UserFieldRole, Field } from '../api'
 import { useAuth } from '../store'
 
 type Tab = 'users' | 'fields'
@@ -21,7 +21,6 @@ export default function AdminUsers() {
   const { data: fields = [] } = useQuery({ queryKey: ['fields'], queryFn: () => fieldsApi.list().then(r => r.data) })
   const ownerFields = fields.filter(f => f.my_role === 'owner')
 
-  // 圃場タブで選択中の圃場のユーザー一覧
   const { data: fieldUsers = [], refetch: refetchUsers } = useQuery({
     queryKey: ['fieldUsers', selectedFieldId],
     queryFn: () => selectedFieldId ? usersApi.list(selectedFieldId).then(r => r.data) : Promise.resolve([]),
@@ -34,7 +33,6 @@ export default function AdminUsers() {
     onError: (err: any) => alert(err.response?.data?.detail ?? '削除に失敗しました'),
   })
 
-  // 初回表示時に最初のowner圃場を自動選択
   useEffect(() => {
     if (ownerFields.length > 0 && !selectedFieldId) {
       setSelectedFieldId(ownerFields[0].id)
@@ -65,7 +63,6 @@ export default function AdminUsers() {
         ))}
       </div>
 
-      {/* 圃場タブ：全圃場表示（owner/member関係なく） */}
       {tab === 'fields' && (
         <div style={{ padding: '12px 16px', overflowY: 'auto', flex: 1 }}>
           {fields.length === 0 && (
@@ -98,7 +95,6 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {/* ユーザータブ：ownerの圃場ごとのメンバー管理 */}
       {tab === 'users' && (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           {ownerFields.length === 0 ? (
@@ -107,7 +103,6 @@ export default function AdminUsers() {
             </p>
           ) : (
             <>
-              {/* 圃場選択 */}
               <div style={{ padding: '8px 16px', background: '#fff', borderBottom: '1px solid #eee' }}>
                 <select
                   style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}
@@ -117,8 +112,6 @@ export default function AdminUsers() {
                   {ownerFields.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                 </select>
               </div>
-
-              {/* ユーザー一覧 */}
               <div style={{ padding: '12px 16px', overflowY: 'auto', flex: 1 }}>
                 {fieldUsers.map(user => (
                   <div key={user.id} style={cardStyle}>
@@ -146,7 +139,6 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {/* ユーザー招待モーダル */}
       {showUserForm && selectedFieldId && (
         <UserInviteModal
           fieldId={selectedFieldId}
@@ -155,7 +147,6 @@ export default function AdminUsers() {
         />
       )}
 
-      {/* 圃場追加/編集モーダル */}
       {showFieldForm && (
         <FieldFormModal
           field={editField}
@@ -167,7 +158,6 @@ export default function AdminUsers() {
   )
 }
 
-// --- ユーザー招待モーダル ---
 function UserInviteModal({ fieldId, onClose, onSaved }: { fieldId: number; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -234,7 +224,6 @@ function UserInviteModal({ fieldId, onClose, onSaved }: { fieldId: number; onClo
   )
 }
 
-// --- 圃場追加/編集モーダル ---
 function FieldFormModal({ field, onClose, onSaved }: { field: Field | null; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(field?.name ?? '')
   const [area, setArea] = useState(field?.area?.toString() ?? '')
