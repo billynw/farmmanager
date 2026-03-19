@@ -30,9 +30,7 @@ export default function AdminUsers() {
   const [editField, setEditField] = useState<Field | null>(null)
 
   const { data: fields = [] } = useQuery({ queryKey: ['fields'], queryFn: () => fieldsApi.list().then(r => r.data) })
-  // owner or manager の圃場はユーザー招待可能
   const manageableFields = fields.filter(f => f.my_role === 'owner' || f.my_role === 'manager')
-  const ownerFields = fields.filter(f => f.my_role === 'owner')
 
   const { data: fieldUsers = [], refetch: refetchUsers } = useQuery({
     queryKey: ['fieldUsers', selectedFieldId],
