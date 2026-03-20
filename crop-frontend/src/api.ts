@@ -184,11 +184,9 @@ export const sensorsApi = {
   get: (id: number) => api.get<SensorOut>(`/sensors/${id}`),
   create: (data: { field_id: number; name: string; active?: boolean }) =>
     api.post<SensorOut>('/sensors', data),
-  update: (id: number, data: { name?: string; active?: boolean }) =>
+  update: (id: number, data: { name?: string; active?: boolean; field_id?: number }) =>
     api.put<SensorOut>(`/sensors/${id}`, data),
   delete: (id: number) => api.delete(`/sensors/${id}`),
-  updateWifi: (id: number, data: { ssid: string; password: string }) =>
-    api.post(`/sensors/${id}/wifi`, data),
   readings: (sensor_id: number, metric?: string, limit = 24) =>
     api.get<SensorReadingOut[]>(`/sensors/${sensor_id}/readings`, { params: { metric, limit } }),
   photos: (sensor_id: number, limit = 24) =>
