@@ -104,6 +104,7 @@ export interface SensorOut {
   field_id: number
   name: string
   active: boolean
+  wifi_ssid?: string
 }
 
 export interface SensorReadingOut {
@@ -180,6 +181,14 @@ export const itemsApi = {
 
 export const sensorsApi = {
   list: (field_id?: number) => api.get<SensorOut[]>('/sensors', { params: { field_id } }),
+  get: (id: number) => api.get<SensorOut>(`/sensors/${id}`),
+  create: (data: { field_id: number; name: string; active?: boolean }) =>
+    api.post<SensorOut>('/sensors', data),
+  update: (id: number, data: { name?: string; active?: boolean }) =>
+    api.put<SensorOut>(`/sensors/${id}`, data),
+  delete: (id: number) => api.delete(`/sensors/${id}`),
+  updateWifi: (id: number, data: { ssid: string; password: string }) =>
+    api.post(`/sensors/${id}/wifi`, data),
   readings: (sensor_id: number, metric?: string, limit = 24) =>
     api.get<SensorReadingOut[]>(`/sensors/${sensor_id}/readings`, { params: { metric, limit } }),
   photos: (sensor_id: number, limit = 24) =>
