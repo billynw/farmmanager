@@ -60,7 +60,7 @@ export default function AdminUsers() {
   // --- sensors state ---
   const [sensorFieldId, setSensorFieldId] = useState<number | null>(null)
   const [sensorModal, setSensorModal] = useState<SensorModal | null>(null)
-  const [sensorForm, setSensorForm] = useState({ name: '', active: true })
+  const [sensorForm, setSensorForm] = useState({ name: '', active: true, field_id: 0 })
   const [wifiForm, setWifiForm] = useState({ ssid: '', password: '' })
   const [showWifiPassword, setShowWifiPassword] = useState(false)
   const [sensorSubmitting, setSensorSubmitting] = useState(false)
@@ -139,12 +139,12 @@ export default function AdminUsers() {
   }
 
   const openAddSensor = () => {
-    setSensorForm({ name: '', active: true })
+    setSensorForm({ name: '', active: true, field_id: activeSensorFieldId ?? fields[0]?.id ?? 0 })
     setSensorModal({ mode: 'add' })
   }
 
   const openEditSensor = (sensor: SensorOut) => {
-    setSensorForm({ name: sensor.name, active: sensor.active })
+    setSensorForm({ name: sensor.name, active: sensor.active, field_id: sensor.field_id })
     setSensorModal({ mode: 'edit', sensor })
   }
 
@@ -156,15 +156,15 @@ export default function AdminUsers() {
   }
 
   const handleSensorSubmit = async () => {
-    if (!sensorForm.name.trim()) return
+    if (!sensorForm.name.trim() || !sensorForm.field_id) return
     setSensorSubmitting(true)
     try {
       if (sensorModal?.mode === 'add') {
-        await sensorsApi.create({ field_id: activeSensorFieldId!, name: sensorForm.name.trim(), active: sensorForm.active })
+        await sensorsApi.create({ field_id: sensorForm.field_id, name: sensorForm.name.trim(), active: sensorForm.active })
       } else if (sensorModal?.mode === 'edit') {
-        await sensorsApi.update((sensorModal as any).sensor.id, { name: sensorForm.name.trim(), active: sensorForm.active })
+        await sensorsApi.update((sensorModal as any).sensor.id, { name: sensorForm.name.trim(), active: sensorForm.active, field_id: sensorForm.field_id })
       }
-      refetchSensors()
+      qc.invalidateQueries({ queryKey: ['sensors'] })
       setSensorModal(null)
     } catch (err: any) {
       alert(err.response?.data?.detail ?? '保存に失敗しました')
@@ -402,16 +402,32 @@ export default function AdminUsers() {
             <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700 }}>
               {sensorModal.mode === 'add' ? 'センサーを追加' : 'センサーを編集'}
             </h3>
+
+            {/* 圃場選択 */}
+            <div style={{ marginBottom: 12 }}>
+              <label style={labelStyle}>圃場</label>
+              <select
+                style={{ ...inputStyle, appearance: 'auto' }}
+                value={sensorForm.field_id}
+                onChange={e => setSensorForm(f => ({ ...f, field_id: Number(e.target.value) }))}
+              >
+                {fields.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+            </div>
+
+            {/* センサー名 */}
             <div style={{ marginBottom: 12 }}>
               <label style={labelStyle}>センサー名</label>
               <input
                 style={inputStyle}
                 value={sensorForm.name}
                 onChange={e => setSensorForm(f => ({ ...f, name: e.target.value }))}
-                placeholder="例：A圃場 水位センサー"
+                placeholder="例：水位センサー"
                 autoFocus
               />
             </div>
+
+            {/* 有効フラグ */}
             <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
               <label style={{ fontSize: 14, color: '#333' }}>有効</label>
               <input
@@ -421,9 +437,10 @@ export default function AdminUsers() {
                 style={{ width: 18, height: 18, accentColor: '#2d7a4f' }}
               />
             </div>
+
             <div style={{ display: 'flex', gap: 8 }}>
               <button style={cancelBtnStyle} onClick={() => setSensorModal(null)}>キャンセル</button>
-              <button style={saveBtnStyle} onClick={handleSensorSubmit} disabled={sensorSubmitting || !sensorForm.name.trim()}>
+              <button style={saveBtnStyle} onClick={handleSensorSubmit} disabled={sensorSubmitting || !sensorForm.name.trim() || !sensorForm.field_id}>
                 {sensorSubmitting ? '保存中…' : '保存'}
               </button>
             </div>
