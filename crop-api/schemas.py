@@ -172,6 +172,7 @@ class SensorOut(BaseModel):
 
 # --- SensorReading ---
 class SensorReadingCreate(BaseModel):
+    token: str
     metric: str
     value: float
     unit: Optional[str] = None

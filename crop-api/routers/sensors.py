@@ -2,7 +2,7 @@ import os
 import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.orm import Session
 from database import get_db
 from auth import get_current_user
@@ -19,6 +19,12 @@ def get_sensor_photo_dir(sensor_id: int) -> str:
     path = os.path.join(settings.SENSOR_PHOTO_DIR, str(sensor_id))
     os.makedirs(path, exist_ok=True)
     return path
+
+
+def verify_sensor_token(sensor: models.Sensor, token: str):
+    """センサーのtokenを検証する。不一致なら403を返す"""
+    if sensor.token != token:
+        raise HTTPException(status_code=403, detail="Invalid sensor token")
 
 
 # ----------------------------------------------------------------
@@ -82,7 +88,7 @@ def delete_sensor(
 
 
 # ----------------------------------------------------------------
-# 計測値の記録（センサーデバイスからのPOST想定・認証不要）
+# 計測値の記録（センサーデバイスからのPOST・tokenで認証）
 # ----------------------------------------------------------------
 
 @router.post("/sensors/{sensor_id}/readings", response_model=schemas.SensorReadingOut)
@@ -91,10 +97,11 @@ def post_reading(
     body: schemas.SensorReadingCreate,
     db: Session = Depends(get_db),
 ):
-    """センサーデバイスから計測値を受け取る（認証不要）"""
+    """センサーデバイスから計測値を受け取る（tokenで認証）"""
     sensor = db.query(models.Sensor).filter(models.Sensor.id == sensor_id).first()
     if not sensor:
         raise HTTPException(status_code=404, detail="Sensor not found")
+    verify_sensor_token(sensor, body.token)
     reading = models.SensorReading(
         sensor_id=sensor_id,
         metric=body.metric,
@@ -123,20 +130,22 @@ def get_readings(
 
 
 # ----------------------------------------------------------------
-# 写真のアップロード・取得（センサーカメラ対応・認証不要）
+# 写真のアップロード・取得（センサーカメラ対応・tokenで認証）
 # ----------------------------------------------------------------
 
 @router.post("/sensors/{sensor_id}/photos", response_model=schemas.SensorPhotoOut)
 async def upload_sensor_photo(
     sensor_id: int,
+    token: str = Query(..., description="センサートークン"),
     file: UploadFile = File(...),
     taken_at: Optional[datetime] = None,
     db: Session = Depends(get_db),
 ):
-    """センサーカメラから写真を受け取る（認証不要）"""
+    """センサーカメラから写真を受け取る（tokenで認証）"""
     sensor = db.query(models.Sensor).filter(models.Sensor.id == sensor_id).first()
     if not sensor:
         raise HTTPException(status_code=404, detail="Sensor not found")
+    verify_sensor_token(sensor, token)
 
     photo_dir = get_sensor_photo_dir(sensor_id)
     ext = os.path.splitext(file.filename or "")[1].lower() or ".jpg"
@@ -146,7 +155,6 @@ async def upload_sensor_photo(
     with open(file_path, "wb") as f:
         f.write(await file.read())
 
-    # DBにはnginxで配信するURLパスを保存
     url_path = f"/sensor-photos/{sensor_id}/{filename}"
 
     photo = models.SensorPhoto(
@@ -258,8 +266,8 @@ def seed_sensor_dummy(
 
         metrics = [
             ("water_level",   "cm",  15.0, 3.0),
-            ("water_temp",    "°C",  22.0, 2.0),
-            ("air_temp",      "°C",  20.0, 4.0),
+            ("water_temp",    "\u00b0C",  22.0, 2.0),
+            ("air_temp",      "\u00b0C",  20.0, 4.0),
             ("soil_moisture", "%",   65.0, 10.0),
         ]
         for hours_ago in range(24, -1, -1):
