@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { fieldsApi, sensorsApi } from '../api'
 import type { Field, SensorOut, SensorReadingOut, SensorPhotoOut } from '../api'
 import AppHeader from '../components/AppHeader'
+import BottomNav from '../components/BottomNav'
 
 const METRIC_CONFIG: Record<string, { label: string; unit: string; color: string; max: number; min: number }> = {
   water_level:   { label: '水位',    unit: 'cm', color: '#378ADD', max: 25,  min: 0  },
@@ -29,9 +30,7 @@ export default function SensorDetail() {
     queryKey: ['fields'],
     queryFn: () => fieldsApi.list().then(r => r.data),
   })
-
   const activeFieldId = selectedFieldId ?? fields[0]?.id ?? null
-
   useEffect(() => {
     if (!selectedFieldId && fields.length > 0) setSelectedFieldId(fields[0].id)
   }, [fields, selectedFieldId])
@@ -41,9 +40,7 @@ export default function SensorDetail() {
     queryFn: () => sensorsApi.list(activeFieldId!).then(r => r.data),
     enabled: !!activeFieldId,
   })
-
   const activeSensorId = selectedSensorId ?? sensors[0]?.id ?? null
-
   useEffect(() => {
     if (sensors.length > 0) setSelectedSensorId(sensors[0].id)
   }, [sensors])
@@ -53,7 +50,6 @@ export default function SensorDetail() {
     queryFn: () => sensorsApi.readings(activeSensorId!, selectedMetric, chartRange === '24h' ? 24 : 168).then(r => r.data),
     enabled: !!activeSensorId,
   })
-
   const { data: allReadings = [] } = useQuery<SensorReadingOut[]>({
     queryKey: ['readings-all', activeSensorId],
     queryFn: () => sensorsApi.readings(activeSensorId!, undefined, 200).then(r => r.data),
@@ -68,7 +64,6 @@ export default function SensorDetail() {
     queryFn: () => sensorsApi.photos(activeSensorId!).then(r => r.data),
     enabled: !!activeSensorId,
   })
-
   const activePhoto = photos.find(p => p.id === selectedPhotoId) ?? photos[0] ?? null
 
   const chartData = [...readings].reverse()
@@ -88,26 +83,21 @@ export default function SensorDetail() {
     chartPath = 'M' + pts.join(' L')
     chartArea = chartPath + ` L${(W - pad).toFixed(1)},${(H - pad).toFixed(1)} L${pad},${(H - pad).toFixed(1)} Z`
   }
-
   const chartLabels = chartRange === '24h'
     ? ['0:00', '6:00', '12:00', '18:00', '24:00']
     : ['7日前', '6日前', '5日前', '4日前', '3日前', '2日前', '昨日', '今日']
-
   const cfg = METRIC_CONFIG[selectedMetric]
 
   return (
     <div style={pageStyle}>
       <AppHeader />
-
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', paddingBottom: 72 }}>
 
         <div style={sectionLabelStyle}>圃場</div>
         <div style={pillRowStyle}>
           {fields.map(f => (
             <div key={f.id} onClick={() => { setSelectedFieldId(f.id); setSelectedSensorId(null) }}
-              style={f.id === activeFieldId ? activePillStyle : pillStyle}>
-              {f.name}
-            </div>
+              style={f.id === activeFieldId ? activePillStyle : pillStyle}>{f.name}</div>
           ))}
         </div>
 
@@ -117,9 +107,7 @@ export default function SensorDetail() {
             <div style={pillRowStyle}>
               {sensors.map(s => (
                 <div key={s.id} onClick={() => setSelectedSensorId(s.id)}
-                  style={s.id === activeSensorId ? activeSensorPillStyle : sensorPillStyle}>
-                  {s.name}
-                </div>
+                  style={s.id === activeSensorId ? activeSensorPillStyle : sensorPillStyle}>{s.name}</div>
               ))}
             </div>
           </>
@@ -128,9 +116,7 @@ export default function SensorDetail() {
         <div style={sectionLabelStyle}>
           最新センサー値
           {latestReadings[0] && (
-            <span style={{ fontSize: 10, color: '#bbb', marginLeft: 6 }}>
-              {formatDate(latestReadings[0].recorded_at)} 更新
-            </span>
+            <span style={{ fontSize: 10, color: '#bbb', marginLeft: 6 }}>{formatDate(latestReadings[0].recorded_at)} 更新</span>
           )}
         </div>
 
@@ -183,10 +169,10 @@ export default function SensorDetail() {
                 <stop offset="100%" stopColor={chartColor} stopOpacity="0" />
               </linearGradient>
             </defs>
-            <line x1={pad} y1={H - pad} x2={W - pad} y2={H - pad} stroke="#eee" strokeWidth="0.5" />
+            <line x1={pad} y1={H-pad} x2={W-pad} y2={H-pad} stroke="#eee" strokeWidth="0.5" />
             {chartArea && <path d={chartArea} fill="url(#cg)" />}
             {chartPath && <path d={chartPath} stroke={chartColor} strokeWidth="1.5" fill="none" strokeLinejoin="round" strokeLinecap="round" />}
-            {chartData.length === 0 && <text x={W / 2} y={H / 2} fontSize="10" fill="#ccc" textAnchor="middle">データなし</text>}
+            {chartData.length === 0 && <text x={W/2} y={H/2} fontSize="10" fill="#ccc" textAnchor="middle">データなし</text>}
             {chartLabels.map((l, i) => {
               const x = pad + (i / (chartLabels.length - 1)) * (W - pad * 2)
               return <text key={l} x={x.toFixed(1)} y={H} fontSize="8" fill="#bbb" textAnchor="middle">{l}</text>
@@ -200,8 +186,7 @@ export default function SensorDetail() {
             <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: 10, overflow: 'hidden', position: 'relative', marginBottom: 8 }}>
               <img src={activePhoto?.file_path} alt="センサー写真"
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-              />
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
               <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent, rgba(0,0,0,0.5))', padding: '8px 10px' }}>
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)' }}>
                   {activePhoto ? formatDate(activePhoto.taken_at) : ''} — {sensors.find(s => s.id === activeSensorId)?.name}
@@ -227,6 +212,7 @@ export default function SensorDetail() {
           </div>
         )}
       </div>
+      <BottomNav />
     </div>
   )
 }

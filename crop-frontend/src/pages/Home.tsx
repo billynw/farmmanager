@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { fieldsApi, itemsApi } from '../api'
 import type { Item, Field, FieldSensorSummary, SensorLatestReading } from '../api'
 import AppHeader from '../components/AppHeader'
+import BottomNav from '../components/BottomNav'
 
 const METRIC_CONFIG: Record<string, { label: string; unit: string; color: string; max: number; min: number }> = {
   water_level:   { label: '水位',    unit: 'cm', color: '#378ADD', max: 25,  min: 0  },
@@ -27,9 +28,7 @@ function aggregateLatest(summary: FieldSensorSummary): SensorLatestReading[] {
   for (const sensor of summary.sensors) {
     for (const r of sensor.latest) {
       const existing = map.get(r.metric)
-      if (!existing || new Date(r.recorded_at) > new Date(existing.recorded_at)) {
-        map.set(r.metric, r)
-      }
+      if (!existing || new Date(r.recorded_at) > new Date(existing.recorded_at)) map.set(r.metric, r)
     }
   }
   return Array.from(map.values())
@@ -43,14 +42,12 @@ export default function Home() {
     queryKey: ['fields'],
     queryFn: () => fieldsApi.list().then(r => r.data),
   })
-
   const { data: items = [], isLoading: itemsLoading } = useQuery<Item[]>({
     queryKey: ['items', 'home'],
     queryFn: () => itemsApi.list({ status: 'growing' }).then(r => r.data),
   })
 
   const activeFieldId = selectedFieldId ?? fields[0]?.id ?? null
-
   useEffect(() => {
     if (!selectedFieldId && fields.length > 0) setSelectedFieldId(fields[0].id)
   }, [fields, selectedFieldId])
@@ -60,32 +57,24 @@ export default function Home() {
     queryFn: () => fieldsApi.sensorSummary(activeFieldId!).then(r => r.data),
     enabled: !!activeFieldId,
   })
-
   const sensorReadings = sensorSummary ? aggregateLatest(sensorSummary) : []
 
   const recentItems = [...items]
     .filter(item => item.latest_work_log)
-    .sort((a, b) =>
-      new Date(b.latest_work_log!.worked_at).getTime() -
-      new Date(a.latest_work_log!.worked_at).getTime()
-    )
+    .sort((a, b) => new Date(b.latest_work_log!.worked_at).getTime() - new Date(a.latest_work_log!.worked_at).getTime())
     .slice(0, 5)
 
   return (
     <div style={pageStyle}>
       <AppHeader />
-
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', paddingBottom: 72 }}>
 
         <div style={sectionLabelStyle}>センサー概要</div>
         {fields.length > 0 && (
           <div style={{ display: 'flex', gap: 6, marginBottom: 10, overflowX: 'auto', paddingBottom: 2 }}>
             {fields.map(f => (
-              <div
-                key={f.id}
-                onClick={() => setSelectedFieldId(f.id)}
-                style={f.id === activeFieldId ? activePillStyle : pillStyle}
-              >
+              <div key={f.id} onClick={() => setSelectedFieldId(f.id)}
+                style={f.id === activeFieldId ? activePillStyle : pillStyle}>
                 {f.name}
               </div>
             ))}
@@ -98,16 +87,7 @@ export default function Home() {
               const cfg = METRIC_CONFIG[r.metric]
               if (!cfg) return null
               const pct = (r.value - cfg.min) / (cfg.max - cfg.min) * 100
-              return (
-                <SensorCard
-                  key={r.metric}
-                  label={cfg.label}
-                  value={r.value}
-                  unit={r.unit ?? cfg.unit}
-                  color={cfg.color}
-                  pct={pct}
-                />
-              )
+              return <SensorCard key={r.metric} label={cfg.label} value={r.value} unit={r.unit ?? cfg.unit} color={cfg.color} pct={pct} />
             })}
           </div>
         ) : (
@@ -160,12 +140,12 @@ export default function Home() {
             )}
           </div>
         ))}
-
         <div style={{ textAlign: 'center', fontSize: 13, color: '#2d7a4f', padding: 8, cursor: 'pointer' }}
           onClick={() => navigate('/items')}>
           作物一覧をすべて見る →
         </div>
       </div>
+      <BottomNav />
     </div>
   )
 }

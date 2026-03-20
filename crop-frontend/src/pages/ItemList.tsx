@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { itemsApi, fieldsApi, exportApi } from '../api'
 import type { Item } from '../api'
 import AppHeader from '../components/AppHeader'
+import BottomNav from '../components/BottomNav'
 
 const STATUS_LABEL: Record<string, string> = { growing: '栽培中', finished: '終了' }
 const STATUS_COLOR: Record<string, string> = { growing: '#2d7a4f', finished: '#888' }
@@ -34,11 +35,7 @@ export default function ItemList() {
 
   return (
     <div style={pageStyle}>
-      <AppHeader
-        actions={
-          <button onClick={() => setShowExport(true)} style={smallBtnStyle}>CSV</button>
-        }
-      />
+      <AppHeader actions={<button onClick={() => setShowExport(true)} style={smallBtnStyle}>CSV</button>} />
 
       <div style={{ display: 'flex', gap: 8, padding: '12px 16px', background: '#fff', borderBottom: '1px solid #eee' }}>
         <select style={selectStyle} value={fieldFilter ?? ''} onChange={e => setFieldFilter(e.target.value ? Number(e.target.value) : undefined)}>
@@ -52,7 +49,7 @@ export default function ItemList() {
         </select>
       </div>
 
-      <div style={{ padding: '12px 16px', flex: 1, overflowY: 'auto' }}>
+      <div style={{ padding: '12px 16px', flex: 1, overflowY: 'auto', paddingBottom: 72 }}>
         {isLoading && <p style={{ color: '#888', textAlign: 'center', marginTop: 40 }}>読み込み中...</p>}
         {!isLoading && items.length === 0 && (
           <p style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>作物が登録されていません</p>
@@ -63,7 +60,7 @@ export default function ItemList() {
       </div>
 
       {showExport && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end' }}
           onClick={() => setShowExport(false)}>
           <div style={{ background: '#fff', width: '100%', borderRadius: '16px 16px 0 0', padding: '20px 16px 32px' }}
             onClick={e => e.stopPropagation()}>
@@ -82,21 +79,20 @@ export default function ItemList() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <button style={{ padding: '13px', background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}
-                onClick={() => downloadCsv(
-                  () => exportApi.workLogsCsv({ from: exportFrom || undefined, to: exportTo || undefined }),
-                  `work_logs_${exportFrom || 'all'}.csv`
-                )}>作業ログをダウンロード</button>
+                onClick={() => downloadCsv(() => exportApi.workLogsCsv({ from: exportFrom || undefined, to: exportTo || undefined }), `work_logs_${exportFrom || 'all'}.csv`)}>
+                作業ログをダウンロード
+              </button>
               <button style={{ padding: '13px', background: '#1a5c38', color: '#fff', border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}
-                onClick={() => downloadCsv(
-                  () => exportApi.harvestsCsv({ from: exportFrom || undefined, to: exportTo || undefined }),
-                  `harvests_${exportFrom || 'all'}.csv`
-                )}>収穫記録をダウンロード</button>
+                onClick={() => downloadCsv(() => exportApi.harvestsCsv({ from: exportFrom || undefined, to: exportTo || undefined }), `harvests_${exportFrom || 'all'}.csv`)}>
+                収穫記録をダウンロード
+              </button>
             </div>
           </div>
         </div>
       )}
 
       <button style={fabStyle} onClick={() => navigate('/items/new')}>＋ 作物を追加</button>
+      <BottomNav />
     </div>
   )
 }
@@ -141,9 +137,9 @@ const pageStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column
 const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: '14px 16px', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }
 const selectStyle: React.CSSProperties = { flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14, background: '#fff' }
 const fabStyle: React.CSSProperties = {
-  position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+  position: 'fixed', bottom: 64, left: '50%', transform: 'translateX(-50%)',
   background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 50,
   padding: '14px 28px', fontSize: 16, fontWeight: 600, cursor: 'pointer',
-  boxShadow: '0 4px 16px rgba(45,122,79,0.35)', whiteSpace: 'nowrap',
+  boxShadow: '0 4px 16px rgba(45,122,79,0.35)', whiteSpace: 'nowrap', zIndex: 50,
 }
 const smallBtnStyle: React.CSSProperties = { fontSize: 12, padding: '4px 10px', border: '1px solid #ddd', borderRadius: 6, background: '#fff', cursor: 'pointer', color: '#666' }
