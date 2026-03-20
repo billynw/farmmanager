@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/v1", tags=["sensors"])
 
 def get_sensor_photo_dir(sensor_id: int) -> str:
     """センサーIDごとのディレクトリパスを返す"""
-    path = os.path.join(settings.SENSOR_PHOTO_DIR, f"sensor_{sensor_id}")
+    path = os.path.join(settings.SENSOR_PHOTO_DIR, str(sensor_id))
     os.makedirs(path, exist_ok=True)
     return path
 
@@ -130,7 +130,7 @@ async def upload_sensor_photo(
         f.write(await file.read())
 
     # DBにはnginxで配信するURLパスを保存
-    url_path = f"/sensor-photos/sensor_{sensor_id}/{filename}"
+    url_path = f"/sensor-photos/{sensor_id}/{filename}"
 
     photo = models.SensorPhoto(
         sensor_id=sensor_id,
