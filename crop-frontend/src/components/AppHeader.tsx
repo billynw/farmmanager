@@ -16,10 +16,11 @@ export default function AppHeader({ backTo, title, subtitle, actions }: AppHeade
 
   return (
     <>
-      {/* ロゴ + ユーザー名・ログアウト */}
+      {/* ロゴ + ユーザー名・ログアウト（+ トップレベルページのactions） */}
       <div style={headerStyle}>
         <img src={logoImg} alt="ロゴ" style={{ height: 32, objectFit: 'contain' }} />
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {!backTo && actions}
           <span style={{ fontSize: 13, color: '#666' }}>{user?.name}</span>
           <button onClick={logout} style={smallBtnStyle}>ログアウト</button>
         </div>
