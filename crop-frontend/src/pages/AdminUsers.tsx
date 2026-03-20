@@ -84,14 +84,7 @@ export default function AdminUsers() {
 
   return (
     <div style={pageStyle}>
-      <AppHeader
-        actions={
-          <button style={addBtnStyle} onClick={() => {
-            if (tab === 'users') setShowUserForm(true)
-            else { setEditField(null); setShowFieldForm(true) }
-          }}>＋ 追加</button>
-        }
-      />
+      <AppHeader />
 
       <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #eee' }}>
         {(['fields', 'users'] as Tab[]).map(t => (
@@ -228,6 +221,16 @@ export default function AdminUsers() {
           onSaved={() => { qc.invalidateQueries({ queryKey: ['fields'] }); setShowFieldForm(false) }}
         />
       )}
+
+      {/* ＋追加ボタン（BottomNavの直上） */}
+      <div style={addBarStyle}>
+        <button style={addBtnStyle} onClick={() => {
+          if (tab === 'users') setShowUserForm(true)
+          else { setEditField(null); setShowFieldForm(true) }
+        }}>
+          ＋ 追加
+        </button>
+      </div>
 
       <BottomNav />
     </div>
@@ -423,5 +426,25 @@ const modalStyle: React.CSSProperties = { background: '#fff', width: '100%', bor
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: 13, color: '#444', marginBottom: 4 }
 const inputStyle: React.CSSProperties = { display: 'block', width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 15, boxSizing: 'border-box' }
 const btnStyle: React.CSSProperties = { flex: 1, padding: '12px', background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: 'pointer' }
-const addBtnStyle: React.CSSProperties = { fontSize: 13, padding: '6px 14px', background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }
+const addBarStyle: React.CSSProperties = {
+  position: 'fixed',
+  bottom: 'calc(56px + env(safe-area-inset-bottom))',
+  left: 0, right: 0,
+  padding: '8px 16px',
+  background: '#fff',
+  borderTop: '1px solid #eee',
+  zIndex: 99,
+}
+const addBtnStyle: React.CSSProperties = {
+  display: 'block',
+  width: '100%',
+  padding: '12px',
+  background: '#2d7a4f',
+  color: '#fff',
+  border: 'none',
+  borderRadius: 10,
+  fontSize: 15,
+  fontWeight: 600,
+  cursor: 'pointer',
+}
 const smallBtnStyle: React.CSSProperties = { fontSize: 12, padding: '4px 10px', border: '1px solid #ddd', borderRadius: 6, background: '#fff', cursor: 'pointer', color: '#666' }
