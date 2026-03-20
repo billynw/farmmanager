@@ -14,6 +14,8 @@ import ItemForm from './pages/ItemForm'
 import WorkLogNew from './pages/WorkLogNew'
 import WorkLogEdit from './pages/WorkLogEdit'
 import Harvests from './pages/Harvests'
+import HarvestNew from './pages/HarvestNew'
+import HarvestEdit from './pages/HarvestEdit'
 import AdminUsers from './pages/AdminUsers'
 import SensorDetail from './pages/SensorDetail'
 
@@ -48,6 +50,8 @@ export default function App() {
           <Route path="/items/:id/log/new" element={<RequireAuth><WorkLogNew /></RequireAuth>} />
           <Route path="/items/:id/log/:logId/edit" element={<RequireAuth><WorkLogEdit /></RequireAuth>} />
           <Route path="/items/:id/harvests" element={<RequireAuth><Harvests /></RequireAuth>} />
+          <Route path="/items/:id/harvests/new" element={<RequireAuth><HarvestNew /></RequireAuth>} />
+          <Route path="/items/:id/harvests/:harvestId/edit" element={<RequireAuth><HarvestEdit /></RequireAuth>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
