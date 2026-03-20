@@ -47,6 +47,13 @@ export default function ItemList() {
         </div>
       </div>
 
+      {/* ナビタブ */}
+      <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #eee' }}>
+        <div style={tabStyle} onClick={() => navigate('/')}>ホーム</div>
+        <div style={{ ...tabStyle, color: '#2d7a4f', borderBottom: '2px solid #2d7a4f', fontWeight: 500 }}>作物一覧</div>
+        <div style={tabStyle} onClick={() => navigate('/sensors')}>センサー</div>
+      </div>
+
       <div style={{ display: 'flex', gap: 8, padding: '12px 16px', background: '#fff', borderBottom: '1px solid #eee' }}>
         <select style={selectStyle} value={fieldFilter ?? ''} onChange={e => setFieldFilter(e.target.value ? Number(e.target.value) : undefined)}>
           <option value="">全圃場</option>
@@ -146,6 +153,7 @@ function ItemCard({ item, onClick }: { item: Item; onClick: () => void }) {
 
 const pageStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', height: '100dvh', background: '#f5f5f0', position: 'relative' }
 const headerStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', background: '#fff', borderBottom: '1px solid #eee' }
+const tabStyle: React.CSSProperties = { flex: 1, padding: '10px 0', textAlign: 'center', fontSize: 13, color: '#999', borderBottom: '2px solid transparent', cursor: 'pointer' }
 const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: '14px 16px', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }
 const selectStyle: React.CSSProperties = { flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14, background: '#fff' }
 const fabStyle: React.CSSProperties = {
