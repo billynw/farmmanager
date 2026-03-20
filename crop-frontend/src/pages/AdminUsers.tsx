@@ -16,7 +16,7 @@ const ROLE_LABEL: Record<UserFieldRole, string> = {
 const ROLE_COLOR: Record<UserFieldRole, string> = {
   owner: '#2d7a4f',
   manager: '#1a5fa8',
-  member: '#888',
+  member: '#888888',  // 6桁にしないと + '22' で壊れる
 }
 
 function canDelete(myRole: UserFieldRole | undefined, targetRole: UserFieldRole | undefined): boolean {
@@ -174,7 +174,6 @@ export default function AdminUsers() {
                   const showDelete = !isSelf && canDelete(myRoleInSelectedField, user.field_role)
                   const toggleable = !isSelf && canChangeRole(myRoleInSelectedField, user.field_role)
                   const isToggling = togglingUserId === user.id
-                  // 削除ボタン幅分（32px）を確保して右端を揃える
                   const DELETE_BTN_W = 32
                   return (
                     <div key={user.id} style={cardStyle}>
@@ -182,9 +181,7 @@ export default function AdminUsers() {
                         <div style={{ fontWeight: 600, fontSize: 15 }}>{user.name}</div>
                         {user.email && <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{user.email}</div>}
                       </div>
-                      {/* 右エリア: ロールバッジ + 削除ボタン（常に同幅を確保） */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        {/* ロールバッジ：常に表示 */}
                         {user.field_role && (
                           <span
                             onClick={() => toggleable && !isToggling && handleRoleToggle(user.id, user.field_role!)}
@@ -202,7 +199,6 @@ export default function AdminUsers() {
                             {isToggling ? '…' : ROLE_LABEL[user.field_role]}
                           </span>
                         )}
-                        {/* 削除ボタン or スペーサー（常に同幅） */}
                         {showDelete ? (
                           <button
                             style={{
@@ -221,7 +217,6 @@ export default function AdminUsers() {
                             <TrashIcon size={17} color="#c0392b" />
                           </button>
                         ) : (
-                          /* スペーサー: 削除ボタンがない行でも右端を揃える */
                           <div style={{ width: DELETE_BTN_W, flexShrink: 0 }} />
                         )}
                       </div>
