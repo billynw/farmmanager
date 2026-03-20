@@ -5,6 +5,7 @@ import { itemsApi, workLogsApi } from '../api'
 import type { WorkLog } from '../api'
 import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
+import { TrashIcon, EditIcon, iconBtnStyle } from '../components/Icons'
 
 export default function ItemDetail() {
   const { id } = useParams<{ id: string }>()
@@ -58,7 +59,6 @@ export default function ItemDetail() {
         <div style={tabStyle} onClick={() => navigate(`/items/${itemId}/harvests`)}>収穫記録</div>
       </div>
 
-      {/* コンテンツ: フッターボタン(64px) + BottomNav(56px) 分の余白 */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', paddingBottom: 136 }}>
         {isLoading && <p style={{ color: '#888', textAlign: 'center', marginTop: 30 }}>読み込み中...</p>}
         {!isLoading && logs.length === 0 && <p style={{ color: '#aaa', textAlign: 'center', marginTop: 30 }}>作業記録がありません</p>}
@@ -75,7 +75,6 @@ export default function ItemDetail() {
         </div>
       </div>
 
-      {/* BottomNavの上に固定 */}
       <div style={{ position: 'fixed', bottom: 56, left: 0, right: 0, padding: '12px 16px', background: '#fff', borderTop: '1px solid #eee', zIndex: 50 }}>
         <button style={addBtnStyle} onClick={() => navigate(`/items/${itemId}/log/new`)}>
           ＋ 作業を記録する
@@ -135,9 +134,13 @@ function LogCard({ log, onDelete, onImageClick, onEdit }: {
           )}
           <span style={{ fontSize: 12, color: '#999' }}>{dateStr}</span>
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={onEdit} style={{ background: 'none', border: 'none', color: '#2d7a4f', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>編集</button>
-          <button onClick={onDelete} style={{ background: 'none', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: 16 }}>×</button>
+        <div style={{ display: 'flex', gap: 2 }}>
+          <button onClick={onEdit} style={iconBtnStyle} title="編集">
+            <EditIcon size={17} />
+          </button>
+          <button onClick={onDelete} style={iconBtnStyle} title="削除">
+            <TrashIcon size={17} />
+          </button>
         </div>
       </div>
       {log.memo && <p style={{ margin: '8px 0 0', fontSize: 14, color: '#333', lineHeight: 1.5 }}>{log.memo}</p>}

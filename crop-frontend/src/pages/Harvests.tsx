@@ -6,6 +6,7 @@ import { itemsApi, harvestsApi } from '../api'
 import type { Harvest } from '../api'
 import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
+import { TrashIcon, EditIcon, iconBtnStyle } from '../components/Icons'
 
 type FormData = {
   harvested_at: string
@@ -127,7 +128,6 @@ export default function Harvests() {
         </div>
       )}
 
-      {/* コンテンツ: フッターボタン(64px) + BottomNav(56px) 分の余白 */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', paddingBottom: 136 }}>
         {isLoading && <p style={{ color: '#888', textAlign: 'center', marginTop: 30 }}>読み込み中...</p>}
         {!isLoading && harvests.length === 0 && (
@@ -150,7 +150,7 @@ export default function Harvests() {
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
                 {editTarget ? '収穫記録を編集' : '収穫を記録する'}
               </h3>
-              <button onClick={() => setShowForm(false)} style={iconBtnStyle}>×</button>
+              <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#444', padding: 0 }}>×</button>
             </div>
             <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <label style={labelStyle}>
@@ -165,7 +165,7 @@ export default function Harvests() {
                 <label style={{ ...labelStyle, flex: 1 }}>
                   単位
                   <select {...register('unit')} style={inputStyle}>
-                    {['kg', 'g', '個', '箱', '束', 'L'].map(u => (
+                    {['kg', 'g', '個', '筱', '束', 'L'].map(u => (
                       <option key={u} value={u}>{u}</option>
                     ))}
                   </select>
@@ -188,7 +188,6 @@ export default function Harvests() {
         </div>
       )}
 
-      {/* BottomNavの上に固定 */}
       <div style={{ position: 'fixed', bottom: 56, left: 0, right: 0, padding: '12px 16px', background: '#fff', borderTop: '1px solid #eee', zIndex: 50 }}>
         <button style={addBtnStyle} onClick={openNew}>＋ 収穫を記録する</button>
       </div>
@@ -204,7 +203,7 @@ function HarvestCard({ harvest: h, onEdit, onDelete }: { harvest: Harvest; onEdi
   return (
     <div style={{ background: '#fff', borderRadius: 12, padding: '12px 14px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', borderLeft: '4px solid #2d7a4f' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', flex: 1 }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a' }}>{dateStr}</span>
           {h.quantity != null && (
             <span style={{ fontSize: 15, fontWeight: 700, color: '#2d7a4f' }}>
@@ -215,9 +214,13 @@ function HarvestCard({ harvest: h, onEdit, onDelete }: { harvest: Harvest; onEdi
             <span style={{ fontSize: 11, background: '#fff3e0', color: '#e65100', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>出荷済</span>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 4 }}>
-          <button onClick={onEdit} style={{ ...smallBtnStyle, color: '#2d7a4f', borderColor: '#2d7a4f' }}>編集</button>
-          <button onClick={onDelete} style={{ ...smallBtnStyle, color: '#c0392b', borderColor: '#e0bbb8' }}>削除</button>
+        <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+          <button onClick={onEdit} style={iconBtnStyle} title="編集">
+            <EditIcon size={17} />
+          </button>
+          <button onClick={onDelete} style={iconBtnStyle} title="削除">
+            <TrashIcon size={17} />
+          </button>
         </div>
       </div>
       {h.memo && <p style={{ margin: '8px 0 0', fontSize: 14, color: '#555', lineHeight: 1.5 }}>{h.memo}</p>}
@@ -227,11 +230,9 @@ function HarvestCard({ harvest: h, onEdit, onDelete }: { harvest: Harvest; onEdi
 
 const tabStyle: React.CSSProperties = { flex: 1, textAlign: 'center', padding: '10px', fontSize: 14, color: '#888', cursor: 'pointer' }
 const activeTabStyle: React.CSSProperties = { ...tabStyle, color: '#2d7a4f', borderBottom: '2px solid #2d7a4f', fontWeight: 600 }
-const iconBtnStyle: React.CSSProperties = { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#444', padding: 0 }
 const labelStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: '#555', fontWeight: 500 }
 const inputStyle: React.CSSProperties = { padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 15, background: '#fafafa', outline: 'none' }
 const addBtnStyle: React.CSSProperties = { display: 'block', width: '100%', padding: '14px', background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 10, fontSize: 16, fontWeight: 600, cursor: 'pointer' }
 const submitBtnStyle: React.CSSProperties = { ...addBtnStyle, marginTop: 4 }
-const smallBtnStyle: React.CSSProperties = { fontSize: 12, padding: '4px 10px', border: '1px solid #ddd', borderRadius: 6, background: '#fff', cursor: 'pointer' }
 const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }
 const drawerStyle: React.CSSProperties = { background: '#fff', width: '100%', borderRadius: '16px 16px 0 0', padding: '20px 16px 32px', maxHeight: '90dvh', overflowY: 'auto' }
