@@ -153,7 +153,7 @@ export default function AdminUsers() {
                   value={selectedFieldId ?? ''}
                   onChange={e => setSelectedFieldId(Number(e.target.value))}
                 >
-                  {manageableFields.map(f => <option key={f.id} value={f.id}>{f.name}（{ROLE_LABEL[f.my_role!]}）</option>)}
+                  {manageableFields.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                 </select>
               </div>
               <div style={{ padding: '12px 16px', overflowY: 'auto', flex: 1 }}>
@@ -333,16 +333,9 @@ function UserInviteModal({ manageableFields, onClose, onSaved }: {
                 }}>
                   <input type="checkbox" checked={sel.checked} onChange={() => toggleField(field.id)}
                     style={{ width: 18, height: 18, cursor: 'pointer', flexShrink: 0 }} />
-                  <div style={{ flex: 1 }}>
-                    <span style={{ fontSize: 14, fontWeight: 500, color: sel.checked ? '#1a1a1a' : '#888' }}>
-                      {field.name}
-                    </span>
-                    {field.my_role && (
-                      <span style={{ fontSize: 11, marginLeft: 6, color: ROLE_COLOR[field.my_role] }}>
-                        ({ROLE_LABEL[field.my_role]})
-                      </span>
-                    )}
-                  </div>
+                  <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: sel.checked ? '#1a1a1a' : '#888' }}>
+                    {field.name}
+                  </span>
                   <span
                     onClick={() => sel.checked && toggleRole(field.id)}
                     style={{
