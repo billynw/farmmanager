@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { itemsApi, fieldsApi } from '../api'
+import AppHeader from '../components/AppHeader'
+import BottomNav from '../components/BottomNav'
 
 export default function ItemForm() {
   const { id } = useParams<{ id: string }>()
@@ -43,12 +45,9 @@ export default function ItemForm() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: '#f5f5f0' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', background: '#fff', borderBottom: '1px solid #eee' }}>
-        <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#444' }}>←</button>
-        <div style={{ fontWeight: 700, fontSize: 16 }}>{isEdit ? '作物を編集' : '作物を追加'}</div>
-      </div>
+      <AppHeader backTo={isEdit ? `/items/${itemId}` : '/items'} title={isEdit ? '作物を編集' : '作物を追加'} />
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 16, paddingBottom: 80 }}>
         <div style={{ background: '#fff', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <label style={labelStyle}>作物名 *</label>
@@ -81,13 +80,15 @@ export default function ItemForm() {
         </div>
       </div>
 
-      <div style={{ padding: '12px 16px', background: '#fff', borderTop: '1px solid #eee' }}>
+      <div style={{ padding: '12px 16px', background: '#fff', borderTop: '1px solid #eee', paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}>
         <button onClick={() => mutation.mutate()} disabled={!name || mutation.isPending}
           style={{ display: 'block', width: '100%', padding: '14px', background: name ? '#2d7a4f' : '#ccc', color: '#fff', border: 'none', borderRadius: 10, fontSize: 16, fontWeight: 600, cursor: name ? 'pointer' : 'not-allowed' }}>
           {mutation.isPending ? '保存中...' : '保存する'}
         </button>
         {mutation.isError && <p style={{ color: '#c0392b', fontSize: 13, marginTop: 8, textAlign: 'center' }}>保存に失敗しました</p>}
       </div>
+
+      <BottomNav />
     </div>
   )
 }
