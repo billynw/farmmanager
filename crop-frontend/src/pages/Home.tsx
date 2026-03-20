@@ -15,7 +15,7 @@ const METRIC_CONFIG: Record<string, { label: string; unit: string; color: string
   gate_open:     { label: 'ゲート',  unit: '',   color: '#e67e22', max: 1,   min: 0  },
 }
 
-const STATUS_LABEL: Record<string, string> = { growing: '活肍中', finished: '終了' }
+const STATUS_LABEL: Record<string, string> = { growing: '栽培中', finished: '終了' }
 const STATUS_COLOR: Record<string, string> = { growing: '#2d7a4f', finished: '#888' }
 
 function formatDate(dateStr: string) {
