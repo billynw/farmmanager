@@ -194,7 +194,5 @@ const saveBtnBarStyle: React.CSSProperties = {
   bottom: 'calc(56px + env(safe-area-inset-bottom))',
   left: 0, right: 0,
   padding: '12px 16px',
-  background: '#fff',
-  borderTop: '1px solid #eee',
   zIndex: 99,
 }
