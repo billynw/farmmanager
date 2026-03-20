@@ -42,7 +42,7 @@ def get_my_field_role(field_id: int, user_id: int, db: Session):
 def require_owner_or_manager(field_id: int, current_user: models.User, db: Session):
     role = get_my_field_role(field_id, current_user.id, db)
     if role not in (models.UserFieldRole.owner, models.UserFieldRole.manager):
-        raise HTTPException(403, "圃場のoownerまたはmanagerのみ操作できます")
+        raise HTTPException(403, "圃場のownerまたはmanagerのみ操作できます")
 
 
 @router.get("", response_model=List[schemas.UserOut])
@@ -102,38 +102,47 @@ def invite_user(
     ).first():
         raise HTTPException(400, "このメールアドレスはメール確認待ちです")
 
-    tokens = []
+    # 既存の未使用招待を全て削除してから新規発行
+    db.query(models.InviteVerification).filter(
+        models.InviteVerification.email == data.email,
+        models.InviteVerification.used == False
+    ).delete()
+    db.flush()
+
+    # 圃場ごとにトークンを発行し、最初のトークンをメールに記載する
+    expires_at = datetime.utcnow() + timedelta(hours=24)
+    first_token = None
+    field_names = []
     for fi in data.fields:
         field = db.get(models.Field, fi.field_id)
-        if not field: continue
-        existing_invite = db.query(models.InviteVerification).filter(
-            models.InviteVerification.email == data.email,
-            models.InviteVerification.field_id == fi.field_id
-        ).first()
-        if existing_invite:
-            db.delete(existing_invite)
-            db.flush()
+        if not field:
+            continue
         token = secrets.token_hex(32)
-        expires_at = datetime.utcnow() + timedelta(hours=24)
+        if first_token is None:
+            first_token = token
         db.add(models.InviteVerification(
             name=data.name, email=data.email,
             field_id=fi.field_id, field_role=fi.field_role,
             token=token, expires_at=expires_at
         ))
-        tokens.append((field.name, token))
+        field_names.append(field.name)
 
     db.commit()
 
-    field_lines = "\n".join(
-        [f"  ・{name}\n   {settings.FRONTEND_URL}/set-password?token={tok}&type=invite"
-         for name, tok in tokens]
-    )
+    if not first_token:
+        raise HTTPException(400, "有効な圃場がありませんでした")
+
+    # メールには1つのリンクだけ記載。accept-invite側で同メール宛の全招待を一括処理する。
+    invite_url = f"{settings.FRONTEND_URL}/set-password?token={first_token}&type=invite"
+    field_list = "、".join(field_names)
     body = f"""{data.name} さん、CropWorksの圃場管理へ招待されました。
 
-以下のリンクから圃場の設定を行ってください。
+招待された圃場：{field_list}
+
+以下のリンクからパスワードを設定してください。
 リンクの有効期限は24時間です。
 
-{field_lines}
+{invite_url}
 
 このメールに心当たりがない場合は無視してください。
 """
@@ -152,12 +161,12 @@ def update_field_role(
     """
     圃場でのユーザーのロールを変更。
     - ownerへの変更は不可（招待時にのみ付与される）
-    - managerはoownerのロール変更不可
+    - managerはownerのロール変更不可
     - 自分自身のロール変更不可
     """
     my_role = get_my_field_role(field_id, current_user.id, db)
     if my_role not in (models.UserFieldRole.owner, models.UserFieldRole.manager):
-        raise HTTPException(403, "圃場のoownerまたはmanagerのみ操作できます")
+        raise HTTPException(403, "圃場のownerまたはmanagerのみ操作できます")
 
     if user_id == current_user.id:
         raise HTTPException(403, "自分自身の権限は変更できません")
@@ -173,9 +182,9 @@ def update_field_role(
     if not target_uf:
         raise HTTPException(404, "ユーザーがこの圃場に属していません")
 
-    # managerはoownerのロール変更不可
+    # managerはownerのロール変更不可
     if my_role == models.UserFieldRole.manager and target_uf.role == models.UserFieldRole.owner:
-        raise HTTPException(403, "managerはoownerの権限を変更できません")
+        raise HTTPException(403, "managerはownerの権限を変更できません")
 
     target_uf.role = field_role
     db.commit()
@@ -213,7 +222,7 @@ def remove_user_from_field(
 ):
     my_role = get_my_field_role(field_id, current_user.id, db)
     if my_role not in (models.UserFieldRole.owner, models.UserFieldRole.manager):
-        raise HTTPException(403, "圃場のoownerまたはmanagerのみ操作できます")
+        raise HTTPException(403, "圃場のownerまたはmanagerのみ操作できます")
 
     target_uf = db.query(models.UserField).filter(
         models.UserField.user_id == user_id,
@@ -223,7 +232,7 @@ def remove_user_from_field(
         return {"ok": True}
 
     if my_role == models.UserFieldRole.manager and target_uf.role == models.UserFieldRole.owner:
-        raise HTTPException(403, "managerはoownerを圃場から削除できません")
+        raise HTTPException(403, "managerはownerを圃場から削除できません")
 
     db.delete(target_uf)
     db.commit()

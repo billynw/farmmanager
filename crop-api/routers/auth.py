@@ -110,7 +110,7 @@ def verify_email(req: schemas.VerifyEmailRequest, db: Session = Depends(get_db))
 
 @router.post("/accept-invite", response_model=schemas.Token)
 def accept_invite(req: schemas.AcceptInviteRequest, db: Session = Depends(get_db)):
-    """招待トークンを検証してパスワード設定→本登録→圃場に紐づけ"""
+    """招待トークンを検証してパスワード設定→本登録→全圃場に一括紐づけ"""
     invite = db.query(models.InviteVerification).filter(
         models.InviteVerification.token == req.token,
         models.InviteVerification.used == False,
@@ -121,6 +121,35 @@ def accept_invite(req: schemas.AcceptInviteRequest, db: Session = Depends(get_db
     if len(req.password) < 6:
         raise HTTPException(400, "パスワードは6文字以上で入力してください")
 
+    # 同じメールアドレスに対する有効な招待をすべて取得
+    all_invites = db.query(models.InviteVerification).filter(
+        models.InviteVerification.email == invite.email,
+        models.InviteVerification.used == False,
+        models.InviteVerification.expires_at > datetime.utcnow()
+    ).all()
+
+    # ユーザーが既に存在する場合（招待リンクを複数回クリックした場合など）
+    existing_user = db.query(models.User).filter(models.User.email == invite.email).first()
+    if existing_user:
+        # 残っている未処理の招待を全て圃場紐づけとして処理
+        for inv in all_invites:
+            uf = db.query(models.UserField).filter(
+                models.UserField.user_id == existing_user.id,
+                models.UserField.field_id == inv.field_id
+            ).first()
+            if uf:
+                uf.role = inv.field_role
+            else:
+                db.add(models.UserField(
+                    user_id=existing_user.id,
+                    field_id=inv.field_id,
+                    role=inv.field_role
+                ))
+            inv.used = True
+        db.commit()
+        return {"access_token": create_access_token(existing_user.id), "token_type": "bearer"}
+
+    # 新規ユーザー作成
     user = models.User(
         name=invite.name,
         email=invite.email,
@@ -129,9 +158,11 @@ def accept_invite(req: schemas.AcceptInviteRequest, db: Session = Depends(get_db
     db.add(user)
     db.flush()
 
-    # 圃場に指定のロールで紐づけ
-    db.add(models.UserField(user_id=user.id, field_id=invite.field_id, role=invite.field_role))
-    invite.used = True
+    # 全ての有効な招待圃場に一括で紐づけ
+    for inv in all_invites:
+        db.add(models.UserField(user_id=user.id, field_id=inv.field_id, role=inv.field_role))
+        inv.used = True
+
     db.commit()
     db.refresh(user)
     return {"access_token": create_access_token(user.id), "token_type": "bearer"}
