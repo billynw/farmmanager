@@ -155,12 +155,19 @@ class SensorCreate(BaseModel):
     field_id: int
     name: str
     active: bool = True
+    token: str
+
+class SensorUpdate(BaseModel):
+    name: Optional[str] = None
+    active: Optional[bool] = None
+    field_id: Optional[int] = None
 
 class SensorOut(BaseModel):
     id: int
     field_id: int
     name: str
     active: bool
+    token: str
     model_config = {"from_attributes": True}
 
 # --- SensorReading ---
