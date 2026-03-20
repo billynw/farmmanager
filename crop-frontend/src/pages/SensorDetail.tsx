@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { fieldsApi, sensorsApi } from '../api'
 import type { Field, SensorOut, SensorReadingOut, SensorPhotoOut } from '../api'
@@ -20,7 +19,6 @@ function formatDate(dateStr: string) {
 }
 
 export default function SensorDetail() {
-  const navigate = useNavigate()
   const [selectedFieldId, setSelectedFieldId] = useState<number | null>(null)
   const [selectedSensorId, setSelectedSensorId] = useState<number | null>(null)
   const [selectedMetric, setSelectedMetric] = useState<string>('water_level')
