@@ -16,11 +16,10 @@ export default function AppHeader({ backTo, title, subtitle, actions }: AppHeade
 
   return (
     <>
-      {/* ロゴ + ユーザー名・ログアウト（+ トップレベルページのactions） */}
+      {/* ロゴ + ユーザー名・ログアウト */}
       <div style={headerStyle}>
         <img src={logoImg} alt="ロゴ" style={{ height: 32, objectFit: 'contain' }} />
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {!backTo && actions}
           <span style={{ fontSize: 13, color: '#666' }}>{user?.name}</span>
           <button onClick={logout} style={smallBtnStyle}>ログアウト</button>
         </div>
@@ -37,6 +36,13 @@ export default function AppHeader({ backTo, title, subtitle, actions }: AppHeade
             </div>
           </div>
           {actions && <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>{actions}</div>}
+        </div>
+      )}
+
+      {/* トップレベルページのみ: actionsをサブ行に表示 */}
+      {!backTo && actions && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 16px', background: '#fff', borderBottom: '1px solid #eee' }}>
+          {actions}
         </div>
       )}
     </>
