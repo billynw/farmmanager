@@ -7,6 +7,7 @@ export default function BottomNav() {
   const isHome    = pathname === '/'
   const isItems   = pathname === '/items' || pathname.startsWith('/items/')
   const isSensors = pathname === '/sensors'
+  const isAdmin   = pathname === '/admin/users'
 
   return (
     <div style={navStyle}>
@@ -22,11 +23,15 @@ export default function BottomNav() {
         <NavIcon type="sensors" active={isSensors} />
         <span>センサー</span>
       </button>
+      <button style={isAdmin   ? activeItemStyle : itemStyle} onClick={() => navigate('/admin/users')}>
+        <NavIcon type="admin" active={isAdmin} />
+        <span>管理</span>
+      </button>
     </div>
   )
 }
 
-function NavIcon({ type, active }: { type: 'home' | 'items' | 'sensors'; active: boolean }) {
+function NavIcon({ type, active }: { type: 'home' | 'items' | 'sensors' | 'admin'; active: boolean }) {
   const color = active ? '#2d7a4f' : '#bbb'
   if (type === 'home') return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -42,10 +47,16 @@ function NavIcon({ type, active }: { type: 'home' | 'items' | 'sensors'; active:
       <rect x="11" y="11" width="6" height="6" rx="1" stroke={color} strokeWidth="1.5" fill="none"/>
     </svg>
   )
-  return (
+  if (type === 'sensors') return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
       <circle cx="10" cy="10" r="3" stroke={color} strokeWidth="1.5" fill="none"/>
       <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.93 4.93l1.41 1.41M13.66 13.66l1.41 1.41M4.93 15.07l1.41-1.41M13.66 6.34l1.41-1.41" stroke={color} strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  )
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <circle cx="10" cy="7" r="3" stroke={color} strokeWidth="1.5" fill="none"/>
+      <path d="M4 17c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke={color} strokeWidth="1.5" strokeLinecap="round" fill="none"/>
     </svg>
   )
 }

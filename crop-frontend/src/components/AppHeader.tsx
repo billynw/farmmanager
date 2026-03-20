@@ -16,12 +16,11 @@ export default function AppHeader({ backTo, title, subtitle, actions }: AppHeade
 
   return (
     <>
-      {/* ロゴ + ユーザー名・管理・ログアウト */}
+      {/* ロゴ + ユーザー名・ログアウト */}
       <div style={headerStyle}>
         <img src={logoImg} alt="ロゴ" style={{ height: 32, objectFit: 'contain' }} />
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span style={{ fontSize: 13, color: '#666' }}>{user?.name}</span>
-          <button onClick={() => navigate('/admin/users')} style={{ ...smallBtnStyle, color: '#2d7a4f', borderColor: '#2d7a4f' }}>管理</button>
           <button onClick={logout} style={smallBtnStyle}>ログアウト</button>
         </div>
       </div>
