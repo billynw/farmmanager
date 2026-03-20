@@ -48,8 +48,12 @@ export default function ItemDetail() {
         ].filter(Boolean).join(' · ')}
         actions={
           <>
-            <button onClick={() => navigate(`/items/${itemId}/edit`)} style={smallBtnStyle}>編集</button>
-            <button onClick={() => setShowDeleteModal(true)} style={{ ...smallBtnStyle, color: '#d32f2f', borderColor: '#d32f2f' }}>削除</button>
+            <button onClick={() => navigate(`/items/${itemId}/edit`)} style={iconBtnStyle} title="編集">
+              <EditIcon size={18} color="#555" />
+            </button>
+            <button onClick={() => setShowDeleteModal(true)} style={iconBtnStyle} title="削除">
+              <TrashIcon size={18} />
+            </button>
           </>
         }
       />
@@ -167,7 +171,6 @@ function LogCard({ log, onDelete, onImageClick, onEdit }: {
 const tabStyle: React.CSSProperties = { flex: 1, textAlign: 'center', padding: '10px', fontSize: 14, color: '#888', cursor: 'pointer' }
 const activeTabStyle: React.CSSProperties = { ...tabStyle, color: '#2d7a4f', borderBottom: '2px solid #2d7a4f', fontWeight: 600 }
 const addBtnStyle: React.CSSProperties = { display: 'block', width: '100%', padding: '14px', background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 10, fontSize: 16, fontWeight: 600, cursor: 'pointer' }
-const smallBtnStyle: React.CSSProperties = { fontSize: 12, padding: '4px 10px', border: '1px solid #ddd', borderRadius: 6, background: '#fff', cursor: 'pointer', color: '#666' }
 const modalOverlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }
 const modalContentStyle: React.CSSProperties = { position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }
 const modalImageStyle: React.CSSProperties = { maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: 8 }
