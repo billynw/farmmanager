@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { usersApi, fieldsApi, sensorsApi } from '../api'
+import { usersApi, fieldsApi, sensorsApi, generateSensorToken } from '../api'
 import type { UserFieldRole, SensorOut } from '../api'
 import { useAuth } from '../store'
 import AppHeader from '../components/AppHeader'
@@ -160,7 +160,8 @@ export default function AdminUsers() {
     setSensorSubmitting(true)
     try {
       if (sensorModal?.mode === 'add') {
-        await sensorsApi.create({ field_id: sensorForm.field_id, name: sensorForm.name.trim(), active: sensorForm.active })
+        const token = generateSensorToken()
+        await sensorsApi.create({ field_id: sensorForm.field_id, name: sensorForm.name.trim(), active: sensorForm.active, token })
       } else if (sensorModal?.mode === 'edit') {
         await sensorsApi.update((sensorModal as any).sensor.id, { name: sensorForm.name.trim(), active: sensorForm.active, field_id: sensorForm.field_id })
       }
@@ -174,11 +175,12 @@ export default function AdminUsers() {
   }
 
   const handleWifiTransmit = async () => {
-    if (!wifiForm.ssid.trim()) return
+    if (!wifiForm.ssid.trim() || sensorModal?.mode !== 'wifi') return
+    const sensor = (sensorModal as { mode: 'wifi'; sensor: SensorOut }).sensor
     setSensorSubmitting(true)
     setWifiStatus('')
     try {
-      await transmitWifi(wifiForm.ssid.trim(), wifiForm.password, setWifiStatus)
+      await transmitWifi(wifiForm.ssid.trim(), wifiForm.password, sensor.token, setWifiStatus)
     } catch (err: any) {
       setWifiStatus('エラー: ' + (err?.message ?? '送信に失敗しました'))
     } finally {
@@ -354,6 +356,9 @@ export default function AdminUsers() {
                       {sensor.active ? '有効' : '無効'}
                     </span>
                   </div>
+                  <div style={{ fontSize: 11, color: '#bbb', marginTop: 2, fontFamily: 'monospace' }}>
+                    {sensor.token}
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: 2 }}>
                   <button style={iconBtnStyle} title="WIFI設定" onClick={() => openWifiSensor(sensor)}>
@@ -403,7 +408,6 @@ export default function AdminUsers() {
               {sensorModal.mode === 'add' ? 'センサーを追加' : 'センサーを編集'}
             </h3>
 
-            {/* 圃場選択 */}
             <div style={{ marginBottom: 12 }}>
               <label style={labelStyle}>圃場</label>
               <select
@@ -415,7 +419,6 @@ export default function AdminUsers() {
               </select>
             </div>
 
-            {/* センサー名 */}
             <div style={{ marginBottom: 12 }}>
               <label style={labelStyle}>センサー名</label>
               <input
@@ -427,7 +430,6 @@ export default function AdminUsers() {
               />
             </div>
 
-            {/* 有効フラグ */}
             <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
               <label style={{ fontSize: 14, color: '#333' }}>有効</label>
               <input
