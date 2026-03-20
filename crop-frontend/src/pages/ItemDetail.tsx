@@ -58,7 +58,8 @@ export default function ItemDetail() {
         <div style={tabStyle} onClick={() => navigate(`/items/${itemId}/harvests`)}>収穫記録</div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', paddingBottom: 80 }}>
+      {/* コンテンツ: フッターボタン(64px) + BottomNav(56px) 分の余白 */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', paddingBottom: 136 }}>
         {isLoading && <p style={{ color: '#888', textAlign: 'center', marginTop: 30 }}>読み込み中...</p>}
         {!isLoading && logs.length === 0 && <p style={{ color: '#aaa', textAlign: 'center', marginTop: 30 }}>作業記録がありません</p>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -74,7 +75,8 @@ export default function ItemDetail() {
         </div>
       </div>
 
-      <div style={{ padding: '12px 16px', background: '#fff', borderTop: '1px solid #eee' }}>
+      {/* BottomNavの上に固定 */}
+      <div style={{ position: 'fixed', bottom: 56, left: 0, right: 0, padding: '12px 16px', background: '#fff', borderTop: '1px solid #eee', zIndex: 50 }}>
         <button style={addBtnStyle} onClick={() => navigate(`/items/${itemId}/log/new`)}>
           ＋ 作業を記録する
         </button>
