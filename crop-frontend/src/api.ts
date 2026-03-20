@@ -99,6 +99,29 @@ export interface FieldSensorSummary {
   sensors: SensorWithLatest[]
 }
 
+export interface SensorOut {
+  id: number
+  field_id: number
+  name: string
+  active: boolean
+}
+
+export interface SensorReadingOut {
+  id: number
+  sensor_id: number
+  metric: string
+  value: number
+  unit?: string
+  recorded_at: string
+}
+
+export interface SensorPhotoOut {
+  id: number
+  sensor_id: number
+  file_path: string
+  taken_at: string
+}
+
 // --- API calls ---
 export const authApi = {
   login: (email: string, password: string) =>
@@ -152,6 +175,14 @@ export const itemsApi = {
   create: (data: Omit<Item, 'id' | 'field' | 'latest_work_log'>) => api.post<Item>('/items', data),
   update: (id: number, data: Omit<Item, 'id' | 'field' | 'latest_work_log'>) => api.put<Item>(`/items/${id}`, data),
   delete: (id: number) => api.delete(`/items/${id}`),
+}
+
+export const sensorsApi = {
+  list: (field_id?: number) => api.get<SensorOut[]>('/sensors', { params: { field_id } }),
+  readings: (sensor_id: number, metric?: string, limit = 24) =>
+    api.get<SensorReadingOut[]>(`/sensors/${sensor_id}/readings`, { params: { metric, limit } }),
+  photos: (sensor_id: number, limit = 24) =>
+    api.get<SensorPhotoOut[]>(`/sensors/${sensor_id}/photos`, { params: { limit } }),
 }
 
 export const workLogsApi = {

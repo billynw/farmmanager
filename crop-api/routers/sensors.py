@@ -1,6 +1,8 @@
+import os
+import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from database import get_db
 from auth import get_current_user
@@ -9,6 +11,10 @@ import schemas
 import random
 
 router = APIRouter(prefix="/api/v1", tags=["sensors"])
+
+UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "uploads")
+SENSOR_PHOTO_DIR = os.path.join(UPLOAD_DIR, "sensor_photos")
+os.makedirs(SENSOR_PHOTO_DIR, exist_ok=True)
 
 
 # ----------------------------------------------------------------
@@ -96,6 +102,55 @@ def get_readings(
 
 
 # ----------------------------------------------------------------
+# 写真のアップロード・取得（センサーカメラ対応）
+# ----------------------------------------------------------------
+
+@router.post("/sensors/{sensor_id}/photos", response_model=schemas.SensorPhotoOut)
+async def upload_sensor_photo(
+    sensor_id: int,
+    file: UploadFile = File(...),
+    taken_at: Optional[datetime] = None,
+    db: Session = Depends(get_db),
+):
+    """センサーカメラから写真を受け取る（認証不要）"""
+    sensor = db.query(models.Sensor).filter(models.Sensor.id == sensor_id).first()
+    if not sensor:
+        raise HTTPException(status_code=404, detail="Sensor not found")
+
+    ext = os.path.splitext(file.filename or "")[1] or ".jpg"
+    filename = f"{uuid.uuid4().hex}{ext}"
+    file_path = os.path.join(SENSOR_PHOTO_DIR, filename)
+    with open(file_path, "wb") as f:
+        f.write(await file.read())
+
+    photo = models.SensorPhoto(
+        sensor_id=sensor_id,
+        file_path=f"sensor_photos/{filename}",
+        taken_at=taken_at or datetime.utcnow(),
+    )
+    db.add(photo)
+    db.commit()
+    db.refresh(photo)
+    return photo
+
+
+@router.get("/sensors/{sensor_id}/photos", response_model=List[schemas.SensorPhotoOut])
+def get_sensor_photos(
+    sensor_id: int,
+    limit: int = 24,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    return (
+        db.query(models.SensorPhoto)
+        .filter(models.SensorPhoto.sensor_id == sensor_id)
+        .order_by(models.SensorPhoto.taken_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+
+# ----------------------------------------------------------------
 # 圃場ごとの最新センサー値サマリー（フロントのホーム画面向け）
 # ----------------------------------------------------------------
 
@@ -113,7 +168,6 @@ def field_sensor_summary(
     for sensor in field.sensors:
         if not sensor.active:
             continue
-        # metricごとの最新レコードを取得
         latest_per_metric = (
             db.query(models.SensorReading)
             .filter(models.SensorReading.sensor_id == sensor.id)
@@ -123,7 +177,6 @@ def field_sensor_summary(
             )
             .all()
         )
-        # 各metricの最新1件だけ残す
         seen = set()
         latest = []
         for r in latest_per_metric:
@@ -167,17 +220,15 @@ def seed_sensor_dummy(
     now = datetime.utcnow()
 
     for field in fields:
-        # すでにセンサーがある圃場はスキップ
         existing = db.query(models.Sensor).filter(models.Sensor.field_id == field.id).first()
         if existing:
             continue
 
         sensor = models.Sensor(field_id=field.id, name=f"{field.name}センサー", active=True)
         db.add(sensor)
-        db.flush()  # sensor.id を確定
+        db.flush()
         created_sensors += 1
 
-        # 過去24時間分のダミー計測値を1時間ごとに生成
         metrics = [
             ("water_level",   "cm",  15.0, 3.0),
             ("water_temp",    "°C",  22.0, 2.0),

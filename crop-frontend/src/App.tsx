@@ -15,6 +15,7 @@ import WorkLogNew from './pages/WorkLogNew'
 import WorkLogEdit from './pages/WorkLogEdit'
 import Harvests from './pages/Harvests'
 import AdminUsers from './pages/AdminUsers'
+import SensorDetail from './pages/SensorDetail'
 
 const qc = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000 } } })
 
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/" element={<RequireAuth><Home /></RequireAuth>} />
           <Route path="/items" element={<RequireAuth><ItemList /></RequireAuth>} />
+          <Route path="/sensors" element={<RequireAuth><SensorDetail /></RequireAuth>} />
           <Route path="/admin/users" element={<RequireAuth><AdminUsers /></RequireAuth>} />
           <Route path="/items/new" element={<RequireAuth><ItemForm /></RequireAuth>} />
           <Route path="/items/:id" element={<RequireAuth><ItemDetail /></RequireAuth>} />

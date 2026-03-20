@@ -165,7 +165,7 @@ class SensorOut(BaseModel):
 
 # --- SensorReading ---
 class SensorReadingCreate(BaseModel):
-    metric: str   # "water_level", "water_temp", "air_temp", "soil_moisture", "ph", "gate_open", etc.
+    metric: str
     value: float
     unit: Optional[str] = None
     recorded_at: Optional[datetime] = None
@@ -177,6 +177,14 @@ class SensorReadingOut(BaseModel):
     value: float
     unit: Optional[str]
     recorded_at: datetime
+    model_config = {"from_attributes": True}
+
+# --- SensorPhoto ---
+class SensorPhotoOut(BaseModel):
+    id: int
+    sensor_id: int
+    file_path: str
+    taken_at: datetime
     model_config = {"from_attributes": True}
 
 # センサーの最新値をmetricごとにまとめたもの（フロント向け集約）

@@ -1,0 +1,290 @@
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { useAuth } from '../store'
+import { fieldsApi, sensorsApi } from '../api'
+import type { Field, SensorOut, SensorReadingOut, SensorPhotoOut } from '../api'
+import logoImg from '../assets/logo.png'
+
+const METRIC_CONFIG: Record<string, { label: string; unit: string; color: string; max: number; min: number }> = {
+  water_level:   { label: '水位',    unit: 'cm', color: '#378ADD', max: 25,  min: 0  },
+  water_temp:    { label: '水温',    unit: '°C', color: '#1D9E75', max: 35,  min: 10 },
+  air_temp:      { label: '気温',    unit: '°C', color: '#BA7517', max: 40,  min: 0  },
+  soil_moisture: { label: '地中水分', unit: '%',  color: '#639922', max: 100, min: 0  },
+  ph:            { label: 'pH',      unit: '',   color: '#8e44ad', max: 14,  min: 0  },
+  gate_open:     { label: 'ゲート',  unit: '',   color: '#e67e22', max: 1,   min: 0  },
+}
+
+function formatDate(dateStr: string) {
+  const d = new Date(dateStr)
+  return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+export default function SensorDetail() {
+  const navigate = useNavigate()
+  const logout = useAuth((s) => s.logout)
+  const user = useAuth((s) => s.user)
+
+  const [selectedFieldId, setSelectedFieldId] = useState<number | null>(null)
+  const [selectedSensorId, setSelectedSensorId] = useState<number | null>(null)
+  const [selectedMetric, setSelectedMetric] = useState<string>('water_level')
+  const [selectedPhotoId, setSelectedPhotoId] = useState<number | null>(null)
+  const [chartRange, setChartRange] = useState<'24h' | '7d'>('24h')
+
+  const { data: fields = [] } = useQuery<Field[]>({
+    queryKey: ['fields'],
+    queryFn: () => fieldsApi.list().then(r => r.data),
+  })
+
+  const activeFieldId = selectedFieldId ?? fields[0]?.id ?? null
+
+  useEffect(() => {
+    if (!selectedFieldId && fields.length > 0) setSelectedFieldId(fields[0].id)
+  }, [fields, selectedFieldId])
+
+  const { data: sensors = [] } = useQuery<SensorOut[]>({
+    queryKey: ['sensors', activeFieldId],
+    queryFn: () => sensorsApi.list(activeFieldId!).then(r => r.data),
+    enabled: !!activeFieldId,
+  })
+
+  const activeSensorId = selectedSensorId ?? sensors[0]?.id ?? null
+
+  useEffect(() => {
+    if (sensors.length > 0) setSelectedSensorId(sensors[0].id)
+  }, [sensors])
+
+  // 選択metricの計測値履歴
+  const { data: readings = [] } = useQuery<SensorReadingOut[]>({
+    queryKey: ['readings', activeSensorId, selectedMetric, chartRange],
+    queryFn: () => sensorsApi.readings(activeSensorId!, selectedMetric, chartRange === '24h' ? 24 : 168).then(r => r.data),
+    enabled: !!activeSensorId,
+  })
+
+  // 最新値をmetricごとに集約
+  const { data: allReadings = [] } = useQuery<SensorReadingOut[]>({
+    queryKey: ['readings-all', activeSensorId],
+    queryFn: () => sensorsApi.readings(activeSensorId!, undefined, 200).then(r => r.data),
+    enabled: !!activeSensorId,
+  })
+  const latestByMetric = new Map<string, SensorReadingOut>()
+  for (const r of [...allReadings].reverse()) {
+    latestByMetric.set(r.metric, r)
+  }
+  const latestReadings = Array.from(latestByMetric.values())
+
+  // 写真
+  const { data: photos = [] } = useQuery<SensorPhotoOut[]>({
+    queryKey: ['sensor-photos', activeSensorId],
+    queryFn: () => sensorsApi.photos(activeSensorId!).then(r => r.data),
+    enabled: !!activeSensorId,
+  })
+
+  const activePhoto = photos.find(p => p.id === selectedPhotoId) ?? photos[0] ?? null
+
+  // グラフ描画
+  const chartData = [...readings].reverse()
+  const W = 320, H = 80, pad = 10
+  let chartPath = ''
+  let chartArea = ''
+  let chartColor = '#378ADD'
+  if (chartData.length >= 2) {
+    const cfg = METRIC_CONFIG[selectedMetric]
+    chartColor = cfg?.color ?? '#378ADD'
+    const vals = chartData.map(r => r.value)
+    const minV = Math.min(...vals) - 1
+    const maxV = Math.max(...vals) + 1
+    const pts = vals.map((v, i) => {
+      const x = pad + (i / (vals.length - 1)) * (W - pad * 2)
+      const y = H - pad - ((v - minV) / (maxV - minV)) * (H - pad * 2)
+      return `${x.toFixed(1)},${y.toFixed(1)}`
+    })
+    chartPath = 'M' + pts.join(' L')
+    chartArea = chartPath + ` L${(W - pad).toFixed(1)},${(H - pad).toFixed(1)} L${pad},${(H - pad).toFixed(1)} Z`
+  }
+
+  const chartLabels = chartRange === '24h'
+    ? ['0:00', '6:00', '12:00', '18:00', '24:00']
+    : ['7日前', '6日前', '5日前', '4日前', '3日前', '2日前', '昨日', '今日']
+
+  const cfg = METRIC_CONFIG[selectedMetric]
+
+  return (
+    <div style={pageStyle}>
+      <div style={headerStyle}>
+        <img src={logoImg} alt="ロゴ" style={{ height: 32, objectFit: 'contain' }} />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span style={{ fontSize: 13, color: '#666' }}>{user?.name}</span>
+          <button onClick={() => navigate('/admin/users')} style={{ ...smallBtnStyle, color: '#2d7a4f', borderColor: '#2d7a4f' }}>管理</button>
+          <button onClick={logout} style={smallBtnStyle}>ログアウト</button>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #eee' }}>
+        <div style={tabStyle} onClick={() => navigate('/')}>ホーム</div>
+        <div style={tabStyle} onClick={() => navigate('/items')}>作物一覧</div>
+        <div style={{ ...tabStyle, color: '#2d7a4f', borderBottom: '2px solid #2d7a4f', fontWeight: 500 }}>センサー</div>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+
+        <div style={sectionLabelStyle}>圃場</div>
+        <div style={pillRowStyle}>
+          {fields.map(f => (
+            <div key={f.id} onClick={() => { setSelectedFieldId(f.id); setSelectedSensorId(null) }}
+              style={f.id === activeFieldId ? activePillStyle : pillStyle}>
+              {f.name}
+            </div>
+          ))}
+        </div>
+
+        {sensors.length > 1 && (
+          <>
+            <div style={sectionLabelStyle}>センサー</div>
+            <div style={pillRowStyle}>
+              {sensors.map(s => (
+                <div key={s.id} onClick={() => setSelectedSensorId(s.id)}
+                  style={s.id === activeSensorId ? activeSensorPillStyle : sensorPillStyle}>
+                  {s.name}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        <div style={sectionLabelStyle}>
+          最新センサー値
+          {latestReadings[0] && (
+            <span style={{ fontSize: 10, color: '#bbb', marginLeft: 6 }}>
+              {formatDate(latestReadings[0].recorded_at)} 更新
+            </span>
+          )}
+        </div>
+
+        {latestReadings.length > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 14 }}>
+            {latestReadings.map(r => {
+              const mc = METRIC_CONFIG[r.metric]
+              if (!mc) return null
+              const pct = Math.min(100, Math.max(0, (r.value - mc.min) / (mc.max - mc.min) * 100))
+              const isSelected = r.metric === selectedMetric
+              return (
+                <div key={r.metric} onClick={() => setSelectedMetric(r.metric)}
+                  style={{
+                    background: '#fff', border: `1.5px solid ${isSelected ? mc.color : '#eee'}`,
+                    borderRadius: 8, padding: '8px 6px', cursor: 'pointer',
+                  }}>
+                  <div style={{ fontSize: 10, color: '#999', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: mc.color, flexShrink: 0 }} />
+                    {mc.label}
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 500, color: '#1a1a1a', lineHeight: 1.2 }}>
+                    {r.value}<span style={{ fontSize: 10, fontWeight: 400, color: '#999' }}>{r.unit ?? mc.unit}</span>
+                  </div>
+                  <div style={{ height: 3, background: '#eee', borderRadius: 2, marginTop: 5, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', borderRadius: 2, background: mc.color, width: `${pct}%` }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <div style={{ background: '#fff', borderRadius: 8, padding: '16px', textAlign: 'center', fontSize: 13, color: '#bbb', marginBottom: 14 }}>
+            センサーデータがありません
+          </div>
+        )}
+
+        {/* グラフ */}
+        <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 500, color: '#444' }}>
+              {cfg?.label ?? selectedMetric}の推移
+            </div>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {(['24h', '7d'] as const).map(r => (
+                <div key={r} onClick={() => setChartRange(r)}
+                  style={{
+                    fontSize: 10, padding: '2px 8px', borderRadius: 10, cursor: 'pointer',
+                    border: `1px solid ${chartRange === r ? '#2d7a4f' : '#ddd'}`,
+                    background: chartRange === r ? '#2d7a4f' : '#fff',
+                    color: chartRange === r ? '#fff' : '#888',
+                  }}>
+                  {r === '24h' ? '24h' : '7日'}
+                </div>
+              ))}
+            </div>
+          </div>
+          <svg viewBox={`0 0 ${W} ${H}`} width="100%" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={chartColor} stopOpacity="0.18" />
+                <stop offset="100%" stopColor={chartColor} stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <line x1={pad} y1={H - pad} x2={W - pad} y2={H - pad} stroke="#eee" strokeWidth="0.5" />
+            {chartArea && <path d={chartArea} fill="url(#cg)" />}
+            {chartPath && <path d={chartPath} stroke={chartColor} strokeWidth="1.5" fill="none" strokeLinejoin="round" strokeLinecap="round" />}
+            {chartData.length === 0 && (
+              <text x={W / 2} y={H / 2} fontSize="10" fill="#ccc" textAnchor="middle">データなし</text>
+            )}
+            {chartLabels.map((l, i) => {
+              const x = pad + (i / (chartLabels.length - 1)) * (W - pad * 2)
+              return <text key={l} x={x.toFixed(1)} y={H} fontSize="8" fill="#bbb" textAnchor="middle">{l}</text>
+            })}
+          </svg>
+        </div>
+
+        {/* カメラ写真 */}
+        <div style={sectionLabelStyle}>カメラ写真</div>
+        {photos.length > 0 ? (
+          <>
+            <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: 10, overflow: 'hidden', position: 'relative', marginBottom: 8 }}>
+              <img
+                src={`/uploads/${activePhoto?.file_path}`}
+                alt="センサー写真"
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+              />
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent, rgba(0,0,0,0.5))', padding: '8px 10px' }}>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)' }}>
+                  {activePhoto ? formatDate(activePhoto.taken_at) : ''} — {sensors.find(s => s.id === activeSensorId)?.name}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, marginBottom: 16 }}>
+              {photos.map(p => (
+                <div key={p.id} onClick={() => setSelectedPhotoId(p.id)}
+                  style={{
+                    width: 72, height: 72, flexShrink: 0, borderRadius: 6, overflow: 'hidden',
+                    position: 'relative', cursor: 'pointer',
+                    border: `2px solid ${p.id === (activePhoto?.id) ? '#2d7a4f' : 'transparent'}`,
+                  }}>
+                  <img src={`/uploads/${p.file_path}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.45)', fontSize: 8, color: '#fff', padding: '2px 3px', textAlign: 'center' }}>
+                    {formatDate(p.taken_at)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div style={{ background: '#fff', borderRadius: 10, padding: '32px 16px', textAlign: 'center', marginBottom: 16 }}>
+            <div style={{ fontSize: 32, opacity: 0.2, marginBottom: 8 }}>📷</div>
+            <div style={{ fontSize: 13, color: '#bbb' }}>写真がありません</div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const pageStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', height: '100dvh', background: '#f5f5f0' }
+const headerStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', background: '#fff', borderBottom: '1px solid #eee' }
+const tabStyle: React.CSSProperties = { flex: 1, padding: '10px 0', textAlign: 'center', fontSize: 13, color: '#999', borderBottom: '2px solid transparent', cursor: 'pointer' }
+const sectionLabelStyle: React.CSSProperties = { fontSize: 12, color: '#999', marginBottom: 8, marginTop: 4 }
+const pillRowStyle: React.CSSProperties = { display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto', paddingBottom: 2 }
+const pillStyle: React.CSSProperties = { padding: '5px 12px', borderRadius: 20, border: '1px solid #ddd', background: '#fff', fontSize: 12, color: '#666', whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0 }
+const activePillStyle: React.CSSProperties = { ...pillStyle, background: '#2d7a4f', borderColor: '#2d7a4f', color: '#fff' }
+const sensorPillStyle: React.CSSProperties = { padding: '4px 10px', borderRadius: 20, border: '1px solid #ddd', background: '#fff', fontSize: 11, color: '#666', whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0 }
+const activeSensorPillStyle: React.CSSProperties = { ...sensorPillStyle, background: '#e8f5ee', borderColor: '#2d7a4f', color: '#2d7a4f' }
+const smallBtnStyle: React.CSSProperties = { fontSize: 12, padding: '4px 10px', border: '1px solid #ddd', borderRadius: 6, background: '#fff', cursor: 'pointer', color: '#666' }

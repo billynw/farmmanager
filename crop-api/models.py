@@ -183,11 +183,12 @@ class Sensor(Base):
     __tablename__ = "sensors"
     id = Column(Integer, primary_key=True)
     field_id = Column(Integer, ForeignKey("fields.id"), nullable=False)
-    name = Column(String(100), nullable=False)  # 例: "水口センサー"
+    name = Column(String(100), nullable=False)
     active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     field = relationship("Field", back_populates="sensors")
     readings = relationship("SensorReading", back_populates="sensor", cascade="all, delete-orphan")
+    photos = relationship("SensorPhoto", back_populates="sensor", cascade="all, delete-orphan")
 
 
 class SensorReading(Base):
@@ -195,8 +196,19 @@ class SensorReading(Base):
     __tablename__ = "sensor_readings"
     id = Column(Integer, primary_key=True)
     sensor_id = Column(Integer, ForeignKey("sensors.id"), nullable=False)
-    metric = Column(String(50), nullable=False)  # 例: "water_level", "water_temp", "ph", "gate_open"
+    metric = Column(String(50), nullable=False)
     value = Column(Float, nullable=False)
-    unit = Column(String(20), nullable=True)     # 例: "cm", "°C", "%", ""
+    unit = Column(String(20), nullable=True)
     recorded_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     sensor = relationship("Sensor", back_populates="readings")
+
+
+class SensorPhoto(Base):
+    """センサーカメラが送ってくる写真"""
+    __tablename__ = "sensor_photos"
+    id = Column(Integer, primary_key=True)
+    sensor_id = Column(Integer, ForeignKey("sensors.id"), nullable=False)
+    file_path = Column(String(500), nullable=False)
+    taken_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    sensor = relationship("Sensor", back_populates="photos")
