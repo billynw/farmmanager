@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "change-this-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7日
     PHOTO_DIR: str = "/var/crop-photos"
+    SENSOR_PHOTO_DIR: str = "/var/crop-sensor-photos"
     ALLOWED_ORIGINS: str = "https://crop.example.com"
     FRONTEND_URL: str = "https://crop.example.com"
 

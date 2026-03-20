@@ -13,14 +13,10 @@ import random
 
 router = APIRouter(prefix="/api/v1", tags=["sensors"])
 
-# センサー写真のベースディレクトリ（作業ログ写真とは完全に分離）
-# 構造: /var/crop-sensor-photos/sensor_{id}/ファイル名
-SENSOR_PHOTO_BASE = os.environ.get("SENSOR_PHOTO_DIR", "/var/crop-sensor-photos")
-
 
 def get_sensor_photo_dir(sensor_id: int) -> str:
     """センサーIDごとのディレクトリパスを返す"""
-    path = os.path.join(SENSOR_PHOTO_BASE, f"sensor_{sensor_id}")
+    path = os.path.join(settings.SENSOR_PHOTO_DIR, f"sensor_{sensor_id}")
     os.makedirs(path, exist_ok=True)
     return path
 
@@ -125,7 +121,6 @@ async def upload_sensor_photo(
     if not sensor:
         raise HTTPException(status_code=404, detail="Sensor not found")
 
-    # sensor_{id}/ フォルダに保存
     photo_dir = get_sensor_photo_dir(sensor_id)
     ext = os.path.splitext(file.filename or "")[1].lower() or ".jpg"
     filename = f"{uuid.uuid4().hex}{ext}"
@@ -134,8 +129,7 @@ async def upload_sensor_photo(
     with open(file_path, "wb") as f:
         f.write(await file.read())
 
-    # DBには nginx で配信するURLパスを保存
-    # /sensor-photos/sensor_{id}/ファイル名
+    # DBにはnginxで配信するURLパスを保存
     url_path = f"/sensor-photos/sensor_{sensor_id}/{filename}"
 
     photo = models.SensorPhoto(
