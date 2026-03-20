@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { workTypesApi, workLogsApi, itemsApi } from '../api'
+import AppHeader from '../components/AppHeader'
+import BottomNav from '../components/BottomNav'
 
 interface AgroRow { product_name: string; quantity: string; dilution: string; unit: string }
 
@@ -61,17 +63,13 @@ export default function WorkLogNew() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: '#f5f5f0' }}>
-      {/* ヘッダー */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', background: '#fff', borderBottom: '1px solid #eee' }}>
-        <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#444' }}>←</button>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 16 }}>作業を記録</div>
-          <div style={{ fontSize: 12, color: '#999' }}>{item?.name}</div>
-        </div>
-      </div>
+      <AppHeader
+        backTo={`/items/${itemId}`}
+        title="作業を記録"
+        subtitle={item?.name}
+      />
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
-        {/* 作業種別 */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', paddingBottom: 80 }}>
         <label style={labelStyle}>作業の種類</label>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
           {workTypes.map(wt => (
@@ -87,21 +85,18 @@ export default function WorkLogNew() {
           ))}
         </div>
 
-        {/* 日時 */}
         <label style={labelStyle}>日時</label>
         <input type="datetime-local" value={workedAt} onChange={e => setWorkedAt(e.target.value)} style={{ ...inputStyle, marginBottom: 20 }} />
 
-        {/* メモ */}
         <label style={labelStyle}>メモ（任意）</label>
         <textarea value={memo} onChange={e => setMemo(e.target.value)} rows={3} placeholder="作業内容、気づきなど..."
           style={{ ...inputStyle, resize: 'none', lineHeight: 1.6, marginBottom: 20 }} />
 
-        {/* 写真 */}
         <label style={labelStyle}>写真（任意）</label>
         <label style={{ display: 'block', marginBottom: 20 }}>
           <input type="file" accept="image/*" capture="environment" multiple onChange={handlePhoto} style={{ display: 'none' }} />
           <div style={{ border: '2px dashed #ddd', borderRadius: 10, padding: '16px', textAlign: 'center', color: '#aaa', cursor: 'pointer', fontSize: 14 }}>
-            📷 タップして撮影・選択
+            📷 タップして撃影・選択
           </div>
         </label>
         {previews.length > 0 && (
@@ -110,7 +105,6 @@ export default function WorkLogNew() {
           </div>
         )}
 
-        {/* 農薬・肥料 */}
         <button onClick={() => setShowAgro(!showAgro)}
           style={{ width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: 8, background: showAgro ? '#fff8f0' : '#fff', color: '#b36b00', fontSize: 14, cursor: 'pointer', marginBottom: showAgro ? 12 : 20 }}>
           🧪 農薬・肥料を記録する {showAgro ? '▲' : '▼'}
@@ -138,14 +132,15 @@ export default function WorkLogNew() {
         )}
       </div>
 
-      {/* 保存ボタン */}
-      <div style={{ padding: '12px 16px', background: '#fff', borderTop: '1px solid #eee' }}>
+      <div style={{ position: 'fixed', bottom: 56, left: 0, right: 0, padding: '12px 16px', background: '#fff', borderTop: '1px solid #eee', zIndex: 50 }}>
         <button onClick={() => mutation.mutate()} disabled={mutation.isPending}
           style={{ display: 'block', width: '100%', padding: '14px', background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 10, fontSize: 16, fontWeight: 600, cursor: 'pointer', opacity: mutation.isPending ? 0.6 : 1 }}>
           {mutation.isPending ? '保存中...' : '保存する'}
         </button>
         {mutation.isError && <p style={{ color: '#c0392b', fontSize: 13, marginTop: 8, textAlign: 'center' }}>保存に失敗しました</p>}
       </div>
+
+      <BottomNav />
     </div>
   )
 }
