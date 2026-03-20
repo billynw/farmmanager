@@ -55,7 +55,7 @@ export default function ItemDetail() {
       />
 
       <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #eee' }}>
-        <div style={activeTabStyle}>作業ログ</div>
+        <div style={activeTabStyle}>作業記録</div>
         <div style={tabStyle} onClick={() => navigate(`/items/${itemId}/harvests`)}>収穫記録</div>
       </div>
 
@@ -96,7 +96,7 @@ export default function ItemDetail() {
             <h3 style={{ margin: '0 0 12px', fontSize: 18, fontWeight: 600 }}>作物を削除</h3>
             <p style={{ margin: '0 0 20px', fontSize: 14, color: '#666', lineHeight: 1.6 }}>
               「{item.name}」を削除しますか？<br />
-              <strong style={{ color: '#d32f2f' }}>この作物に紐づくすべての作業ログと収穫記録も削除されます。</strong>
+              <strong style={{ color: '#d32f2f' }}>この作物に紐づくすべての作業記録と収穫記録も削除されます。</strong>
             </p>
             <div style={{ display: 'flex', gap: 8 }}>
               <button style={{ flex: 1, padding: '12px', border: '1px solid #ddd', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 14 }}
