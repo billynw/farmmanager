@@ -431,20 +431,7 @@ const addBarStyle: React.CSSProperties = {
   bottom: 'calc(56px + env(safe-area-inset-bottom))',
   left: 0, right: 0,
   padding: '8px 16px',
-  background: '#fff',
-  borderTop: '1px solid #eee',
   zIndex: 99,
 }
-const addBtnStyle: React.CSSProperties = {
-  display: 'block',
-  width: '100%',
-  padding: '12px',
-  background: '#2d7a4f',
-  color: '#fff',
-  border: 'none',
-  borderRadius: 10,
-  fontSize: 15,
-  fontWeight: 600,
-  cursor: 'pointer',
-}
+const addBtnStyle: React.CSSProperties = { fontSize: 13, padding: '6px 14px', background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }
 const smallBtnStyle: React.CSSProperties = { fontSize: 12, padding: '4px 10px', border: '1px solid #ddd', borderRadius: 6, background: '#fff', cursor: 'pointer', color: '#666' }
