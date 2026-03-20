@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
 import { usersApi, fieldsApi } from '../api'
 import type { UserFieldRole, Field, FieldInviteItem } from '../api'
 import { useAuth } from '../store'
+import AppHeader from '../components/AppHeader'
+import BottomNav from '../components/BottomNav'
 
 type Tab = 'users' | 'fields'
 
@@ -61,7 +62,6 @@ function EditIcon({ size = 16, color = '#555' }: { size?: number; color?: string
 }
 
 export default function AdminUsers() {
-  const navigate = useNavigate()
   const qc = useQueryClient()
   const currentUser = useAuth((s) => s.user)
   const [tab, setTab] = useState<Tab>('fields')
@@ -110,14 +110,14 @@ export default function AdminUsers() {
 
   return (
     <div style={pageStyle}>
-      <div style={headerStyle}>
-        <button onClick={() => navigate('/')} style={backBtnStyle}>← 戻る</button>
-        <span style={{ fontWeight: 700, fontSize: 16 }}>管理メニュー</span>
-        <button style={addBtnStyle} onClick={() => {
-          if (tab === 'users') setShowUserForm(true)
-          else { setEditField(null); setShowFieldForm(true) }
-        }}>＋ 追加</button>
-      </div>
+      <AppHeader
+        actions={
+          <button style={addBtnStyle} onClick={() => {
+            if (tab === 'users') setShowUserForm(true)
+            else { setEditField(null); setShowFieldForm(true) }
+          }}>＋ 追加</button>
+        }
+      />
 
       <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #eee' }}>
         {(['fields', 'users'] as Tab[]).map(t => (
@@ -133,7 +133,7 @@ export default function AdminUsers() {
       </div>
 
       {tab === 'fields' && (
-        <div style={{ padding: '12px 16px', overflowY: 'auto', flex: 1 }}>
+        <div style={{ padding: '12px 16px', overflowY: 'auto', flex: 1, paddingBottom: 80 }}>
           {fields.length === 0 && (
             <p style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>圃場が登録されていません。「＋追加」から圃場を作成してください。</p>
           )}
@@ -156,18 +156,11 @@ export default function AdminUsers() {
               </div>
               {field.my_role === 'owner' && (
                 <div style={{ display: 'flex', gap: 2 }}>
-                  <button
-                    style={ICON_BTN}
-                    title="編集"
-                    onClick={() => { setEditField(field); setShowFieldForm(true) }}
-                  >
+                  <button style={ICON_BTN} title="編集" onClick={() => { setEditField(field); setShowFieldForm(true) }}>
                     <EditIcon size={17} color="#555" />
                   </button>
-                  <button
-                    style={ICON_BTN}
-                    title="削除"
-                    onClick={() => { if (confirm(`「${field.name}」を削除しますか？`)) deleteFieldMut.mutate(field.id) }}
-                  >
+                  <button style={ICON_BTN} title="削除"
+                    onClick={() => { if (confirm(`「${field.name}」を削除しますか？`)) deleteFieldMut.mutate(field.id) }}>
                     <TrashIcon size={17} color="#c0392b" />
                   </button>
                 </div>
@@ -178,7 +171,7 @@ export default function AdminUsers() {
       )}
 
       {tab === 'users' && (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', paddingBottom: 80 }}>
           {manageableFields.length === 0 ? (
             <p style={{ color: '#aaa', textAlign: 'center', marginTop: 40, padding: '0 16px' }}>
               圃場を作成するか、manager以上の圃場に属するとユーザーを招待できます。
@@ -200,7 +193,6 @@ export default function AdminUsers() {
                   const showDelete = !isSelf && canDelete(myRoleInSelectedField, user.field_role)
                   const toggleable = !isSelf && canChangeRole(myRoleInSelectedField, user.field_role)
                   const isToggling = togglingUserId === user.id
-                  const DELETE_BTN_W = 32
                   return (
                     <div key={user.id} style={cardStyle}>
                       <div style={{ flex: 1 }}>
@@ -211,7 +203,6 @@ export default function AdminUsers() {
                         {user.field_role && (
                           <span
                             onClick={() => toggleable && !isToggling && handleRoleToggle(user.id, user.field_role!)}
-                            title={toggleable ? 'タップして切り替え' : undefined}
                             style={{
                               fontSize: 11, padding: '3px 9px', borderRadius: 20, fontWeight: 600,
                               background: ROLE_COLOR[user.field_role] + '22',
@@ -219,25 +210,21 @@ export default function AdminUsers() {
                               cursor: toggleable ? 'pointer' : 'default',
                               opacity: isToggling ? 0.5 : 1,
                               border: toggleable ? `1px solid ${ROLE_COLOR[user.field_role]}55` : `1px solid ${ROLE_COLOR[user.field_role]}33`,
-                              transition: 'opacity 0.15s',
                             }}
                           >
                             {isToggling ? '…' : ROLE_LABEL[user.field_role]}
                           </span>
                         )}
                         {showDelete ? (
-                          <button
-                            style={ICON_BTN}
-                            title="圃場から削除"
+                          <button style={ICON_BTN} title="圃場から削除"
                             onClick={() => {
                               if (selectedFieldId && confirm(`${user.name}をこの圃場から削除しますか？`))
                                 usersApi.removeFromField(user.id, selectedFieldId).then(() => refetchUsers())
-                            }}
-                          >
+                            }}>
                             <TrashIcon size={17} color="#c0392b" />
                           </button>
                         ) : (
-                          <div style={{ width: DELETE_BTN_W, flexShrink: 0 }} />
+                          <div style={{ width: 32, flexShrink: 0 }} />
                         )}
                       </div>
                     </div>
@@ -267,6 +254,8 @@ export default function AdminUsers() {
           onSaved={() => { qc.invalidateQueries({ queryKey: ['fields'] }); setShowFieldForm(false) }}
         />
       )}
+
+      <BottomNav />
     </div>
   )
 }
@@ -298,17 +287,11 @@ function UserInviteModal({ manageableFields, onClose, onSaved }: {
   }
 
   const toggleField = (fieldId: number) => {
-    setFieldSelections(prev => ({
-      ...prev,
-      [fieldId]: { ...prev[fieldId], checked: !prev[fieldId].checked }
-    }))
+    setFieldSelections(prev => ({ ...prev, [fieldId]: { ...prev[fieldId], checked: !prev[fieldId].checked } }))
   }
 
   const toggleRole = (fieldId: number) => {
-    setFieldSelections(prev => ({
-      ...prev,
-      [fieldId]: { ...prev[fieldId], role: prev[fieldId].role === 'manager' ? 'member' : 'manager' }
-    }))
+    setFieldSelections(prev => ({ ...prev, [fieldId]: { ...prev[fieldId], role: prev[fieldId].role === 'manager' ? 'member' : 'manager' } }))
   }
 
   const submit = async (e: React.FormEvent) => {
@@ -388,7 +371,6 @@ function UserInviteModal({ manageableFields, onClose, onSaved }: {
                       color: sel.checked ? ROLE_COLOR[sel.role] : '#bbb',
                       border: sel.checked ? `1px solid ${ROLE_COLOR[sel.role]}55` : '1px solid transparent',
                       cursor: sel.checked ? 'pointer' : 'default',
-                      transition: 'all 0.15s',
                     }}
                   >
                     {ROLE_LABEL[sel.role]}
@@ -461,13 +443,11 @@ function FieldFormModal({ field, onClose, onSaved }: { field: Field | null; onCl
 }
 
 const pageStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', height: '100dvh', background: '#f5f5f0' }
-const headerStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', background: '#fff', borderBottom: '1px solid #eee' }
 const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: '12px 16px', marginBottom: 8, display: 'flex', alignItems: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }
-const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }
+const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end' }
 const modalStyle: React.CSSProperties = { background: '#fff', width: '100%', borderRadius: '16px 16px 0 0', padding: '20px 16px 32px' }
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: 13, color: '#444', marginBottom: 4 }
 const inputStyle: React.CSSProperties = { display: 'block', width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 15, boxSizing: 'border-box' }
 const btnStyle: React.CSSProperties = { flex: 1, padding: '12px', background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: 'pointer' }
-const backBtnStyle: React.CSSProperties = { background: 'none', border: 'none', fontSize: 14, color: '#2d7a4f', cursor: 'pointer', fontWeight: 600 }
 const addBtnStyle: React.CSSProperties = { fontSize: 13, padding: '6px 14px', background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }
 const smallBtnStyle: React.CSSProperties = { fontSize: 12, padding: '4px 10px', border: '1px solid #ddd', borderRadius: 6, background: '#fff', cursor: 'pointer', color: '#666' }
