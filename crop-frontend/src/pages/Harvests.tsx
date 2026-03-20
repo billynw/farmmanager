@@ -127,7 +127,8 @@ export default function Harvests() {
         </div>
       )}
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', paddingBottom: 80 }}>
+      {/* コンテンツ: フッターボタン(64px) + BottomNav(56px) 分の余白 */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', paddingBottom: 136 }}>
         {isLoading && <p style={{ color: '#888', textAlign: 'center', marginTop: 30 }}>読み込み中...</p>}
         {!isLoading && harvests.length === 0 && (
           <p style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>収穫記録がありません</p>
@@ -164,7 +165,7 @@ export default function Harvests() {
                 <label style={{ ...labelStyle, flex: 1 }}>
                   単位
                   <select {...register('unit')} style={inputStyle}>
-                    {['kg', 'g', '個', '筱', '束', 'L'].map(u => (
+                    {['kg', 'g', '個', '箱', '束', 'L'].map(u => (
                       <option key={u} value={u}>{u}</option>
                     ))}
                   </select>
@@ -187,7 +188,8 @@ export default function Harvests() {
         </div>
       )}
 
-      <div style={{ padding: '12px 16px', background: '#fff', borderTop: '1px solid #eee' }}>
+      {/* BottomNavの上に固定 */}
+      <div style={{ position: 'fixed', bottom: 56, left: 0, right: 0, padding: '12px 16px', background: '#fff', borderTop: '1px solid #eee', zIndex: 50 }}>
         <button style={addBtnStyle} onClick={openNew}>＋ 収穫を記録する</button>
       </div>
 
