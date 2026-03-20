@@ -7,6 +7,7 @@ import Register from './pages/Register'
 import SetPassword from './pages/SetPassword'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
+import Home from './pages/Home'
 import ItemList from './pages/ItemList'
 import ItemDetail from './pages/ItemDetail'
 import ItemForm from './pages/ItemForm'
@@ -36,7 +37,8 @@ export default function App() {
           <Route path="/set-password" element={<SetPassword />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/" element={<RequireAuth><ItemList /></RequireAuth>} />
+          <Route path="/" element={<RequireAuth><Home /></RequireAuth>} />
+          <Route path="/items" element={<RequireAuth><ItemList /></RequireAuth>} />
           <Route path="/admin/users" element={<RequireAuth><AdminUsers /></RequireAuth>} />
           <Route path="/items/new" element={<RequireAuth><ItemForm /></RequireAuth>} />
           <Route path="/items/:id" element={<RequireAuth><ItemDetail /></RequireAuth>} />
