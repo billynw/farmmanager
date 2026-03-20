@@ -43,7 +43,7 @@ export default function Harvests() {
       />
 
       <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #eee' }}>
-        <div style={tabStyle} onClick={() => navigate(`/items/${itemId}`)}作業記録</div>
+        <div style={tabStyle} onClick={() => navigate(`/items/${itemId}`)}>作業記録</div>
         <div style={activeTabStyle}>収穫記録</div>
       </div>
 
