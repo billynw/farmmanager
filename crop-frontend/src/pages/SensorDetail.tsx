@@ -54,14 +54,12 @@ export default function SensorDetail() {
     if (sensors.length > 0) setSelectedSensorId(sensors[0].id)
   }, [sensors])
 
-  // 選択metricの計測値履歴
   const { data: readings = [] } = useQuery<SensorReadingOut[]>({
     queryKey: ['readings', activeSensorId, selectedMetric, chartRange],
     queryFn: () => sensorsApi.readings(activeSensorId!, selectedMetric, chartRange === '24h' ? 24 : 168).then(r => r.data),
     enabled: !!activeSensorId,
   })
 
-  // 最新値をmetricごとに集約
   const { data: allReadings = [] } = useQuery<SensorReadingOut[]>({
     queryKey: ['readings-all', activeSensorId],
     queryFn: () => sensorsApi.readings(activeSensorId!, undefined, 200).then(r => r.data),
@@ -73,7 +71,6 @@ export default function SensorDetail() {
   }
   const latestReadings = Array.from(latestByMetric.values())
 
-  // 写真
   const { data: photos = [] } = useQuery<SensorPhotoOut[]>({
     queryKey: ['sensor-photos', activeSensorId],
     queryFn: () => sensorsApi.photos(activeSensorId!).then(r => r.data),
@@ -82,7 +79,6 @@ export default function SensorDetail() {
 
   const activePhoto = photos.find(p => p.id === selectedPhotoId) ?? photos[0] ?? null
 
-  // グラフ描画
   const chartData = [...readings].reverse()
   const W = 320, H = 80, pad = 10
   let chartPath = ''
@@ -194,7 +190,6 @@ export default function SensorDetail() {
           </div>
         )}
 
-        {/* グラフ */}
         <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 500, color: '#444' }}>
@@ -234,13 +229,12 @@ export default function SensorDetail() {
           </svg>
         </div>
 
-        {/* カメラ写真 */}
         <div style={sectionLabelStyle}>カメラ写真</div>
         {photos.length > 0 ? (
           <>
             <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: 10, overflow: 'hidden', position: 'relative', marginBottom: 8 }}>
               <img
-                src={`/uploads/${activePhoto?.file_path}`}
+                src={activePhoto?.file_path}
                 alt="センサー写真"
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
@@ -259,7 +253,7 @@ export default function SensorDetail() {
                     position: 'relative', cursor: 'pointer',
                     border: `2px solid ${p.id === (activePhoto?.id) ? '#2d7a4f' : 'transparent'}`,
                   }}>
-                  <img src={`/uploads/${p.file_path}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={p.file_path} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.45)', fontSize: 8, color: '#fff', padding: '2px 3px', textAlign: 'center' }}>
                     {formatDate(p.taken_at)}
                   </div>

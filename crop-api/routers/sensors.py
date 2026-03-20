@@ -6,15 +6,23 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from database import get_db
 from auth import get_current_user
+from config import settings
 import models
 import schemas
 import random
 
 router = APIRouter(prefix="/api/v1", tags=["sensors"])
 
-UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "uploads")
-SENSOR_PHOTO_DIR = os.path.join(UPLOAD_DIR, "sensor_photos")
-os.makedirs(SENSOR_PHOTO_DIR, exist_ok=True)
+# センサー写真のベースディレクトリ（作業ログ写真とは完全に分離）
+# 構造: /var/crop-sensor-photos/sensor_{id}/ファイル名
+SENSOR_PHOTO_BASE = os.environ.get("SENSOR_PHOTO_DIR", "/var/crop-sensor-photos")
+
+
+def get_sensor_photo_dir(sensor_id: int) -> str:
+    """センサーIDごとのディレクトリパスを返す"""
+    path = os.path.join(SENSOR_PHOTO_BASE, f"sensor_{sensor_id}")
+    os.makedirs(path, exist_ok=True)
+    return path
 
 
 # ----------------------------------------------------------------
@@ -102,7 +110,7 @@ def get_readings(
 
 
 # ----------------------------------------------------------------
-# 写真のアップロード・取得（センサーカメラ対応）
+# 写真のアップロード・取得（センサーカメラ対応・認証不要）
 # ----------------------------------------------------------------
 
 @router.post("/sensors/{sensor_id}/photos", response_model=schemas.SensorPhotoOut)
@@ -117,15 +125,22 @@ async def upload_sensor_photo(
     if not sensor:
         raise HTTPException(status_code=404, detail="Sensor not found")
 
-    ext = os.path.splitext(file.filename or "")[1] or ".jpg"
+    # sensor_{id}/ フォルダに保存
+    photo_dir = get_sensor_photo_dir(sensor_id)
+    ext = os.path.splitext(file.filename or "")[1].lower() or ".jpg"
     filename = f"{uuid.uuid4().hex}{ext}"
-    file_path = os.path.join(SENSOR_PHOTO_DIR, filename)
+    file_path = os.path.join(photo_dir, filename)
+
     with open(file_path, "wb") as f:
         f.write(await file.read())
 
+    # DBには nginx で配信するURLパスを保存
+    # /sensor-photos/sensor_{id}/ファイル名
+    url_path = f"/sensor-photos/sensor_{sensor_id}/{filename}"
+
     photo = models.SensorPhoto(
         sensor_id=sensor_id,
-        file_path=f"sensor_photos/{filename}",
+        file_path=url_path,
         taken_at=taken_at or datetime.utcnow(),
     )
     db.add(photo)
