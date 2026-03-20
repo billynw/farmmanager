@@ -48,9 +48,7 @@ export default function FieldForm() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: '#f5f5f0' }}>
       <AppHeader
-        actions={
-          <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#444' }}>←</button>
-        }
+        backTo="/admin/users"
         title={isEdit ? '圃場を編集' : '圃場を追加'}
       />
 
