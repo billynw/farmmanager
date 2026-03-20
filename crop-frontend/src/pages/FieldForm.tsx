@@ -5,7 +5,7 @@ import { fieldsApi } from '../api'
 
 export default function FieldForm() {
   const { id } = useParams<{ id: string }>()
-  const isEdit = !!id && id !== 'new' && !isNaN(Number(id))
+  const isEdit = !!id && !isNaN(Number(id))
   const fieldId = isEdit ? Number(id) : null
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -14,19 +14,22 @@ export default function FieldForm() {
   const [area, setArea] = useState('')
   const [locationNote, setLocationNote] = useState('')
 
-  const { data: field } = useQuery({
-    queryKey: ['field', fieldId],
-    enabled: !!fieldId,
-    queryFn: () => fieldsApi.get(fieldId!).then(r => r.data),
+  const { data: fields = [] } = useQuery({
+    queryKey: ['fields'],
+    queryFn: () => fieldsApi.list().then(r => r.data),
+    enabled: isEdit,
   })
 
   useEffect(() => {
-    if (field) {
-      setName(field.name)
-      setArea(field.area?.toString() ?? '')
-      setLocationNote(field.location_note ?? '')
+    if (isEdit && fields.length > 0) {
+      const field = fields.find(f => f.id === fieldId)
+      if (field) {
+        setName(field.name)
+        setArea(field.area?.toString() ?? '')
+        setLocationNote(field.location_note ?? '')
+      }
     }
-  }, [field])
+  }, [fields, fieldId, isEdit])
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -51,7 +54,7 @@ export default function FieldForm() {
         <div style={{ background: '#fff', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <label style={labelStyle}>圃場名 *</label>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="例：北圃" style={inputStyle} required />
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="例：北圃" style={inputStyle} />
           </div>
           <div>
             <label style={labelStyle}>面積（アール）</label>

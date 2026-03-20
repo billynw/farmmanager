@@ -157,6 +157,7 @@ export const usersApi = {
 
 export const fieldsApi = {
   list: () => api.get<Field[]>('/fields'),
+  get: (id: number) => api.get<Field>(`/fields/${id}`),
   create: (data: Omit<Field, 'id' | 'my_role'>) => api.post<Field>('/fields', data),
   update: (id: number, data: Omit<Field, 'id' | 'my_role'>) => api.put<Field>(`/fields/${id}`, data),
   delete: (id: number) => api.delete(`/fields/${id}`),
