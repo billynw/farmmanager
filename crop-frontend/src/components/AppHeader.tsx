@@ -21,7 +21,9 @@ export default function AppHeader({ backTo, title, subtitle, actions }: AppHeade
         <img src={logoImg} alt="ロゴ" style={{ height: 32, objectFit: 'contain' }} />
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span style={{ fontSize: 13, color: '#666' }}>{user?.name}</span>
-          <button onClick={logout} style={smallBtnStyle}>ログアウト</button>
+          <button onClick={logout} style={logoutBtnStyle} title="ログアウト">
+            <LogoutIcon />
+          </button>
         </div>
       </div>
 
@@ -49,6 +51,16 @@ export default function AppHeader({ backTo, title, subtitle, actions }: AppHeade
   )
 }
 
+function LogoutIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+      <path d="M8 3H4a1 1 0 00-1 1v12a1 1 0 001 1h4" stroke="#999" strokeWidth="1.5" strokeLinecap="round"/>
+      <path d="M13 14l4-4-4-4" stroke="#999" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <line x1="17" y1="10" x2="7" y2="10" stroke="#999" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  )
+}
+
 const headerStyle: React.CSSProperties = {
   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
   padding: '12px 16px', background: '#fff', borderBottom: '1px solid #eee',
@@ -60,7 +72,7 @@ const subHeaderStyle: React.CSSProperties = {
 const iconBtnStyle: React.CSSProperties = {
   background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#444', padding: 0, flexShrink: 0,
 }
-const smallBtnStyle: React.CSSProperties = {
-  fontSize: 12, padding: '4px 10px', border: '1px solid #ddd',
-  borderRadius: 6, background: '#fff', cursor: 'pointer', color: '#666',
+const logoutBtnStyle: React.CSSProperties = {
+  background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+  display: 'flex', alignItems: 'center', borderRadius: 6,
 }
