@@ -325,53 +325,58 @@ export default function AdminUsers() {
       {/* センサータブ */}
       {tab === 'sensors' && (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', paddingBottom: 100 }}>
-          {fields.length > 0 && (
-            <div style={{ padding: '8px 16px', background: '#fff', borderBottom: '1px solid #eee' }}>
-              <select
-                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}
-                value={activeSensorFieldId ?? ''}
-                onChange={e => setSensorFieldId(Number(e.target.value))}
-              >
-                {fields.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-              </select>
-            </div>
-          )}
-          <div style={{ padding: '12px 16px', overflowY: 'auto', flex: 1 }}>
-            {fields.length === 0 && (
-              <p style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>まず圃場を登録してください。</p>
-            )}
-            {sensors.length === 0 && fields.length > 0 && (
-              <p style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>センサーが登録されていません。</p>
-            )}
-            {sensors.map(sensor => (
-              <div key={sensor.id} style={cardStyle}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontWeight: 600, fontSize: 15 }}>{sensor.name}</span>
-                    <span style={{
-                      fontSize: 11, padding: '1px 7px', borderRadius: 20, fontWeight: 600,
-                      background: sensor.active ? '#2d7a4f22' : '#88888822',
-                      color: sensor.active ? '#2d7a4f' : '#888',
-                    }}>
-                      {sensor.active ? '有効' : '無効'}
-                    </span>
+          {manageableFields.length === 0 ? (
+            <p style={{ color: '#aaa', textAlign: 'center', marginTop: 40, padding: '0 16px' }}>
+              圃場を作成するか、manager以上の圃場に属するとセンサーを管理できます。
+            </p>
+          ) : (
+            <>
+              {fields.length > 0 && (
+                <div style={{ padding: '8px 16px', background: '#fff', borderBottom: '1px solid #eee' }}>
+                  <select
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}
+                    value={activeSensorFieldId ?? ''}
+                    onChange={e => setSensorFieldId(Number(e.target.value))}
+                  >
+                    {fields.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                  </select>
+                </div>
+              )}
+              <div style={{ padding: '12px 16px', overflowY: 'auto', flex: 1 }}>
+                {sensors.length === 0 && (
+                  <p style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>センサーが登録されていません。</p>
+                )}
+                {sensors.map(sensor => (
+                  <div key={sensor.id} style={cardStyle}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontWeight: 600, fontSize: 15 }}>{sensor.name}</span>
+                        <span style={{
+                          fontSize: 11, padding: '1px 7px', borderRadius: 20, fontWeight: 600,
+                          background: sensor.active ? '#2d7a4f22' : '#88888822',
+                          color: sensor.active ? '#2d7a4f' : '#888',
+                        }}>
+                          {sensor.active ? '有効' : '無効'}
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 2 }}>
+                      <button style={iconBtnStyle} title="WIFI設定" onClick={() => openWifiSensor(sensor)}>
+                        <WifiIcon size={17} />
+                      </button>
+                      <button style={iconBtnStyle} title="編集" onClick={() => openEditSensor(sensor)}>
+                        <EditIcon size={17} color="#555" />
+                      </button>
+                      <button style={iconBtnStyle} title="削除"
+                        onClick={() => setDeleteTarget({ type: 'sensor', id: sensor.id, name: sensor.name })}>
+                        <TrashIcon size={17} />
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <div style={{ display: 'flex', gap: 2 }}>
-                  <button style={iconBtnStyle} title="WIFI設定" onClick={() => openWifiSensor(sensor)}>
-                    <WifiIcon size={17} />
-                  </button>
-                  <button style={iconBtnStyle} title="編集" onClick={() => openEditSensor(sensor)}>
-                    <EditIcon size={17} color="#555" />
-                  </button>
-                  <button style={iconBtnStyle} title="削除"
-                    onClick={() => setDeleteTarget({ type: 'sensor', id: sensor.id, name: sensor.name })}>
-                    <TrashIcon size={17} />
-                  </button>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
         </div>
       )}
 
@@ -528,13 +533,15 @@ export default function AdminUsers() {
       )}
 
       {/* FABボタン */}
-      <button style={fabStyle} onClick={() => {
-        if (tab === 'users') navigate('/admin/users/invite')
-        else if (tab === 'fields') navigate('/admin/fields/new')
-        else openAddSensor()
-      }}>
-        {tab === 'users' ? '＋ ユーザーを追加' : tab === 'fields' ? '＋ 圃場を追加' : '＋ センサーを追加'}
-      </button>
+      {tab !== 'sensors' || manageableFields.length > 0 ? (
+        <button style={fabStyle} onClick={() => {
+          if (tab === 'users') navigate('/admin/users/invite')
+          else if (tab === 'fields') navigate('/admin/fields/new')
+          else openAddSensor()
+        }}>
+          {tab === 'users' ? '＋ ユーザーを追加' : tab === 'fields' ? '＋ 圃場を追加' : '＋ センサーを追加'}
+        </button>
+      ) : null}
 
       <BottomNav />
     </div>
