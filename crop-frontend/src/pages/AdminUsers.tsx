@@ -356,9 +356,6 @@ export default function AdminUsers() {
                       {sensor.active ? '有効' : '無効'}
                     </span>
                   </div>
-                  <div style={{ fontSize: 11, color: '#bbb', marginTop: 2, fontFamily: 'monospace' }}>
-                    {sensor.token}
-                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: 2 }}>
                   <button style={iconBtnStyle} title="WIFI設定" onClick={() => openWifiSensor(sensor)}>

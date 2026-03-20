@@ -180,9 +180,9 @@ export const itemsApi = {
   delete: (id: number) => api.delete(`/items/${id}`),
 }
 
-/** 英小文字+数字15文字のランダムトークンを生成する */
+/** 英大文字+英小文字+数字15文字のランダムトークンを生成する */
 export function generateSensorToken(): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
   return Array.from({ length: 15 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
 }
 
