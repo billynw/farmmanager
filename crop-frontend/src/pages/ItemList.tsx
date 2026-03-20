@@ -3,8 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { itemsApi, fieldsApi, exportApi } from '../api'
 import type { Item } from '../api'
-import { useAuth } from '../store'
-import logoImg from '../assets/logo.png'
+import AppHeader from '../components/AppHeader'
 
 const STATUS_LABEL: Record<string, string> = { growing: '栽培中', finished: '終了' }
 const STATUS_COLOR: Record<string, string> = { growing: '#2d7a4f', finished: '#888' }
@@ -26,8 +25,6 @@ export default function ItemList() {
   const [exportFrom, setExportFrom] = useState('')
   const [exportTo, setExportTo] = useState('')
   const navigate = useNavigate()
-  const logout = useAuth((s) => s.logout)
-  const user = useAuth((s) => s.user)
 
   const { data: fields = [] } = useQuery({ queryKey: ['fields'], queryFn: () => fieldsApi.list().then(r => r.data) })
   const { data: items = [], isLoading } = useQuery({
@@ -37,22 +34,11 @@ export default function ItemList() {
 
   return (
     <div style={pageStyle}>
-      <div style={headerStyle}>
-        <img src={logoImg} alt="ロゴ" style={{ height: 32, objectFit: 'contain' }} />
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span style={{ fontSize: 13, color: '#666' }}>{user?.name}</span>
-          <button onClick={() => navigate('/admin/users')} style={{ ...smallBtnStyle, color: '#2d7a4f', borderColor: '#2d7a4f' }}>管理</button>
-          <button onClick={() => setShowExport(true)} style={{ ...smallBtnStyle, color: '#2d7a4f', borderColor: '#2d7a4f' }}>CSV</button>
-          <button onClick={logout} style={smallBtnStyle}>ログアウト</button>
-        </div>
-      </div>
-
-      {/* ナビタブ */}
-      <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #eee' }}>
-        <div style={tabStyle} onClick={() => navigate('/')}>ホーム</div>
-        <div style={{ ...tabStyle, color: '#2d7a4f', borderBottom: '2px solid #2d7a4f', fontWeight: 500 }}>作物一覧</div>
-        <div style={tabStyle} onClick={() => navigate('/sensors')}>センサー</div>
-      </div>
+      <AppHeader
+        actions={
+          <button onClick={() => setShowExport(true)} style={smallBtnStyle}>CSV</button>
+        }
+      />
 
       <div style={{ display: 'flex', gap: 8, padding: '12px 16px', background: '#fff', borderBottom: '1px solid #eee' }}>
         <select style={selectStyle} value={fieldFilter ?? ''} onChange={e => setFieldFilter(e.target.value ? Number(e.target.value) : undefined)}>
@@ -152,8 +138,6 @@ function ItemCard({ item, onClick }: { item: Item; onClick: () => void }) {
 }
 
 const pageStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', height: '100dvh', background: '#f5f5f0', position: 'relative' }
-const headerStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', background: '#fff', borderBottom: '1px solid #eee' }
-const tabStyle: React.CSSProperties = { flex: 1, padding: '10px 0', textAlign: 'center', fontSize: 13, color: '#999', borderBottom: '2px solid transparent', cursor: 'pointer' }
 const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: '14px 16px', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }
 const selectStyle: React.CSSProperties = { flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14, background: '#fff' }
 const fabStyle: React.CSSProperties = {

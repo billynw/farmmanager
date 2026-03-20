@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { useAuth } from '../store'
 import { fieldsApi, itemsApi } from '../api'
 import type { Item, Field, FieldSensorSummary, SensorLatestReading } from '../api'
-import logoImg from '../assets/logo.png'
+import AppHeader from '../components/AppHeader'
 
-// センサーのmetricに対応する表示設定
 const METRIC_CONFIG: Record<string, { label: string; unit: string; color: string; max: number; min: number }> = {
   water_level:   { label: '水位',    unit: 'cm', color: '#378ADD', max: 25,  min: 0  },
   water_temp:    { label: '水温',    unit: '°C', color: '#1D9E75', max: 35,  min: 10 },
@@ -24,7 +22,6 @@ function formatDate(dateStr: string) {
   return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-// 圃場の全センサーの最新値をmetricごとにまとめる（複数センサーある場合は最新優先）
 function aggregateLatest(summary: FieldSensorSummary): SensorLatestReading[] {
   const map = new Map<string, SensorLatestReading>()
   for (const sensor of summary.sensors) {
@@ -40,8 +37,6 @@ function aggregateLatest(summary: FieldSensorSummary): SensorLatestReading[] {
 
 export default function Home() {
   const navigate = useNavigate()
-  const logout = useAuth((s) => s.logout)
-  const user = useAuth((s) => s.user)
   const [selectedFieldId, setSelectedFieldId] = useState<number | null>(null)
 
   const { data: fields = [] } = useQuery<Field[]>({
@@ -54,16 +49,12 @@ export default function Home() {
     queryFn: () => itemsApi.list({ status: 'growing' }).then(r => r.data),
   })
 
-  // 先頭圃場を初期選択
   const activeFieldId = selectedFieldId ?? fields[0]?.id ?? null
 
   useEffect(() => {
-    if (!selectedFieldId && fields.length > 0) {
-      setSelectedFieldId(fields[0].id)
-    }
+    if (!selectedFieldId && fields.length > 0) setSelectedFieldId(fields[0].id)
   }, [fields, selectedFieldId])
 
-  // 選択中圃場のセンサーサマリー取得
   const { data: sensorSummary } = useQuery<FieldSensorSummary>({
     queryKey: ['sensor-summary', activeFieldId],
     queryFn: () => fieldsApi.sensorSummary(activeFieldId!).then(r => r.data),
@@ -72,7 +63,6 @@ export default function Home() {
 
   const sensorReadings = sensorSummary ? aggregateLatest(sensorSummary) : []
 
-  // latest_work_log.worked_at の新しい順にソート、上位5件
   const recentItems = [...items]
     .filter(item => item.latest_work_log)
     .sort((a, b) =>
@@ -83,26 +73,10 @@ export default function Home() {
 
   return (
     <div style={pageStyle}>
-      {/* ヘッダー */}
-      <div style={headerStyle}>
-        <img src={logoImg} alt="ロゴ" style={{ height: 32, objectFit: 'contain' }} />
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span style={{ fontSize: 13, color: '#666' }}>{user?.name}</span>
-          <button onClick={() => navigate('/admin/users')} style={{ ...smallBtnStyle, color: '#2d7a4f', borderColor: '#2d7a4f' }}>管理</button>
-          <button onClick={logout} style={smallBtnStyle}>ログアウト</button>
-        </div>
-      </div>
-
-      {/* ナビタブ */}
-      <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #eee' }}>
-        <div style={{ ...tabStyle, color: '#2d7a4f', borderBottom: '2px solid #2d7a4f', fontWeight: 500 }}>ホーム</div>
-        <div style={tabStyle} onClick={() => navigate('/items')}>作物一覧</div>
-        <div style={tabStyle} onClick={() => navigate('/sensors')}>センサー</div>
-      </div>
+      <AppHeader />
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
 
-        {/* センサー概要 */}
         <div style={sectionLabelStyle}>センサー概要</div>
         {fields.length > 0 && (
           <div style={{ display: 'flex', gap: 6, marginBottom: 10, overflowX: 'auto', paddingBottom: 2 }}>
@@ -149,7 +123,6 @@ export default function Home() {
 
         <div style={{ height: 1, background: '#eee', margin: '12px 0' }} />
 
-        {/* 最近の作業 */}
         <div style={sectionLabelStyle}>最近の作業</div>
         {itemsLoading && <p style={{ color: '#aaa', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>読み込み中...</p>}
         {!itemsLoading && recentItems.length === 0 && (
@@ -180,9 +153,7 @@ export default function Home() {
                 )}
                 {item.latest_work_log.memo && (
                   <span style={{ marginLeft: 6, color: '#aaa' }}>
-                    {item.latest_work_log.memo.length > 20
-                      ? item.latest_work_log.memo.substring(0, 20) + '...'
-                      : item.latest_work_log.memo}
+                    {item.latest_work_log.memo.length > 20 ? item.latest_work_log.memo.substring(0, 20) + '...' : item.latest_work_log.memo}
                   </span>
                 )}
               </div>
@@ -190,10 +161,8 @@ export default function Home() {
           </div>
         ))}
 
-        <div
-          style={{ textAlign: 'center', fontSize: 13, color: '#2d7a4f', padding: 8, cursor: 'pointer' }}
-          onClick={() => navigate('/items')}
-        >
+        <div style={{ textAlign: 'center', fontSize: 13, color: '#2d7a4f', padding: 8, cursor: 'pointer' }}
+          onClick={() => navigate('/items')}>
           作物一覧をすべて見る →
         </div>
       </div>
@@ -219,10 +188,7 @@ function SensorCard({ label, value, unit, color, pct }: { label: string; value: 
 }
 
 const pageStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', height: '100dvh', background: '#f5f5f0' }
-const headerStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', background: '#fff', borderBottom: '1px solid #eee' }
-const tabStyle: React.CSSProperties = { flex: 1, padding: '10px 0', textAlign: 'center', fontSize: 13, color: '#999', borderBottom: '2px solid transparent', cursor: 'pointer' }
 const sectionLabelStyle: React.CSSProperties = { fontSize: 12, color: '#999', marginBottom: 8, marginTop: 4 }
 const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 10, padding: '14px 16px', marginBottom: 8, cursor: 'pointer', border: '1px solid #eee' }
 const pillStyle: React.CSSProperties = { padding: '5px 12px', borderRadius: 20, border: '1px solid #ddd', background: '#fff', fontSize: 12, color: '#666', whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0 }
 const activePillStyle: React.CSSProperties = { ...pillStyle, background: '#2d7a4f', borderColor: '#2d7a4f', color: '#fff' }
-const smallBtnStyle: React.CSSProperties = { fontSize: 12, padding: '4px 10px', border: '1px solid #ddd', borderRadius: 6, background: '#fff', cursor: 'pointer', color: '#666' }

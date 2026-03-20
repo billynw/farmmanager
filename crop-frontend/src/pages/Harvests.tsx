@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { itemsApi, harvestsApi } from '../api'
 import type { Harvest } from '../api'
+import AppHeader from '../components/AppHeader'
 
 type FormData = {
   harvested_at: string
@@ -89,14 +90,10 @@ export default function Harvests() {
   }
 
   const onSubmit = (d: FormData) => {
-    if (editTarget) {
-      updateMut.mutate({ id: editTarget.id, d })
-    } else {
-      createMut.mutate(d)
-    }
+    if (editTarget) updateMut.mutate({ id: editTarget.id, d })
+    else createMut.mutate(d)
   }
 
-  // 合計収穫量（単位ごと）
   const totals = harvests.reduce<Record<string, number>>((acc, h) => {
     if (h.quantity != null) {
       const u = h.unit ?? '?'
@@ -107,24 +104,17 @@ export default function Harvests() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: '#f5f5f0' }}>
-      {/* ヘッダー */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', background: '#fff', borderBottom: '1px solid #eee' }}>
-        <button onClick={() => navigate(`/items/${itemId}`)} style={iconBtnStyle}>←</button>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 700, fontSize: 18, color: '#1a1a1a' }}>{item?.name ?? '...'}</div>
-          <div style={{ fontSize: 12, color: '#999' }}>
-            {item?.variety && `${item.variety} · `}{item?.field?.name ?? '圃場未設定'}
-          </div>
-        </div>
-      </div>
+      <AppHeader
+        backTo={`/items/${itemId}`}
+        title={item?.name ?? '...'}
+        subtitle={[item?.variety, item?.field?.name ?? '圃場未設定'].filter(Boolean).join(' · ')}
+      />
 
-      {/* タブ */}
       <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #eee' }}>
         <div style={tabStyle} onClick={() => navigate(`/items/${itemId}`)}>作業ログ</div>
         <div style={activeTabStyle}>収穫記録</div>
       </div>
 
-      {/* サマリー */}
       {Object.keys(totals).length > 0 && (
         <div style={{ margin: '12px 16px 0', padding: '10px 14px', background: '#e8f5ee', borderRadius: 10, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12, color: '#2d7a4f', fontWeight: 600 }}>🌾 合計収穫量</span>
@@ -136,7 +126,6 @@ export default function Harvests() {
         </div>
       )}
 
-      {/* 一覧 */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
         {isLoading && <p style={{ color: '#888', textAlign: 'center', marginTop: 30 }}>読み込み中...</p>}
         {!isLoading && harvests.length === 0 && (
@@ -144,9 +133,7 @@ export default function Harvests() {
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {harvests.map(h => (
-            <HarvestCard
-              key={h.id}
-              harvest={h}
+            <HarvestCard key={h.id} harvest={h}
               onEdit={() => openEdit(h)}
               onDelete={() => { if (confirm('この収穫記録を削除しますか？')) deleteMut.mutate(h.id) }}
             />
@@ -154,7 +141,6 @@ export default function Harvests() {
         </div>
       </div>
 
-      {/* フォームモーダル */}
       {showForm && (
         <div style={overlayStyle} onClick={() => setShowForm(false)}>
           <div style={drawerStyle} onClick={e => e.stopPropagation()}>
@@ -164,13 +150,11 @@ export default function Harvests() {
               </h3>
               <button onClick={() => setShowForm(false)} style={iconBtnStyle}>×</button>
             </div>
-
             <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <label style={labelStyle}>
                 収穫日 <span style={{ color: '#e53' }}>*</span>
                 <input type="date" {...register('harvested_at', { required: true })} style={inputStyle} />
               </label>
-
               <div style={{ display: 'flex', gap: 8 }}>
                 <label style={{ ...labelStyle, flex: 2 }}>
                   収穫量
@@ -179,24 +163,21 @@ export default function Harvests() {
                 <label style={{ ...labelStyle, flex: 1 }}>
                   単位
                   <select {...register('unit')} style={inputStyle}>
-                    {['kg', 'g', '個', '箱', '束', 'L'].map(u => (
+                    {['kg', 'g', '個', '筱', '束', 'L'].map(u => (
                       <option key={u} value={u}>{u}</option>
                     ))}
                   </select>
                 </label>
               </div>
-
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#333', cursor: 'pointer' }}>
                 <input type="checkbox" {...register('shipped')} style={{ width: 18, height: 18, accentColor: '#2d7a4f' }} />
                 出荷済み
               </label>
-
               <label style={labelStyle}>
                 メモ
                 <textarea rows={3} placeholder="品質・天気など" {...register('memo')}
                   style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
               </label>
-
               <button type="submit" disabled={isSubmitting} style={submitBtnStyle}>
                 {isSubmitting ? '保存中...' : editTarget ? '更新する' : '記録する'}
               </button>
@@ -205,7 +186,6 @@ export default function Harvests() {
         </div>
       )}
 
-      {/* 追加ボタン */}
       <div style={{ padding: '12px 16px', background: '#fff', borderTop: '1px solid #eee' }}>
         <button style={addBtnStyle} onClick={openNew}>＋ 収穫を記録する</button>
       </div>
@@ -216,7 +196,6 @@ export default function Harvests() {
 function HarvestCard({ harvest: h, onEdit, onDelete }: { harvest: Harvest; onEdit: () => void; onDelete: () => void }) {
   const d = new Date(h.harvested_at + 'T00:00:00')
   const dateStr = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`
-
   return (
     <div style={{ background: '#fff', borderRadius: 12, padding: '12px 14px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', borderLeft: '4px solid #2d7a4f' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -228,9 +207,7 @@ function HarvestCard({ harvest: h, onEdit, onDelete }: { harvest: Harvest; onEdi
             </span>
           )}
           {h.shipped && (
-            <span style={{ fontSize: 11, background: '#fff3e0', color: '#e65100', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>
-              出荷済
-            </span>
+            <span style={{ fontSize: 11, background: '#fff3e0', color: '#e65100', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>出荷済</span>
           )}
         </div>
         <div style={{ display: 'flex', gap: 4 }}>

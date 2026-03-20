@@ -1,9 +1,9 @@
-
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { itemsApi, workLogsApi } from '../api'
 import type { WorkLog } from '../api'
+import AppHeader from '../components/AppHeader'
 
 export default function ItemDetail() {
   const { id } = useParams<{ id: string }>()
@@ -28,7 +28,7 @@ export default function ItemDetail() {
     mutationFn: itemsApi.delete,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['items'] })
-      navigate('/')
+      navigate('/items')
     },
   })
 
@@ -36,38 +36,37 @@ export default function ItemDetail() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: '#f5f5f0' }}>
-      {/* ヘッダー */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', background: '#fff', borderBottom: '1px solid #eee' }}>
-        <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#444', padding: 0 }}>←</button>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 700, fontSize: 18, color: '#1a1a1a' }}>{item.name}</div>
-          <div style={{ fontSize: 12, color: '#999' }}>
-            {item.variety && `${item.variety} · `}{item.field?.name ?? '圃場未設定'}
-            {item.planted_at && ` · 定植 ${item.planted_at}`}
-          </div>
-        </div>
-        <button onClick={() => navigate(`/items/${itemId}/edit`)} style={smallBtnStyle}>編集</button>
-        <button onClick={() => setShowDeleteModal(true)} style={{...smallBtnStyle, color: '#d32f2f', borderColor: '#d32f2f'}}>削除</button>
-      </div>
+      <AppHeader
+        backTo="/items"
+        title={item.name}
+        subtitle={[
+          item.variety,
+          item.field?.name ?? '圃場未設定',
+          item.planted_at ? `定植 ${item.planted_at}` : undefined,
+        ].filter(Boolean).join(' · ')}
+        actions={
+          <>
+            <button onClick={() => navigate(`/items/${itemId}/edit`)} style={smallBtnStyle}>編集</button>
+            <button onClick={() => setShowDeleteModal(true)} style={{ ...smallBtnStyle, color: '#d32f2f', borderColor: '#d32f2f' }}>削除</button>
+          </>
+        }
+      />
 
-      {/* タブライン */}
+      {/* 作業ログ / 収穫記録 タブ */}
       <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #eee' }}>
         <div style={activeTabStyle}>作業ログ</div>
         <div style={tabStyle} onClick={() => navigate(`/items/${itemId}/harvests`)}>収穫記録</div>
       </div>
 
-      {/* ログ一覧 */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
         {isLoading && <p style={{ color: '#888', textAlign: 'center', marginTop: 30 }}>読み込み中...</p>}
         {!isLoading && logs.length === 0 && <p style={{ color: '#aaa', textAlign: 'center', marginTop: 30 }}>作業記録がありません</p>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {logs.map(log => (
-            <LogCard 
-              key={log.id} 
+            <LogCard
+              key={log.id}
               log={log}
-              onDelete={() => {
-                if (confirm('この記録を削除しますか？')) deleteLog.mutate(log.id)
-              }}
+              onDelete={() => { if (confirm('この記録を削除しますか？')) deleteLog.mutate(log.id) }}
               onImageClick={setModalImage}
               onEdit={() => navigate(`/items/${itemId}/log/${log.id}/edit`)}
             />
@@ -75,53 +74,34 @@ export default function ItemDetail() {
         </div>
       </div>
 
-      {/* 作業記録ボタン */}
       <div style={{ padding: '12px 16px', background: '#fff', borderTop: '1px solid #eee' }}>
         <button style={addBtnStyle} onClick={() => navigate(`/items/${itemId}/log/new`)}>
           ＋ 作業を記録する
         </button>
       </div>
 
-      {/* 画像モーダル */}
       {modalImage && (
-        <div 
-          style={modalOverlayStyle} 
-          onClick={() => setModalImage(null)}
-        >
-          <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
+        <div style={modalOverlayStyle} onClick={() => setModalImage(null)}>
+          <div style={modalContentStyle} onClick={e => e.stopPropagation()}>
             <img src={modalImage} alt="" style={modalImageStyle} />
-            <button 
-              style={modalCloseStyle}
-              onClick={() => setModalImage(null)}
-            >
-              ×
-            </button>
+            <button style={modalCloseStyle} onClick={() => setModalImage(null)}>×</button>
           </div>
         </div>
       )}
 
-      {/* 削除確認モーダル */}
       {showDeleteModal && (
         <div style={modalOverlayStyle} onClick={() => setShowDeleteModal(false)}>
-          <div style={deleteModalStyle} onClick={(e) => e.stopPropagation()}>
+          <div style={deleteModalStyle} onClick={e => e.stopPropagation()}>
             <h3 style={{ margin: '0 0 12px', fontSize: 18, fontWeight: 600 }}>作物を削除</h3>
             <p style={{ margin: '0 0 20px', fontSize: 14, color: '#666', lineHeight: 1.6 }}>
               「{item.name}」を削除しますか？<br />
               <strong style={{ color: '#d32f2f' }}>この作物に紐づくすべての作業ログと収穫記録も削除されます。</strong>
             </p>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button 
-                style={{ flex: 1, padding: '12px', border: '1px solid #ddd', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 14 }}
-                onClick={() => setShowDeleteModal(false)}
-              >
-                キャンセル
-              </button>
-              <button 
-                style={{ flex: 1, padding: '12px', border: 'none', borderRadius: 8, background: '#d32f2f', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
-                onClick={() => deleteItem.mutate(itemId)}
-              >
-                削除する
-              </button>
+              <button style={{ flex: 1, padding: '12px', border: '1px solid #ddd', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 14 }}
+                onClick={() => setShowDeleteModal(false)}>キャンセル</button>
+              <button style={{ flex: 1, padding: '12px', border: 'none', borderRadius: 8, background: '#d32f2f', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
+                onClick={() => deleteItem.mutate(itemId)}>削除する</button>
             </div>
           </div>
         </div>
@@ -130,11 +110,11 @@ export default function ItemDetail() {
   )
 }
 
-function LogCard({ log, onDelete, onImageClick, onEdit }: { 
-  log: WorkLog; 
-  onDelete: () => void; 
-  onImageClick: (url: string) => void;
-  onEdit: () => void;
+function LogCard({ log, onDelete, onImageClick, onEdit }: {
+  log: WorkLog
+  onDelete: () => void
+  onImageClick: (url: string) => void
+  onEdit: () => void
 }) {
   const dt = new Date(log.worked_at)
   const dateStr = `${dt.getFullYear()}/${dt.getMonth()+1}/${dt.getDate()} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`
@@ -165,21 +145,9 @@ function LogCard({ log, onDelete, onImageClick, onEdit }: {
       {log.photos.length > 0 && (
         <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
           {log.photos.map(p => (
-            <img 
-              key={p.id} 
-              src={p.file_path} 
-              alt="" 
-              style={{ 
-                width: 72, 
-                height: 72, 
-                objectFit: 'cover', 
-                borderRadius: 6,
-                cursor: 'pointer',
-                transition: 'opacity 0.2s'
-              }}
+            <img key={p.id} src={p.file_path} alt=""
+              style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 6, cursor: 'pointer' }}
               onClick={() => onImageClick(p.file_path)}
-              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
-              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
             />
           ))}
         </div>
@@ -193,56 +161,8 @@ const tabStyle: React.CSSProperties = { flex: 1, textAlign: 'center', padding: '
 const activeTabStyle: React.CSSProperties = { ...tabStyle, color: '#2d7a4f', borderBottom: '2px solid #2d7a4f', fontWeight: 600 }
 const addBtnStyle: React.CSSProperties = { display: 'block', width: '100%', padding: '14px', background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 10, fontSize: 16, fontWeight: 600, cursor: 'pointer' }
 const smallBtnStyle: React.CSSProperties = { fontSize: 12, padding: '4px 10px', border: '1px solid #ddd', borderRadius: 6, background: '#fff', cursor: 'pointer', color: '#666' }
-
-const modalOverlayStyle: React.CSSProperties = {
-  position: 'fixed',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  background: 'rgba(0, 0, 0, 0.9)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 1000,
-  padding: 20,
-}
-
-const modalContentStyle: React.CSSProperties = {
-  position: 'relative',
-  maxWidth: '90vw',
-  maxHeight: '90vh',
-}
-
-const modalImageStyle: React.CSSProperties = {
-  maxWidth: '100%',
-  maxHeight: '90vh',
-  objectFit: 'contain',
-  borderRadius: 8,
-}
-
-const modalCloseStyle: React.CSSProperties = {
-  position: 'absolute',
-  top: -40,
-  right: 0,
-  background: 'rgba(255, 255, 255, 0.2)',
-  border: 'none',
-  color: '#fff',
-  fontSize: 32,
-  width: 40,
-  height: 40,
-  borderRadius: '50%',
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  lineHeight: 1,
-}
-
-const deleteModalStyle: React.CSSProperties = {
-  background: '#fff',
-  borderRadius: 12,
-  padding: 24,
-  maxWidth: 400,
-  width: '90%',
-}
+const modalOverlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }
+const modalContentStyle: React.CSSProperties = { position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }
+const modalImageStyle: React.CSSProperties = { maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: 8 }
+const modalCloseStyle: React.CSSProperties = { position: 'absolute', top: -40, right: 0, background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', fontSize: 32, width: 40, height: 40, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }
+const deleteModalStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: 24, maxWidth: 400, width: '90%' }
