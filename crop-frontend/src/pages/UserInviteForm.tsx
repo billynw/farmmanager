@@ -34,7 +34,6 @@ export default function UserInviteForm() {
   })
   const manageableFields = fields.filter(f => f.my_role === 'owner' || f.my_role === 'manager')
 
-  // フィールド一覧が取得できたら初期化
   useState(() => {
     if (manageableFields.length > 0 && Object.keys(fieldSelections).length === 0) {
       setFieldSelections(
@@ -112,7 +111,7 @@ export default function UserInviteForm() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: '#f5f5f0' }}>
       <AppHeader backTo="/admin/users" title="ユーザーを招待" />
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 16, paddingBottom: 80 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 16, paddingBottom: 'calc(80px + 56px + env(safe-area-inset-bottom))' }}>
         <div style={{ background: '#fff', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 12 }}>
           <div>
             <label style={labelStyle}>ユーザー名 <span style={{ color: '#c0392b' }}>*</span></label>
@@ -172,7 +171,7 @@ export default function UserInviteForm() {
         {error && <p style={{ color: '#c0392b', fontSize: 13, marginTop: 12, textAlign: 'center' }}>{error}</p>}
       </div>
 
-      <div style={{ padding: '12px 16px', background: '#fff', borderTop: '1px solid #eee' }}>
+      <div style={saveBtnBarStyle}>
         <button
           onClick={submit}
           disabled={!name || !email || !someChecked || loading}
@@ -190,3 +189,12 @@ export default function UserInviteForm() {
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: 13, color: '#444', fontWeight: 600, marginBottom: 6 }
 const inputStyle: React.CSSProperties = { display: 'block', width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 15, boxSizing: 'border-box' }
 const smallBtnStyle: React.CSSProperties = { fontSize: 12, padding: '4px 10px', border: '1px solid #ddd', borderRadius: 6, background: '#fff', cursor: 'pointer', color: '#666' }
+const saveBtnBarStyle: React.CSSProperties = {
+  position: 'fixed',
+  bottom: 'calc(56px + env(safe-area-inset-bottom))',
+  left: 0, right: 0,
+  padding: '12px 16px',
+  background: '#fff',
+  borderTop: '1px solid #eee',
+  zIndex: 99,
+}

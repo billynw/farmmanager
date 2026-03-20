@@ -52,7 +52,7 @@ export default function FieldForm() {
         title={isEdit ? '圃場を編集' : '圃場を追加'}
       />
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 16, paddingBottom: 80 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 16, paddingBottom: 'calc(80px + 56px + env(safe-area-inset-bottom))' }}>
         <div style={{ background: '#fff', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <label style={labelStyle}>圃場名 *</label>
@@ -69,7 +69,7 @@ export default function FieldForm() {
         </div>
       </div>
 
-      <div style={{ padding: '12px 16px', background: '#fff', borderTop: '1px solid #eee', paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}>
+      <div style={saveBtnBarStyle}>
         <button
           onClick={() => mutation.mutate()}
           disabled={!name || mutation.isPending}
@@ -87,3 +87,12 @@ export default function FieldForm() {
 
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: 13, color: '#444', fontWeight: 600, marginBottom: 6 }
 const inputStyle: React.CSSProperties = { display: 'block', width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 15, boxSizing: 'border-box' }
+const saveBtnBarStyle: React.CSSProperties = {
+  position: 'fixed',
+  bottom: 'calc(56px + env(safe-area-inset-bottom))',
+  left: 0, right: 0,
+  padding: '12px 16px',
+  background: '#fff',
+  borderTop: '1px solid #eee',
+  zIndex: 99,
+}
