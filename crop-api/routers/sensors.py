@@ -50,6 +50,23 @@ def create_sensor(
     return sensor
 
 
+@router.put("/sensors/{sensor_id}", response_model=schemas.SensorOut)
+def update_sensor(
+    sensor_id: int,
+    body: schemas.SensorUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    sensor = db.query(models.Sensor).filter(models.Sensor.id == sensor_id).first()
+    if not sensor:
+        raise HTTPException(status_code=404, detail="Sensor not found")
+    for key, value in body.model_dump(exclude_unset=True).items():
+        setattr(sensor, key, value)
+    db.commit()
+    db.refresh(sensor)
+    return sensor
+
+
 @router.delete("/sensors/{sensor_id}")
 def delete_sensor(
     sensor_id: int,
@@ -233,7 +250,8 @@ def seed_sensor_dummy(
         if existing:
             continue
 
-        sensor = models.Sensor(field_id=field.id, name=f"{field.name}センサー", active=True)
+        dummy_token = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=15))
+        sensor = models.Sensor(field_id=field.id, name=f"{field.name}センサー", active=True, token=dummy_token)
         db.add(sensor)
         db.flush()
         created_sensors += 1
