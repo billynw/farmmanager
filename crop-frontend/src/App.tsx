@@ -12,6 +12,7 @@ import ItemList from './pages/ItemList'
 import ItemDetail from './pages/ItemDetail'
 import ItemForm from './pages/ItemForm'
 import FieldForm from './pages/FieldForm'
+import UserInviteForm from './pages/UserInviteForm'
 import WorkLogNew from './pages/WorkLogNew'
 import WorkLogEdit from './pages/WorkLogEdit'
 import Harvests from './pages/Harvests'
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="/items" element={<RequireAuth><ItemList /></RequireAuth>} />
           <Route path="/sensors" element={<RequireAuth><SensorDetail /></RequireAuth>} />
           <Route path="/admin/users" element={<RequireAuth><AdminUsers /></RequireAuth>} />
+          <Route path="/admin/users/invite" element={<RequireAuth><UserInviteForm /></RequireAuth>} />
           <Route path="/admin/fields/new" element={<RequireAuth><FieldForm /></RequireAuth>} />
           <Route path="/admin/fields/:id/edit" element={<RequireAuth><FieldForm /></RequireAuth>} />
           <Route path="/items/new" element={<RequireAuth><ItemForm /></RequireAuth>} />

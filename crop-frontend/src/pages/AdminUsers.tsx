@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { usersApi, fieldsApi } from '../api'
-import type { UserFieldRole, Field, FieldInviteItem } from '../api'
+import type { UserFieldRole } from '../api'
 import { useAuth } from '../store'
 import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
@@ -42,7 +42,6 @@ export default function AdminUsers() {
   const currentUser = useAuth((s) => s.user)
   const [tab, setTab] = useState<Tab>('fields')
   const [selectedFieldId, setSelectedFieldId] = useState<number | null>(null)
-  const [showUserForm, setShowUserForm] = useState(false)
   const [togglingUserId, setTogglingUserId] = useState<number | null>(null)
 
   const { data: fields = [] } = useQuery({ queryKey: ['fields'], queryFn: () => fieldsApi.list().then(r => r.data) })
@@ -206,16 +205,8 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {showUserForm && (
-        <UserInviteModal
-          manageableFields={manageableFields}
-          onClose={() => setShowUserForm(false)}
-          onSaved={() => { refetchUsers(); setShowUserForm(false) }}
-        />
-      )}
-
       <button style={fabStyle} onClick={() => {
-        if (tab === 'users') setShowUserForm(true)
+        if (tab === 'users') navigate('/admin/users/invite')
         else navigate('/admin/fields/new')
       }}>
         {tab === 'users' ? '＋ ユーザーを追加' : '＋ 圃場を追加'}
@@ -226,149 +217,8 @@ export default function AdminUsers() {
   )
 }
 
-function UserInviteModal({ manageableFields, onClose, onSaved }: {
-  manageableFields: Field[]
-  onClose: () => void
-  onSaved: () => void
-}) {
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [fieldSelections, setFieldSelections] = useState<Record<number, { checked: boolean; role: UserFieldRole }>>(
-    Object.fromEntries(manageableFields.map(f => [f.id, { checked: false, role: 'member' as UserFieldRole }]))
-  )
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [done, setDone] = useState(false)
-
-  const allChecked = manageableFields.every(f => fieldSelections[f.id]?.checked)
-  const someChecked = manageableFields.some(f => fieldSelections[f.id]?.checked)
-
-  const toggleAll = () => {
-    const next = !allChecked
-    setFieldSelections(prev => {
-      const updated = { ...prev }
-      manageableFields.forEach(f => { updated[f.id] = { ...updated[f.id], checked: next } })
-      return updated
-    })
-  }
-
-  const toggleField = (fieldId: number) => {
-    setFieldSelections(prev => ({ ...prev, [fieldId]: { ...prev[fieldId], checked: !prev[fieldId].checked } }))
-  }
-
-  const toggleRole = (fieldId: number) => {
-    setFieldSelections(prev => ({ ...prev, [fieldId]: { ...prev[fieldId], role: prev[fieldId].role === 'manager' ? 'member' : 'manager' } }))
-  }
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const selectedFields: FieldInviteItem[] = manageableFields
-      .filter(f => fieldSelections[f.id]?.checked)
-      .map(f => ({ field_id: f.id, field_role: fieldSelections[f.id].role }))
-    if (selectedFields.length === 0) { setError('圃場を少なくとも1つ選択してください'); return }
-    setLoading(true); setError('')
-    try {
-      await usersApi.invite({ name, email, fields: selectedFields })
-      setDone(true)
-    } catch (err: any) {
-      setError(err.response?.data?.detail ?? '保存に失敗しました')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (done) {
-    return (
-      <div style={overlayStyle} onClick={onClose}>
-        <div style={modalStyle} onClick={e => e.stopPropagation()}>
-          <p style={{ color: '#2d7a4f', fontWeight: 600, marginBottom: 8 }}>📧 招待しました</p>
-          <p style={{ color: '#666', fontSize: 14, marginBottom: 20, lineHeight: 1.6 }}>
-            登録済みの場合は即座に圃場に追加されました。<br />
-            未登録の場合は <strong>{email}</strong> に招待メールを送りました。
-          </p>
-          <button style={btnStyle} onClick={onSaved}>閉じる</button>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div style={overlayStyle} onClick={onClose}>
-      <div style={modalStyle} onClick={e => e.stopPropagation()}>
-        <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700 }}>ユーザーを招待</h3>
-        <p style={{ color: '#888', fontSize: 13, marginBottom: 16 }}>
-          登録済みの場合は即座に追加、未登録の場合は招待メールを送信します。
-        </p>
-        {error && <p style={{ color: '#c0392b', fontSize: 13, marginBottom: 10 }}>{error}</p>}
-        <form onSubmit={submit}>
-          <label style={labelStyle}>ユーザー名 <span style={{ color: '#c0392b' }}>*</span></label>
-          <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} required />
-          <label style={{ ...labelStyle, marginTop: 12 }}>メールアドレス <span style={{ color: '#c0392b' }}>*</span></label>
-          <input style={inputStyle} type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="example@email.com" />
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 6 }}>
-            <label style={labelStyle}>圃場と権限 <span style={{ color: '#c0392b' }}>*</span></label>
-            <button type="button" style={smallBtnStyle} onClick={toggleAll}>
-              {allChecked ? 'すべて解除' : 'すべて選択'}
-            </button>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto', marginBottom: 4 }}>
-            {manageableFields.map(field => {
-              const sel = fieldSelections[field.id]
-              return (
-                <div key={field.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '10px 12px',
-                  border: `1px solid ${sel.checked ? '#2d7a4f' : '#eee'}`,
-                  borderRadius: 8,
-                  background: sel.checked ? '#f0faf4' : '#fff',
-                }}>
-                  <input type="checkbox" checked={sel.checked} onChange={() => toggleField(field.id)}
-                    style={{ width: 18, height: 18, cursor: 'pointer', flexShrink: 0 }} />
-                  <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: sel.checked ? '#1a1a1a' : '#888' }}>
-                    {field.name}
-                  </span>
-                  <span
-                    onClick={() => sel.checked && toggleRole(field.id)}
-                    style={{
-                      fontSize: 11, padding: '3px 9px', borderRadius: 20, fontWeight: 600,
-                      background: sel.checked ? ROLE_COLOR[sel.role] + '22' : '#eee',
-                      color: sel.checked ? ROLE_COLOR[sel.role] : '#bbb',
-                      border: sel.checked ? `1px solid ${ROLE_COLOR[sel.role]}55` : '1px solid transparent',
-                      cursor: sel.checked ? 'pointer' : 'default',
-                    }}
-                  >
-                    {ROLE_LABEL[sel.role]}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-
-          {!someChecked && (
-            <p style={{ fontSize: 12, color: '#c0392b', marginBottom: 8 }}>圃場を少なくとも1つ選択してください</p>
-          )}
-
-          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <button type="button" style={{ ...btnStyle, background: '#eee', color: '#444' }} onClick={onClose}>キャンセル</button>
-            <button type="submit" style={{ ...btnStyle, opacity: loading ? 0.6 : 1 }} disabled={loading}>
-              {loading ? '送信中...' : '招待する'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
 const pageStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', height: '100dvh', background: '#f5f5f0' }
 const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: '12px 16px', marginBottom: 8, display: 'flex', alignItems: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }
-const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end' }
-const modalStyle: React.CSSProperties = { background: '#fff', width: '100%', borderRadius: '16px 16px 0 0', padding: '20px 16px 32px' }
-const labelStyle: React.CSSProperties = { display: 'block', fontSize: 13, color: '#444', marginBottom: 4 }
-const inputStyle: React.CSSProperties = { display: 'block', width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 15, boxSizing: 'border-box' }
-const btnStyle: React.CSSProperties = { flex: 1, padding: '12px', background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: 'pointer' }
 const fabStyle: React.CSSProperties = {
   position: 'fixed', bottom: 64, left: '50%', transform: 'translateX(-50%)',
   background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 50,
@@ -376,4 +226,3 @@ const fabStyle: React.CSSProperties = {
   boxShadow: '0 4px 16px rgba(45,122,79,0.35)', whiteSpace: 'nowrap', zIndex: 50,
   width: '90%',
 }
-const smallBtnStyle: React.CSSProperties = { fontSize: 12, padding: '4px 10px', border: '1px solid #ddd', borderRadius: 6, background: '#fff', cursor: 'pointer', color: '#666' }
