@@ -78,6 +78,27 @@ export interface Harvest {
   quantity?: number; unit?: string; shipped: boolean; memo?: string
 }
 
+// --- Sensor Types ---
+export interface SensorLatestReading {
+  metric: string
+  value: number
+  unit?: string
+  recorded_at: string
+}
+
+export interface SensorWithLatest {
+  id: number
+  name: string
+  active: boolean
+  latest: SensorLatestReading[]
+}
+
+export interface FieldSensorSummary {
+  field_id: number
+  field_name: string
+  sensors: SensorWithLatest[]
+}
+
 // --- API calls ---
 export const authApi = {
   login: (email: string, password: string) =>
@@ -116,6 +137,8 @@ export const fieldsApi = {
   create: (data: Omit<Field, 'id' | 'my_role'>) => api.post<Field>('/fields', data),
   update: (id: number, data: Omit<Field, 'id' | 'my_role'>) => api.put<Field>(`/fields/${id}`, data),
   delete: (id: number) => api.delete(`/fields/${id}`),
+  sensorSummary: (field_id: number) =>
+    api.get<FieldSensorSummary>(`/fields/${field_id}/sensor-summary`),
 }
 
 export const workTypesApi = {

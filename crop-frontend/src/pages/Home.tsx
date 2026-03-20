@@ -1,14 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../store'
 import { fieldsApi, itemsApi } from '../api'
-import type { Item, Field } from '../api'
+import type { Item, Field, FieldSensorSummary, SensorLatestReading } from '../api'
 import logoImg from '../assets/logo.png'
 
-// センサーデータはまだサンプル（後でAPIに差し替え）
-const SAMPLE_SENSORS: Record<number, { waterLevel: number; waterTemp: number; airTemp: number; soilMoisture: number }> = {}
-const DEFAULT_SENSOR = { waterLevel: 0, waterTemp: 0, airTemp: 0, soilMoisture: 0 }
+// センサーのmetricに対応する表示設定
+const METRIC_CONFIG: Record<string, { label: string; unit: string; color: string; max: number; min: number }> = {
+  water_level:   { label: '水位',    unit: 'cm', color: '#378ADD', max: 25,  min: 0  },
+  water_temp:    { label: '水温',    unit: '°C', color: '#1D9E75', max: 35,  min: 10 },
+  air_temp:      { label: '気温',    unit: '°C', color: '#BA7517', max: 40,  min: 0  },
+  soil_moisture: { label: '地中水分', unit: '%',  color: '#639922', max: 100, min: 0  },
+  ph:            { label: 'pH',      unit: '',   color: '#8e44ad', max: 14,  min: 0  },
+  gate_open:     { label: 'ゲート',  unit: '',   color: '#e67e22', max: 1,   min: 0  },
+}
 
 const STATUS_LABEL: Record<string, string> = { growing: '栽培中', finished: '終了' }
 const STATUS_COLOR: Record<string, string> = { growing: '#2d7a4f', finished: '#888' }
@@ -18,13 +24,26 @@ function formatDate(dateStr: string) {
   return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
+// 圃場の全センサーの最新値をmetricごとにまとめる（複数センサーある場合は最新優先）
+function aggregateLatest(summary: FieldSensorSummary): SensorLatestReading[] {
+  const map = new Map<string, SensorLatestReading>()
+  for (const sensor of summary.sensors) {
+    for (const r of sensor.latest) {
+      const existing = map.get(r.metric)
+      if (!existing || new Date(r.recorded_at) > new Date(existing.recorded_at)) {
+        map.set(r.metric, r)
+      }
+    }
+  }
+  return Array.from(map.values())
+}
+
 export default function Home() {
   const navigate = useNavigate()
   const logout = useAuth((s) => s.logout)
   const user = useAuth((s) => s.user)
   const [selectedFieldId, setSelectedFieldId] = useState<number | null>(null)
 
-  // 実データ取得
   const { data: fields = [] } = useQuery<Field[]>({
     queryKey: ['fields'],
     queryFn: () => fieldsApi.list().then(r => r.data),
@@ -35,6 +54,24 @@ export default function Home() {
     queryFn: () => itemsApi.list({ status: 'growing' }).then(r => r.data),
   })
 
+  // 先頭圃場を初期選択
+  const activeFieldId = selectedFieldId ?? fields[0]?.id ?? null
+
+  useEffect(() => {
+    if (!selectedFieldId && fields.length > 0) {
+      setSelectedFieldId(fields[0].id)
+    }
+  }, [fields, selectedFieldId])
+
+  // 選択中圃場のセンサーサマリー取得
+  const { data: sensorSummary } = useQuery<FieldSensorSummary>({
+    queryKey: ['sensor-summary', activeFieldId],
+    queryFn: () => fieldsApi.sensorSummary(activeFieldId!).then(r => r.data),
+    enabled: !!activeFieldId,
+  })
+
+  const sensorReadings = sensorSummary ? aggregateLatest(sensorSummary) : []
+
   // latest_work_log.worked_at の新しい順にソート、上位5件
   const recentItems = [...items]
     .filter(item => item.latest_work_log)
@@ -43,10 +80,6 @@ export default function Home() {
       new Date(a.latest_work_log!.worked_at).getTime()
     )
     .slice(0, 5)
-
-  // 選択中の圃場（未選択なら先頭）
-  const activeFieldId = selectedFieldId ?? fields[0]?.id ?? null
-  const sensors = activeFieldId ? (SAMPLE_SENSORS[activeFieldId] ?? DEFAULT_SENSOR) : DEFAULT_SENSOR
 
   return (
     <div style={pageStyle}>
@@ -85,12 +118,34 @@ export default function Home() {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 16 }}>
-          <SensorCard label="水位"    value={sensors.waterLevel}   unit="cm" color="#378ADD" pct={sensors.waterLevel / 25 * 100} />
-          <SensorCard label="水温"    value={sensors.waterTemp}    unit="°C" color="#1D9E75" pct={(sensors.waterTemp - 10) / 25 * 100} />
-          <SensorCard label="気温"    value={sensors.airTemp}      unit="°C" color="#BA7517" pct={sensors.airTemp / 40 * 100} />
-          <SensorCard label="地中水分" value={sensors.soilMoisture} unit="%"  color="#639922" pct={sensors.soilMoisture} />
-        </div>
+        {sensorReadings.length > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 16 }}>
+            {sensorReadings.map(r => {
+              const cfg = METRIC_CONFIG[r.metric]
+              if (!cfg) return null
+              const pct = (r.value - cfg.min) / (cfg.max - cfg.min) * 100
+              return (
+                <SensorCard
+                  key={r.metric}
+                  label={cfg.label}
+                  value={r.value}
+                  unit={r.unit ?? cfg.unit}
+                  color={cfg.color}
+                  pct={pct}
+                />
+              )
+            })}
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 16, opacity: 0.4 }}>
+            {['水位', '水温', '気温', '地中水分'].map(label => (
+              <div key={label} style={{ background: '#fff', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px' }}>
+                <div style={{ fontSize: 10, color: '#999', marginBottom: 3 }}>{label}</div>
+                <div style={{ fontSize: 16, fontWeight: 500, color: '#bbb' }}>--</div>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div style={{ height: 1, background: '#eee', margin: '12px 0' }} />
 
