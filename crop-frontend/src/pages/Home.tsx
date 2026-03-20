@@ -8,30 +8,19 @@ import BottomNav from '../components/BottomNav'
 
 const METRIC_CONFIG: Record<string, { label: string; unit: string; color: string; max: number; min: number }> = {
   water_level:   { label: '水位',    unit: 'cm', color: '#378ADD', max: 25,  min: 0  },
-  water_temp:    { label: '水温',    unit: '°C', color: '#1D9E75', max: 35,  min: 10 },
-  air_temp:      { label: '気温',    unit: '°C', color: '#BA7517', max: 40,  min: 0  },
+  water_temp:    { label: '水温',    unit: '\u00b0C', color: '#1D9E75', max: 35,  min: 10 },
+  air_temp:      { label: '気温',    unit: '\u00b0C', color: '#BA7517', max: 40,  min: 0  },
   soil_moisture: { label: '地中水分', unit: '%',  color: '#639922', max: 100, min: 0  },
   ph:            { label: 'pH',      unit: '',   color: '#8e44ad', max: 14,  min: 0  },
   gate_open:     { label: 'ゲート',  unit: '',   color: '#e67e22', max: 1,   min: 0  },
 }
 
-const STATUS_LABEL: Record<string, string> = { growing: '栽培中', finished: '終了' }
+const STATUS_LABEL: Record<string, string> = { growing: '活肍中', finished: '終了' }
 const STATUS_COLOR: Record<string, string> = { growing: '#2d7a4f', finished: '#888' }
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr)
   return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-
-function aggregateLatest(summary: FieldSensorSummary): SensorLatestReading[] {
-  const map = new Map<string, SensorLatestReading>()
-  for (const sensor of summary.sensors) {
-    for (const r of sensor.latest) {
-      const existing = map.get(r.metric)
-      if (!existing || new Date(r.recorded_at) > new Date(existing.recorded_at)) map.set(r.metric, r)
-    }
-  }
-  return Array.from(map.values())
 }
 
 export default function Home() {
@@ -57,7 +46,9 @@ export default function Home() {
     queryFn: () => fieldsApi.sensorSummary(activeFieldId!).then(r => r.data),
     enabled: !!activeFieldId,
   })
-  const sensorReadings = sensorSummary ? aggregateLatest(sensorSummary) : []
+
+  // 圃場内の最小 ID（最も古い）の有効センサーの値だけ使う
+  const sensorReadings: SensorLatestReading[] = sensorSummary?.sensors[0]?.latest ?? []
 
   const recentItems = [...items]
     .filter(item => item.latest_work_log)

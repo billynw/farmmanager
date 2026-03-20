@@ -195,6 +195,7 @@ def get_sensor_photos(
 
 # ----------------------------------------------------------------
 # 圃場ごとの最新センサー値サマリー（フロントのホーム画面向け）
+# 圃場内の有効センサーをID昇順で並べ、最小ID（最も古い）のセンサーの値のみ返す
 # ----------------------------------------------------------------
 
 @router.get("/fields/{field_id}/sensor-summary", response_model=schemas.FieldSensorSummary)
@@ -207,41 +208,51 @@ def field_sensor_summary(
     if not field:
         raise HTTPException(status_code=404, detail="Field not found")
 
-    sensors_out = []
-    for sensor in field.sensors:
-        if not sensor.active:
-            continue
-        latest_per_metric = (
-            db.query(models.SensorReading)
-            .filter(models.SensorReading.sensor_id == sensor.id)
-            .order_by(
-                models.SensorReading.metric,
-                models.SensorReading.recorded_at.desc(),
-            )
-            .all()
+    # 最小IDの有効センサーだけを取得
+    primary_sensor = (
+        db.query(models.Sensor)
+        .filter(models.Sensor.field_id == field_id, models.Sensor.active == True)
+        .order_by(models.Sensor.id.asc())
+        .first()
+    )
+
+    if not primary_sensor:
+        return schemas.FieldSensorSummary(
+            field_id=field.id,
+            field_name=field.name,
+            sensors=[],
         )
-        seen = set()
-        latest = []
-        for r in latest_per_metric:
-            if r.metric not in seen:
-                seen.add(r.metric)
-                latest.append(schemas.SensorLatestReading(
-                    metric=r.metric,
-                    value=r.value,
-                    unit=r.unit,
-                    recorded_at=r.recorded_at,
-                ))
-        sensors_out.append(schemas.SensorWithLatest(
-            id=sensor.id,
-            name=sensor.name,
-            active=sensor.active,
-            latest=latest,
-        ))
+
+    latest_per_metric = (
+        db.query(models.SensorReading)
+        .filter(models.SensorReading.sensor_id == primary_sensor.id)
+        .order_by(
+            models.SensorReading.metric,
+            models.SensorReading.recorded_at.desc(),
+        )
+        .all()
+    )
+    seen = set()
+    latest = []
+    for r in latest_per_metric:
+        if r.metric not in seen:
+            seen.add(r.metric)
+            latest.append(schemas.SensorLatestReading(
+                metric=r.metric,
+                value=r.value,
+                unit=r.unit,
+                recorded_at=r.recorded_at,
+            ))
 
     return schemas.FieldSensorSummary(
         field_id=field.id,
         field_name=field.name,
-        sensors=sensors_out,
+        sensors=[schemas.SensorWithLatest(
+            id=primary_sensor.id,
+            name=primary_sensor.name,
+            active=primary_sensor.active,
+            latest=latest,
+        )],
     )
 
 
