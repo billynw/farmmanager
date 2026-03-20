@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from database import get_db
 from auth import get_current_user
 import models
@@ -56,7 +55,7 @@ def delete_sensor(
 
 
 # ----------------------------------------------------------------
-# 計測値の記録（センサーデバイスからのPOST想定）
+# 計測値の記録（センサーデバイスからのPOST想定・認証不要）
 # ----------------------------------------------------------------
 
 @router.post("/sensors/{sensor_id}/readings", response_model=schemas.SensorReadingOut)
@@ -151,15 +150,14 @@ def field_sensor_summary(
 
 
 # ----------------------------------------------------------------
-# ダミーデータ生成（センサー未接続時の開発用）
+# ダミーデータ生成（センサー未接続時の開発用・認証不要）
 # ----------------------------------------------------------------
 
 @router.post("/dev/seed-sensor-dummy")
 def seed_sensor_dummy(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
 ):
-    """全圃場にダミーセンサーと計測値を生成する（開発用）"""
+    """全圃場にダミーセンサーと計測値を生成する（開発用・認証不要）"""
     fields = db.query(models.Field).all()
     if not fields:
         raise HTTPException(status_code=400, detail="No fields found. Create fields first.")
