@@ -102,7 +102,7 @@ export default function AdminUsers() {
       {tab === 'fields' && (
         <div style={{ padding: '12px 16px', overflowY: 'auto', flex: 1, paddingBottom: 80 }}>
           {fields.length === 0 && (
-            <p style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>圃場が登録されていません。「＋追加」から圃場を作成してください。</p>
+            <p style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>圃場が登録されていません。「＋ 圃場を追加」から圃場を作成してください。</p>
           )}
           {fields.map(field => (
             <div key={field.id} style={cardStyle}>
@@ -222,15 +222,12 @@ export default function AdminUsers() {
         />
       )}
 
-      {/* ＋追加ボタン（BottomNavの直上） */}
-      <div style={addBarStyle}>
-        <button style={addBtnStyle} onClick={() => {
-          if (tab === 'users') setShowUserForm(true)
-          else { setEditField(null); setShowFieldForm(true) }
-        }}>
-          ＋ 追加
-        </button>
-      </div>
+      <button style={fabStyle} onClick={() => {
+        if (tab === 'users') setShowUserForm(true)
+        else { setEditField(null); setShowFieldForm(true) }
+      }}>
+        {tab === 'users' ? '＋ ユーザーを追加' : '＋ 圃場を追加'}
+      </button>
 
       <BottomNav />
     </div>
@@ -426,12 +423,11 @@ const modalStyle: React.CSSProperties = { background: '#fff', width: '100%', bor
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: 13, color: '#444', marginBottom: 4 }
 const inputStyle: React.CSSProperties = { display: 'block', width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 15, boxSizing: 'border-box' }
 const btnStyle: React.CSSProperties = { flex: 1, padding: '12px', background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: 'pointer' }
-const addBarStyle: React.CSSProperties = {
-  position: 'fixed',
-  bottom: 'calc(56px + env(safe-area-inset-bottom))',
-  left: 0, right: 0,
-  padding: '8px 16px',
-  zIndex: 99,
+const fabStyle: React.CSSProperties = {
+  position: 'fixed', bottom: 64, left: '50%', transform: 'translateX(-50%)',
+  background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 50,
+  padding: '14px 28px', fontSize: 16, fontWeight: 600, cursor: 'pointer',
+  boxShadow: '0 4px 16px rgba(45,122,79,0.35)', whiteSpace: 'nowrap', zIndex: 50,
+  width: '90%',
 }
-const addBtnStyle: React.CSSProperties = { fontSize: 13, padding: '6px 14px', background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }
 const smallBtnStyle: React.CSSProperties = { fontSize: 12, padding: '4px 10px', border: '1px solid #ddd', borderRadius: 6, background: '#fff', cursor: 'pointer', color: '#666' }
