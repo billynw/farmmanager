@@ -185,6 +185,7 @@ class Sensor(Base):
     field_id = Column(Integer, ForeignKey("fields.id"), nullable=False)
     name = Column(String(100), nullable=False)
     active = Column(Boolean, default=True)
+    token = Column(String(15), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     field = relationship("Field", back_populates="sensors")
     readings = relationship("SensorReading", back_populates="sensor", cascade="all, delete-orphan")
