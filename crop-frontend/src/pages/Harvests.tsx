@@ -73,7 +73,7 @@ export default function Harvests() {
         </div>
       </div>
 
-      <div style={{ position: 'fixed', bottom: 56, left: 0, right: 0, padding: '12px 16px', background: '#fff', borderTop: '1px solid #eee', zIndex: 50 }}>
+      <div style={{ position: 'fixed', bottom: 56, left: 0, right: 0, padding: '12px 16px', zIndex: 50 }}>
         <button style={addBtnStyle} onClick={() => navigate(`/items/${itemId}/harvests/new`)}>＋ 収穫を記録する</button>
       </div>
 
