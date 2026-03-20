@@ -6,7 +6,7 @@ import type { Item } from '../api'
 import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
 
-const STATUS_LABEL: Record<string, string> = { growing: '活辝中', finished: '終了' }
+const STATUS_LABEL: Record<string, string> = { growing: '栽培中', finished: '終了' }
 const STATUS_COLOR: Record<string, string> = { growing: '#2d7a4f', finished: '#888' }
 
 async function downloadCsv(fetchFn: () => Promise<Response>, filename: string) {
@@ -44,7 +44,7 @@ export default function ItemList() {
         </select>
         <select style={selectStyle} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
           <option value="">全ステータス</option>
-          <option value="growing">活辝中</option>
+          <option value="growing">栽培中</option>
           <option value="finished">終了</option>
         </select>
       </div>
