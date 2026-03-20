@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { usersApi, fieldsApi } from '../api'
 import type { UserFieldRole, Field, FieldInviteItem } from '../api'
 import { useAuth } from '../store'
@@ -37,12 +38,11 @@ function canChangeRole(myRole: UserFieldRole | undefined, targetRole: UserFieldR
 
 export default function AdminUsers() {
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const currentUser = useAuth((s) => s.user)
   const [tab, setTab] = useState<Tab>('fields')
   const [selectedFieldId, setSelectedFieldId] = useState<number | null>(null)
   const [showUserForm, setShowUserForm] = useState(false)
-  const [showFieldForm, setShowFieldForm] = useState(false)
-  const [editField, setEditField] = useState<Field | null>(null)
   const [togglingUserId, setTogglingUserId] = useState<number | null>(null)
 
   const { data: fields = [] } = useQuery({ queryKey: ['fields'], queryFn: () => fieldsApi.list().then(r => r.data) })
@@ -100,7 +100,7 @@ export default function AdminUsers() {
       </div>
 
       {tab === 'fields' && (
-        <div style={{ padding: '12px 16px', overflowY: 'auto', flex: 1, paddingBottom: 80 }}>
+        <div style={{ padding: '12px 16px', overflowY: 'auto', flex: 1, paddingBottom: 100 }}>
           {fields.length === 0 && (
             <p style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>圃場が登録されていません。「＋ 圃場を追加」から圃場を作成してください。</p>
           )}
@@ -123,7 +123,7 @@ export default function AdminUsers() {
               </div>
               {field.my_role === 'owner' && (
                 <div style={{ display: 'flex', gap: 2 }}>
-                  <button style={iconBtnStyle} title="編集" onClick={() => { setEditField(field); setShowFieldForm(true) }}>
+                  <button style={iconBtnStyle} title="編集" onClick={() => navigate(`/admin/fields/${field.id}/edit`)}>
                     <EditIcon size={17} color="#555" />
                   </button>
                   <button style={iconBtnStyle} title="削除"
@@ -138,7 +138,7 @@ export default function AdminUsers() {
       )}
 
       {tab === 'users' && (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', paddingBottom: 80 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', paddingBottom: 100 }}>
           {manageableFields.length === 0 ? (
             <p style={{ color: '#aaa', textAlign: 'center', marginTop: 40, padding: '0 16px' }}>
               圃場を作成するか、manager以上の圃場に属するとユーザーを招待できます。
@@ -214,17 +214,9 @@ export default function AdminUsers() {
         />
       )}
 
-      {showFieldForm && (
-        <FieldFormModal
-          field={editField}
-          onClose={() => setShowFieldForm(false)}
-          onSaved={() => { qc.invalidateQueries({ queryKey: ['fields'] }); setShowFieldForm(false) }}
-        />
-      )}
-
       <button style={fabStyle} onClick={() => {
         if (tab === 'users') setShowUserForm(true)
-        else { setEditField(null); setShowFieldForm(true) }
+        else navigate('/admin/fields/new')
       }}>
         {tab === 'users' ? '＋ ユーザーを追加' : '＋ 圃場を追加'}
       </button>
@@ -362,52 +354,6 @@ function UserInviteModal({ manageableFields, onClose, onSaved }: {
             <button type="button" style={{ ...btnStyle, background: '#eee', color: '#444' }} onClick={onClose}>キャンセル</button>
             <button type="submit" style={{ ...btnStyle, opacity: loading ? 0.6 : 1 }} disabled={loading}>
               {loading ? '送信中...' : '招待する'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
-function FieldFormModal({ field, onClose, onSaved }: { field: Field | null; onClose: () => void; onSaved: () => void }) {
-  const [name, setName] = useState(field?.name ?? '')
-  const [area, setArea] = useState(field?.area?.toString() ?? '')
-  const [locationNote, setLocationNote] = useState(field?.location_note ?? '')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true); setError('')
-    try {
-      const data = { name, area: area ? parseFloat(area) : undefined, location_note: locationNote || undefined }
-      if (field) await fieldsApi.update(field.id, data)
-      else await fieldsApi.create(data)
-      onSaved()
-    } catch (err: any) {
-      setError(err.response?.data?.detail ?? '保存に失敗しました')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <div style={overlayStyle} onClick={onClose}>
-      <div style={modalStyle} onClick={e => e.stopPropagation()}>
-        <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700 }}>{field ? '圃場編集' : '圃場追加'}</h3>
-        {error && <p style={{ color: '#c0392b', fontSize: 13, marginBottom: 10 }}>{error}</p>}
-        <form onSubmit={submit}>
-          <label style={labelStyle}>圃場名 <span style={{ color: '#c0392b' }}>*</span></label>
-          <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} required placeholder="例：北圃" />
-          <label style={{ ...labelStyle, marginTop: 12 }}>面積（アール）</label>
-          <input style={inputStyle} type="number" step="0.01" min="0" value={area} onChange={e => setArea(e.target.value)} placeholder="例：10.5" />
-          <label style={{ ...labelStyle, marginTop: 12 }}>場所メモ</label>
-          <input style={inputStyle} value={locationNote} onChange={e => setLocationNote(e.target.value)} placeholder="例：山田町3丁目" />
-          <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
-            <button type="button" style={{ ...btnStyle, background: '#eee', color: '#444' }} onClick={onClose}>キャンセル</button>
-            <button type="submit" style={{ ...btnStyle, opacity: loading ? 0.6 : 1 }} disabled={loading}>
-              {loading ? '保存中...' : '保存'}
             </button>
           </div>
         </form>
