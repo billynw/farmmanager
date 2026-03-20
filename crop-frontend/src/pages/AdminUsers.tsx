@@ -267,7 +267,7 @@ export default function AdminUsers() {
             <>
               <div style={{ padding: '8px 16px', background: '#fff', borderBottom: '1px solid #eee' }}>
                 <select
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 16 }}
                   value={selectedFieldId ?? ''}
                   onChange={e => setSelectedFieldId(Number(e.target.value))}
                 >
@@ -334,7 +334,7 @@ export default function AdminUsers() {
             <>
               <div style={{ padding: '8px 16px', background: '#fff', borderBottom: '1px solid #eee' }}>
                 <select
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 16 }}
                   value={activeSensorFieldId ?? ''}
                   onChange={e => setSensorFieldId(Number(e.target.value))}
                 >
@@ -582,7 +582,8 @@ const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, p
 const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }
 const modalStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: 24, width: '100%', maxWidth: 400 }
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: 13, color: '#555', marginBottom: 6, fontWeight: 500 }
-const inputStyle: React.CSSProperties = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14, boxSizing: 'border-box' }
+// font-size を 16px に設定することで iOS でのズームを防止
+const inputStyle: React.CSSProperties = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 16, boxSizing: 'border-box' }
 const cancelBtnStyle: React.CSSProperties = { flex: 1, padding: '12px', border: '1px solid #ddd', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 14 }
 const deleteBtnStyle: React.CSSProperties = { flex: 1, padding: '12px', border: 'none', borderRadius: 8, background: '#d32f2f', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }
 const saveBtnStyle: React.CSSProperties = { flex: 1, padding: '12px', border: 'none', borderRadius: 8, background: '#2d7a4f', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }
