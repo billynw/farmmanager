@@ -7,6 +7,7 @@ import { useAuth } from '../store'
 import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
 import { TrashIcon, EditIcon, iconBtnStyle } from '../components/Icons'
+import { transmitWifi } from '../lib/ggwave'
 
 type Tab = 'users' | 'fields' | 'sensors'
 type DeleteTarget =
@@ -63,6 +64,7 @@ export default function AdminUsers() {
   const [wifiForm, setWifiForm] = useState({ ssid: '', password: '' })
   const [showWifiPassword, setShowWifiPassword] = useState(false)
   const [sensorSubmitting, setSensorSubmitting] = useState(false)
+  const [wifiStatus, setWifiStatus] = useState('')
 
   const { data: fields = [] } = useQuery({ queryKey: ['fields'], queryFn: () => fieldsApi.list().then(r => r.data) })
   const manageableFields = fields.filter(f => f.my_role === 'owner' || f.my_role === 'manager')
@@ -147,7 +149,8 @@ export default function AdminUsers() {
   }
 
   const openWifiSensor = (sensor: SensorOut) => {
-    setWifiForm({ ssid: sensor.wifi_ssid ?? '', password: '' })
+    setWifiForm({ ssid: '', password: '' })
+    setWifiStatus('')
     setShowWifiPassword(false)
     setSensorModal({ mode: 'wifi', sensor })
   }
@@ -170,15 +173,14 @@ export default function AdminUsers() {
     }
   }
 
-  const handleWifiSubmit = async () => {
-    if (!wifiForm.ssid.trim() || sensorModal?.mode !== 'wifi') return
+  const handleWifiTransmit = async () => {
+    if (!wifiForm.ssid.trim()) return
     setSensorSubmitting(true)
+    setWifiStatus('')
     try {
-      await sensorsApi.updateWifi((sensorModal as any).sensor.id, { ssid: wifiForm.ssid.trim(), password: wifiForm.password })
-      setSensorModal(null)
-      alert('WIFI設定を送信しました')
+      await transmitWifi(wifiForm.ssid.trim(), wifiForm.password, setWifiStatus)
     } catch (err: any) {
-      alert(err.response?.data?.detail ?? 'WIFI設定に失敗しました')
+      setWifiStatus('エラー: ' + (err?.message ?? '送信に失敗しました'))
     } finally {
       setSensorSubmitting(false)
     }
@@ -189,6 +191,10 @@ export default function AdminUsers() {
     { key: 'users', label: 'ユーザー' },
     { key: 'sensors', label: 'センサー' },
   ]
+
+  const wifiStatusColor = wifiStatus.startsWith('エラー') ? '#d32f2f'
+    : wifiStatus === '送信完了' ? '#2d7a4f'
+    : '#f59e0b'
 
   return (
     <div style={pageStyle}>
@@ -317,7 +323,6 @@ export default function AdminUsers() {
       {/* センサータブ */}
       {tab === 'sensors' && (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', paddingBottom: 100 }}>
-          {/* 圃場セレクター */}
           {fields.length > 0 && (
             <div style={{ padding: '8px 16px', background: '#fff', borderBottom: '1px solid #eee' }}>
               <select
@@ -329,7 +334,6 @@ export default function AdminUsers() {
               </select>
             </div>
           )}
-
           <div style={{ padding: '12px 16px', overflowY: 'auto', flex: 1 }}>
             {fields.length === 0 && (
               <p style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>まず圃場を登録してください。</p>
@@ -350,12 +354,8 @@ export default function AdminUsers() {
                       {sensor.active ? '有効' : '無効'}
                     </span>
                   </div>
-                  {sensor.wifi_ssid && (
-                    <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>WIFI: {sensor.wifi_ssid}</div>
-                  )}
                 </div>
                 <div style={{ display: 'flex', gap: 2 }}>
-                  {/* WIFIアイコン */}
                   <button style={iconBtnStyle} title="WIFI設定" onClick={() => openWifiSensor(sensor)}>
                     <WifiIcon size={17} />
                   </button>
@@ -431,12 +431,13 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {/* WIFI設定モーダル */}
+      {/* WIFI設定モーダル（ggwave音声送信） */}
       {sensorModal?.mode === 'wifi' && (
-        <div style={overlayStyle} onClick={() => setSensorModal(null)}>
+        <div style={overlayStyle} onClick={() => !sensorSubmitting && setSensorModal(null)}>
           <div style={modalStyle} onClick={e => e.stopPropagation()}>
             <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700 }}>WIFI設定</h3>
             <p style={{ fontSize: 12, color: '#999', marginBottom: 16 }}>{(sensorModal as any).sensor.name}</p>
+
             <div style={{ marginBottom: 12 }}>
               <label style={labelStyle}>SSID（ネットワーク名）</label>
               <input
@@ -444,9 +445,11 @@ export default function AdminUsers() {
                 value={wifiForm.ssid}
                 onChange={e => setWifiForm(f => ({ ...f, ssid: e.target.value }))}
                 placeholder="例：MyFarm-WiFi"
+                disabled={sensorSubmitting}
                 autoFocus
               />
             </div>
+
             <div style={{ marginBottom: 20 }}>
               <label style={labelStyle}>パスワード</label>
               <div style={{ position: 'relative' }}>
@@ -456,6 +459,7 @@ export default function AdminUsers() {
                   value={wifiForm.password}
                   onChange={e => setWifiForm(f => ({ ...f, password: e.target.value }))}
                   placeholder="WIFIパスワード"
+                  disabled={sensorSubmitting}
                 />
                 <button
                   style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#999', fontSize: 13 }}
@@ -465,10 +469,33 @@ export default function AdminUsers() {
                 </button>
               </div>
             </div>
+
+            {/* 送信ステータス */}
+            {wifiStatus !== '' && (
+              <div style={{
+                marginBottom: 16, padding: '10px 14px', borderRadius: 8,
+                background: wifiStatusColor + '18',
+                border: `1px solid ${wifiStatusColor}44`,
+                fontSize: 13, color: wifiStatusColor, fontWeight: 500,
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                {sensorSubmitting && (
+                  <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: '50%', border: `2px solid ${wifiStatusColor}`, borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
+                )}
+                {wifiStatus}
+              </div>
+            )}
+
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
             <div style={{ display: 'flex', gap: 8 }}>
-              <button style={cancelBtnStyle} onClick={() => setSensorModal(null)}>キャンセル</button>
-              <button style={saveBtnStyle} onClick={handleWifiSubmit} disabled={sensorSubmitting || !wifiForm.ssid.trim()}>
-                {sensorSubmitting ? '送信中…' : '設定を送信'}
+              <button style={cancelBtnStyle} onClick={() => setSensorModal(null)} disabled={sensorSubmitting}>キャンセル</button>
+              <button
+                style={{ ...saveBtnStyle, opacity: (sensorSubmitting || !wifiForm.ssid.trim()) ? 0.6 : 1 }}
+                onClick={handleWifiTransmit}
+                disabled={sensorSubmitting || !wifiForm.ssid.trim()}
+              >
+                {sensorSubmitting ? '送信中…' : wifiStatus === '送信完了' ? '再送信' : '音声で送信'}
               </button>
             </div>
           </div>
