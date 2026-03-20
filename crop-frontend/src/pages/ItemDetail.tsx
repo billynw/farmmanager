@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { itemsApi, workLogsApi } from '../api'
 import type { WorkLog } from '../api'
 import AppHeader from '../components/AppHeader'
+import BottomNav from '../components/BottomNav'
 
 export default function ItemDetail() {
   const { id } = useParams<{ id: string }>()
@@ -52,13 +53,12 @@ export default function ItemDetail() {
         }
       />
 
-      {/* 作業ログ / 収穫記録 タブ */}
       <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #eee' }}>
         <div style={activeTabStyle}>作業ログ</div>
         <div style={tabStyle} onClick={() => navigate(`/items/${itemId}/harvests`)}>収穫記録</div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', paddingBottom: 80 }}>
         {isLoading && <p style={{ color: '#888', textAlign: 'center', marginTop: 30 }}>読み込み中...</p>}
         {!isLoading && logs.length === 0 && <p style={{ color: '#aaa', textAlign: 'center', marginTop: 30 }}>作業記録がありません</p>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -106,6 +106,8 @@ export default function ItemDetail() {
           </div>
         </div>
       )}
+
+      <BottomNav />
     </div>
   )
 }

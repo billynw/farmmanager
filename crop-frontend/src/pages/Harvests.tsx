@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { itemsApi, harvestsApi } from '../api'
 import type { Harvest } from '../api'
 import AppHeader from '../components/AppHeader'
+import BottomNav from '../components/BottomNav'
 
 type FormData = {
   harvested_at: string
@@ -126,7 +127,7 @@ export default function Harvests() {
         </div>
       )}
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', paddingBottom: 80 }}>
         {isLoading && <p style={{ color: '#888', textAlign: 'center', marginTop: 30 }}>読み込み中...</p>}
         {!isLoading && harvests.length === 0 && (
           <p style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>収穫記録がありません</p>
@@ -189,6 +190,8 @@ export default function Harvests() {
       <div style={{ padding: '12px 16px', background: '#fff', borderTop: '1px solid #eee' }}>
         <button style={addBtnStyle} onClick={openNew}>＋ 収穫を記録する</button>
       </div>
+
+      <BottomNav />
     </div>
   )
 }
