@@ -444,29 +444,38 @@ export default function AdminUsers() {
                 style={inputStyle}
                 value={wifiForm.ssid}
                 onChange={e => setWifiForm(f => ({ ...f, ssid: e.target.value }))}
-                placeholder="例：MyFarm-WiFi"
+                placeholder="最大15文字"
+                maxLength={15}
                 disabled={sensorSubmitting}
                 autoFocus
               />
+              <div style={{ fontSize: 11, color: wifiForm.ssid.length >= 15 ? '#d32f2f' : '#bbb', textAlign: 'right', marginTop: 3 }}>
+                {wifiForm.ssid.length}/15
+              </div>
             </div>
 
             <div style={{ marginBottom: 20 }}>
               <label style={labelStyle}>パスワード</label>
               <div style={{ position: 'relative' }}>
                 <input
-                  style={{ ...inputStyle, paddingRight: 44 }}
+                  style={{ ...inputStyle, paddingRight: 40 }}
                   type={showWifiPassword ? 'text' : 'password'}
                   value={wifiForm.password}
                   onChange={e => setWifiForm(f => ({ ...f, password: e.target.value }))}
-                  placeholder="WIFIパスワード"
+                  placeholder="最大15文字"
+                  maxLength={15}
                   disabled={sensorSubmitting}
                 />
                 <button
-                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#999', fontSize: 13 }}
+                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}
                   onClick={() => setShowWifiPassword(v => !v)}
+                  tabIndex={-1}
                 >
-                  {showWifiPassword ? '隠す' : '表示'}
+                  {showWifiPassword ? <EyeOffIcon /> : <EyeIcon />}
                 </button>
+              </div>
+              <div style={{ fontSize: 11, color: wifiForm.password.length >= 15 ? '#d32f2f' : '#bbb', textAlign: 'right', marginTop: 3 }}>
+                {wifiForm.password.length}/15
               </div>
             </div>
 
@@ -513,6 +522,25 @@ export default function AdminUsers() {
 
       <BottomNav />
     </div>
+  )
+}
+
+function EyeIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+      <path d="M1 10s3.5-7 9-7 9 7 9 7-3.5 7-9 7-9-7-9-7z" stroke="#999" strokeWidth="1.5" fill="none"/>
+      <circle cx="10" cy="10" r="3" stroke="#999" strokeWidth="1.5" fill="none"/>
+    </svg>
+  )
+}
+
+function EyeOffIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+      <path d="M1 10s3.5-7 9-7 9 7 9 7-3.5 7-9 7-9-7-9-7z" stroke="#999" strokeWidth="1.5" fill="none"/>
+      <circle cx="10" cy="10" r="3" stroke="#999" strokeWidth="1.5" fill="none"/>
+      <line x1="3" y1="3" x2="17" y2="17" stroke="#999" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
   )
 }
 
