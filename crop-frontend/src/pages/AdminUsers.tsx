@@ -33,6 +33,18 @@ function canChangeRole(myRole: UserFieldRole | undefined, targetRole: UserFieldR
   return false
 }
 
+// ゴミ箱アイコン SVG
+function TrashIcon({ size = 16, color = '#c0392b' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14H6L5 6" />
+      <path d="M10 11v6M14 11v6" />
+      <path d="M9 6V4h6v2" />
+    </svg>
+  )
+}
+
 export default function AdminUsers() {
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -162,13 +174,17 @@ export default function AdminUsers() {
                   const showDelete = !isSelf && canDelete(myRoleInSelectedField, user.field_role)
                   const toggleable = !isSelf && canChangeRole(myRoleInSelectedField, user.field_role)
                   const isToggling = togglingUserId === user.id
+                  // 削除ボタン幅分（32px）を確保して右端を揃える
+                  const DELETE_BTN_W = 32
                   return (
                     <div key={user.id} style={cardStyle}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600, fontSize: 15 }}>{user.name}</div>
                         {user.email && <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{user.email}</div>}
                       </div>
+                      {/* 右エリア: ロールバッジ + 削除ボタン（常に同幅を確保） */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {/* ロールバッジ：常に表示 */}
                         {user.field_role && (
                           <span
                             onClick={() => toggleable && !isToggling && handleRoleToggle(user.id, user.field_role!)}
@@ -179,21 +195,34 @@ export default function AdminUsers() {
                               color: ROLE_COLOR[user.field_role],
                               cursor: toggleable ? 'pointer' : 'default',
                               opacity: isToggling ? 0.5 : 1,
-                              border: toggleable ? `1px solid ${ROLE_COLOR[user.field_role]}55` : '1px solid transparent',
+                              border: toggleable ? `1px solid ${ROLE_COLOR[user.field_role]}55` : `1px solid ${ROLE_COLOR[user.field_role]}33`,
                               transition: 'opacity 0.15s',
                             }}
                           >
                             {isToggling ? '…' : ROLE_LABEL[user.field_role]}
                           </span>
                         )}
-                        {showDelete && (
+                        {/* 削除ボタン or スペーサー（常に同幅） */}
+                        {showDelete ? (
                           <button
-                            style={{ ...smallBtnStyle, color: '#c0392b', borderColor: '#c0392b' }}
+                            style={{
+                              width: DELETE_BTN_W, height: DELETE_BTN_W,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              background: 'none', border: 'none', cursor: 'pointer',
+                              borderRadius: 6, padding: 0,
+                              flexShrink: 0,
+                            }}
+                            title="圃場から削除"
                             onClick={() => {
                               if (selectedFieldId && confirm(`${user.name}をこの圃場から削除しますか？`))
                                 usersApi.removeFromField(user.id, selectedFieldId).then(() => refetchUsers())
                             }}
-                          >削除</button>
+                          >
+                            <TrashIcon size={17} color="#c0392b" />
+                          </button>
+                        ) : (
+                          /* スペーサー: 削除ボタンがない行でも右端を揃える */
+                          <div style={{ width: DELETE_BTN_W, flexShrink: 0 }} />
                         )}
                       </div>
                     </div>
