@@ -54,6 +54,10 @@ class User(Base):
     def is_owner_of_any(self):
         return any(uf.role == UserFieldRole.owner for uf in self.user_fields)
 
+    @property
+    def is_manager_of_any(self):
+        return any(uf.role in (UserFieldRole.owner, UserFieldRole.manager) for uf in self.user_fields)
+
 
 class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"

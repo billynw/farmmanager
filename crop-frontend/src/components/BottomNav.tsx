@@ -12,8 +12,7 @@ export default function BottomNav() {
   const isAdmin   = pathname.startsWith('/admin')
 
   // owner または manager の圃場を持つユーザーのみ管理メニューを表示
-  const showAdmin = user?.is_owner_of_any ||
-    user?.user_fields?.some((uf: any) => uf.role === 'owner' || uf.role === 'manager')
+  const showAdmin = user?.is_manager_of_any
 
   return (
     <div style={navStyle}>

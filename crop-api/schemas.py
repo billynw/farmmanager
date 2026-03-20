@@ -37,6 +37,7 @@ class UserOut(BaseModel):
     name: str
     email: Optional[str] = None
     is_owner_of_any: bool = False
+    is_manager_of_any: bool = False
     field_role: Optional[UserFieldRole] = None
     model_config = {"from_attributes": True}
 

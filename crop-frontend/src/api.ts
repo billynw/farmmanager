@@ -28,6 +28,7 @@ export interface User {
   name: string
   email?: string
   is_owner_of_any: boolean
+  is_manager_of_any: boolean
   field_role?: UserFieldRole
 }
 
