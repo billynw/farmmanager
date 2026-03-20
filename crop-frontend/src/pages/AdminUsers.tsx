@@ -5,6 +5,7 @@ import type { UserFieldRole, Field, FieldInviteItem } from '../api'
 import { useAuth } from '../store'
 import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
+import { TrashIcon, EditIcon, iconBtnStyle } from '../components/Icons'
 
 type Tab = 'users' | 'fields'
 
@@ -32,33 +33,6 @@ function canChangeRole(myRole: UserFieldRole | undefined, targetRole: UserFieldR
   if (myRole === 'owner') return targetRole !== 'owner'
   if (myRole === 'manager') return targetRole !== 'owner'
   return false
-}
-
-const ICON_BTN: React.CSSProperties = {
-  width: 32, height: 32,
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-  background: 'none', border: 'none', cursor: 'pointer',
-  borderRadius: 6, padding: 0, flexShrink: 0,
-}
-
-function TrashIcon({ size = 16, color = '#c0392b' }: { size?: number; color?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="3 6 5 6 21 6" />
-      <path d="M19 6l-1 14H6L5 6" />
-      <path d="M10 11v6M14 11v6" />
-      <path d="M9 6V4h6v2" />
-    </svg>
-  )
-}
-
-function EditIcon({ size = 16, color = '#555' }: { size?: number; color?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-    </svg>
-  )
 }
 
 export default function AdminUsers() {
@@ -156,12 +130,12 @@ export default function AdminUsers() {
               </div>
               {field.my_role === 'owner' && (
                 <div style={{ display: 'flex', gap: 2 }}>
-                  <button style={ICON_BTN} title="編集" onClick={() => { setEditField(field); setShowFieldForm(true) }}>
+                  <button style={iconBtnStyle} title="編集" onClick={() => { setEditField(field); setShowFieldForm(true) }}>
                     <EditIcon size={17} color="#555" />
                   </button>
-                  <button style={ICON_BTN} title="削除"
+                  <button style={iconBtnStyle} title="削除"
                     onClick={() => { if (confirm(`「${field.name}」を削除しますか？`)) deleteFieldMut.mutate(field.id) }}>
-                    <TrashIcon size={17} color="#c0392b" />
+                    <TrashIcon size={17} />
                   </button>
                 </div>
               )}
@@ -216,12 +190,12 @@ export default function AdminUsers() {
                           </span>
                         )}
                         {showDelete ? (
-                          <button style={ICON_BTN} title="圃場から削除"
+                          <button style={iconBtnStyle} title="圃場から削除"
                             onClick={() => {
                               if (selectedFieldId && confirm(`${user.name}をこの圃場から削除しますか？`))
                                 usersApi.removeFromField(user.id, selectedFieldId).then(() => refetchUsers())
                             }}>
-                            <TrashIcon size={17} color="#c0392b" />
+                            <TrashIcon size={17} />
                           </button>
                         ) : (
                           <div style={{ width: 32, flexShrink: 0 }} />
