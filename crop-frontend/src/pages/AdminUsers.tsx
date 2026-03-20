@@ -221,7 +221,7 @@ const pageStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column
 const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: '12px 16px', marginBottom: 8, display: 'flex', alignItems: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }
 const fabStyle: React.CSSProperties = {
   position: 'fixed', bottom: 64, left: '50%', transform: 'translateX(-50%)',
-  background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 50,
+  background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 10,
   padding: '14px 28px', fontSize: 16, fontWeight: 600, cursor: 'pointer',
   boxShadow: '0 4px 16px rgba(45,122,79,0.35)', whiteSpace: 'nowrap', zIndex: 50,
   width: '90%',

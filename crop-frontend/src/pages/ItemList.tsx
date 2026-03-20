@@ -6,7 +6,7 @@ import type { Item } from '../api'
 import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
 
-const STATUS_LABEL: Record<string, string> = { growing: '栽培中', finished: '終了' }
+const STATUS_LABEL: Record<string, string> = { growing: '活辝中', finished: '終了' }
 const STATUS_COLOR: Record<string, string> = { growing: '#2d7a4f', finished: '#888' }
 
 async function downloadCsv(fetchFn: () => Promise<Response>, filename: string) {
@@ -44,7 +44,7 @@ export default function ItemList() {
         </select>
         <select style={selectStyle} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
           <option value="">全ステータス</option>
-          <option value="growing">栽培中</option>
+          <option value="growing">活辝中</option>
           <option value="finished">終了</option>
         </select>
       </div>
@@ -138,8 +138,9 @@ const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, p
 const selectStyle: React.CSSProperties = { flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14, background: '#fff' }
 const fabStyle: React.CSSProperties = {
   position: 'fixed', bottom: 64, left: '50%', transform: 'translateX(-50%)',
-  background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 50,
+  background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 10,
   padding: '14px 28px', fontSize: 16, fontWeight: 600, cursor: 'pointer',
   boxShadow: '0 4px 16px rgba(45,122,79,0.35)', whiteSpace: 'nowrap', zIndex: 50,
+  width: '90%',
 }
 const smallBtnStyle: React.CSSProperties = { fontSize: 12, padding: '4px 10px', border: '1px solid #ddd', borderRadius: 6, background: '#fff', cursor: 'pointer', color: '#666' }
