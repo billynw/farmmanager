@@ -76,7 +76,8 @@ export default function AdminUsers() {
     enabled: !!selectedFieldId,
   })
 
-  const activeSensorFieldId = sensorFieldId ?? fields[0]?.id ?? null
+  // センサータブは manageableFields のみ対象
+  const activeSensorFieldId = sensorFieldId ?? manageableFields[0]?.id ?? null
   const { data: sensors = [], refetch: refetchSensors } = useQuery({
     queryKey: ['sensors', activeSensorFieldId],
     queryFn: () => sensorsApi.list(activeSensorFieldId!).then(r => r.data),
@@ -90,10 +91,10 @@ export default function AdminUsers() {
   }, [manageableFields.length])
 
   useEffect(() => {
-    if (fields.length > 0 && !sensorFieldId) {
-      setSensorFieldId(fields[0].id)
+    if (manageableFields.length > 0 && !sensorFieldId) {
+      setSensorFieldId(manageableFields[0].id)
     }
-  }, [fields.length])
+  }, [manageableFields.length])
 
   // --- field / user mutations ---
   const deleteFieldMut = useMutation({
@@ -139,7 +140,7 @@ export default function AdminUsers() {
   }
 
   const openAddSensor = () => {
-    setSensorForm({ name: '', active: true, field_id: activeSensorFieldId ?? fields[0]?.id ?? 0 })
+    setSensorForm({ name: '', active: true, field_id: activeSensorFieldId ?? manageableFields[0]?.id ?? 0 })
     setSensorModal({ mode: 'add' })
   }
 
@@ -322,7 +323,7 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {/* センサータブ */}
+      {/* センサータブ - manageableFields のみ対象 */}
       {tab === 'sensors' && (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', paddingBottom: 100 }}>
           {manageableFields.length === 0 ? (
@@ -331,17 +332,15 @@ export default function AdminUsers() {
             </p>
           ) : (
             <>
-              {fields.length > 0 && (
-                <div style={{ padding: '8px 16px', background: '#fff', borderBottom: '1px solid #eee' }}>
-                  <select
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}
-                    value={activeSensorFieldId ?? ''}
-                    onChange={e => setSensorFieldId(Number(e.target.value))}
-                  >
-                    {fields.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-                  </select>
-                </div>
-              )}
+              <div style={{ padding: '8px 16px', background: '#fff', borderBottom: '1px solid #eee' }}>
+                <select
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}
+                  value={activeSensorFieldId ?? ''}
+                  onChange={e => setSensorFieldId(Number(e.target.value))}
+                >
+                  {manageableFields.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </select>
+              </div>
               <div style={{ padding: '12px 16px', overflowY: 'auto', flex: 1 }}>
                 {sensors.length === 0 && (
                   <p style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>センサーが登録されていません。</p>
@@ -402,7 +401,7 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {/* センサー追加・編集モーダル */}
+      {/* センサー追加・編集モーダル - manageableFields のみ選択可 */}
       {(sensorModal?.mode === 'add' || sensorModal?.mode === 'edit') && (
         <div style={overlayStyle} onClick={() => setSensorModal(null)}>
           <div style={modalStyle} onClick={e => e.stopPropagation()}>
@@ -417,7 +416,7 @@ export default function AdminUsers() {
                 value={sensorForm.field_id}
                 onChange={e => setSensorForm(f => ({ ...f, field_id: Number(e.target.value) }))}
               >
-                {fields.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                {manageableFields.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
               </select>
             </div>
 
