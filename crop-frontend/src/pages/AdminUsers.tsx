@@ -9,6 +9,9 @@ import BottomNav from '../components/BottomNav'
 import { TrashIcon, EditIcon, iconBtnStyle } from '../components/Icons'
 
 type Tab = 'users' | 'fields'
+type DeleteTarget =
+  | { type: 'field'; id: number; name: string }
+  | { type: 'user'; id: number; name: string; fieldId: number }
 
 const ROLE_LABEL: Record<UserFieldRole, string> = {
   owner: 'オーナー',
@@ -43,6 +46,7 @@ export default function AdminUsers() {
   const [tab, setTab] = useState<Tab>('fields')
   const [selectedFieldId, setSelectedFieldId] = useState<number | null>(null)
   const [togglingUserId, setTogglingUserId] = useState<number | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
 
   const { data: fields = [] } = useQuery({ queryKey: ['fields'], queryFn: () => fieldsApi.list().then(r => r.data) })
   const manageableFields = fields.filter(f => f.my_role === 'owner' || f.my_role === 'manager')
@@ -56,7 +60,14 @@ export default function AdminUsers() {
 
   const deleteFieldMut = useMutation({
     mutationFn: (id: number) => fieldsApi.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['fields'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['fields'] }); setDeleteTarget(null) },
+    onError: (err: any) => alert(err.response?.data?.detail ?? '削除に失敗しました'),
+  })
+
+  const deleteUserMut = useMutation({
+    mutationFn: ({ userId, fieldId }: { userId: number; fieldId: number }) =>
+      usersApi.removeFromField(userId, fieldId),
+    onSuccess: () => { refetchUsers(); setDeleteTarget(null) },
     onError: (err: any) => alert(err.response?.data?.detail ?? '削除に失敗しました'),
   })
 
@@ -65,6 +76,12 @@ export default function AdminUsers() {
       setSelectedFieldId(manageableFields[0].id)
     }
   }, [manageableFields.length])
+
+  const handleConfirmDelete = () => {
+    if (!deleteTarget) return
+    if (deleteTarget.type === 'field') deleteFieldMut.mutate(deleteTarget.id)
+    if (deleteTarget.type === 'user') deleteUserMut.mutate({ userId: deleteTarget.id, fieldId: deleteTarget.fieldId })
+  }
 
   const handleRoleToggle = async (userId: number, currentRole: UserFieldRole) => {
     if (!selectedFieldId || togglingUserId === userId) return
@@ -126,7 +143,7 @@ export default function AdminUsers() {
                     <EditIcon size={17} color="#555" />
                   </button>
                   <button style={iconBtnStyle} title="削除"
-                    onClick={() => { if (confirm(`「${field.name}」を削除しますか？`)) deleteFieldMut.mutate(field.id) }}>
+                    onClick={() => setDeleteTarget({ type: 'field', id: field.id, name: field.name })}>
                     <TrashIcon size={17} />
                   </button>
                 </div>
@@ -183,10 +200,7 @@ export default function AdminUsers() {
                         )}
                         {showDelete ? (
                           <button style={iconBtnStyle} title="圃場から削除"
-                            onClick={() => {
-                              if (selectedFieldId && confirm(`${user.name}をこの圃場から削除しますか？`))
-                                usersApi.removeFromField(user.id, selectedFieldId).then(() => refetchUsers())
-                            }}>
+                            onClick={() => selectedFieldId && setDeleteTarget({ type: 'user', id: user.id, name: user.name, fieldId: selectedFieldId })}>
                             <TrashIcon size={17} />
                           </button>
                         ) : (
@@ -205,6 +219,25 @@ export default function AdminUsers() {
         </div>
       )}
 
+      {deleteTarget && (
+        <div style={overlayStyle} onClick={() => setDeleteTarget(null)}>
+          <div style={deleteModalStyle} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 700 }}>
+              {deleteTarget.type === 'field' ? '圃場を削除' : 'ユーザーを削除'}
+            </h3>
+            <p style={{ margin: '0 0 20px', fontSize: 14, color: '#666', lineHeight: 1.6 }}>
+              {deleteTarget.type === 'field'
+                ? `「${deleteTarget.name}」を削除しますか？`
+                : `${deleteTarget.name}をこの圃場から削除しますか？`}
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button style={cancelBtnStyle} onClick={() => setDeleteTarget(null)}>キャンセル</button>
+              <button style={deleteBtnStyle} onClick={handleConfirmDelete}>削除する</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <button style={fabStyle} onClick={() => {
         if (tab === 'users') navigate('/admin/users/invite')
         else navigate('/admin/fields/new')
@@ -219,6 +252,10 @@ export default function AdminUsers() {
 
 const pageStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', height: '100dvh', background: '#f5f5f0' }
 const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: '12px 16px', marginBottom: 8, display: 'flex', alignItems: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }
+const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }
+const deleteModalStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: 24, width: '100%', maxWidth: 400 }
+const cancelBtnStyle: React.CSSProperties = { flex: 1, padding: '12px', border: '1px solid #ddd', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 14 }
+const deleteBtnStyle: React.CSSProperties = { flex: 1, padding: '12px', border: 'none', borderRadius: 8, background: '#d32f2f', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }
 const fabStyle: React.CSSProperties = {
   position: 'fixed', bottom: 64, left: '50%', transform: 'translateX(-50%)',
   background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 10,

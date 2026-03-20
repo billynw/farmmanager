@@ -7,13 +7,17 @@ import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
 import { TrashIcon, EditIcon, iconBtnStyle } from '../components/Icons'
 
+type DeleteTarget =
+  | { type: 'item' }
+  | { type: 'log'; id: number }
+
 export default function ItemDetail() {
   const { id } = useParams<{ id: string }>()
   const itemId = Number(id)
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [modalImage, setModalImage] = useState<string | null>(null)
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
 
   const { data: item } = useQuery({ queryKey: ['item', itemId], queryFn: () => itemsApi.get(itemId).then(r => r.data) })
   const { data: logs = [], isLoading } = useQuery({
@@ -23,16 +27,19 @@ export default function ItemDetail() {
 
   const deleteLog = useMutation({
     mutationFn: workLogsApi.delete,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['work-logs', itemId] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['work-logs', itemId] }); setDeleteTarget(null) },
   })
 
   const deleteItem = useMutation({
     mutationFn: itemsApi.delete,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['items'] })
-      navigate('/items')
-    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['items'] }); navigate('/items') },
   })
+
+  const handleConfirmDelete = () => {
+    if (!deleteTarget) return
+    if (deleteTarget.type === 'item') deleteItem.mutate(itemId)
+    if (deleteTarget.type === 'log') deleteLog.mutate(deleteTarget.id)
+  }
 
   if (!item) return <div style={{ padding: 24, color: '#888' }}>読み込み中...</div>
 
@@ -51,7 +58,7 @@ export default function ItemDetail() {
             <button onClick={() => navigate(`/items/${itemId}/edit`)} style={iconBtnStyle} title="編集">
               <EditIcon size={18} color="#555" />
             </button>
-            <button onClick={() => setShowDeleteModal(true)} style={iconBtnStyle} title="削除">
+            <button onClick={() => setDeleteTarget({ type: 'item' })} style={iconBtnStyle} title="削除">
               <TrashIcon size={18} />
             </button>
           </>
@@ -71,7 +78,7 @@ export default function ItemDetail() {
             <LogCard
               key={log.id}
               log={log}
-              onDelete={() => { if (confirm('この記録を削除しますか？')) deleteLog.mutate(log.id) }}
+              onDelete={() => setDeleteTarget({ type: 'log', id: log.id })}
               onImageClick={setModalImage}
               onEdit={() => navigate(`/items/${itemId}/log/${log.id}/edit`)}
             />
@@ -94,19 +101,23 @@ export default function ItemDetail() {
         </div>
       )}
 
-      {showDeleteModal && (
-        <div style={modalOverlayStyle} onClick={() => setShowDeleteModal(false)}>
+      {deleteTarget && (
+        <div style={overlayStyle} onClick={() => setDeleteTarget(null)}>
           <div style={deleteModalStyle} onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 12px', fontSize: 18, fontWeight: 600 }}>作物を削除</h3>
+            <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 700 }}>
+              {deleteTarget.type === 'item' ? '作物を削除' : '作業記録を削除'}
+            </h3>
             <p style={{ margin: '0 0 20px', fontSize: 14, color: '#666', lineHeight: 1.6 }}>
-              「{item.name}」を削除しますか？<br />
-              <strong style={{ color: '#d32f2f' }}>この作物に紐づくすべての作業記録と収穫記録も削除されます。</strong>
+              {deleteTarget.type === 'item' ? (
+                <>「{item.name}」を削除しますか？<br />
+                <strong style={{ color: '#d32f2f' }}>この作物に紐づくすべての作業記録と収穫記録も削除されます。</strong></>
+              ) : (
+                'この作業記録を削除しますか？'
+              )}
             </p>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button style={{ flex: 1, padding: '12px', border: '1px solid #ddd', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 14 }}
-                onClick={() => setShowDeleteModal(false)}>キャンセル</button>
-              <button style={{ flex: 1, padding: '12px', border: 'none', borderRadius: 8, background: '#d32f2f', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
-                onClick={() => deleteItem.mutate(itemId)}>削除する</button>
+              <button style={cancelBtnStyle} onClick={() => setDeleteTarget(null)}>キャンセル</button>
+              <button style={deleteBtnStyle} onClick={handleConfirmDelete}>削除する</button>
             </div>
           </div>
         </div>
@@ -139,12 +150,8 @@ function LogCard({ log, onDelete, onImageClick, onEdit }: {
           <span style={{ fontSize: 12, color: '#999' }}>{dateStr}</span>
         </div>
         <div style={{ display: 'flex', gap: 2 }}>
-          <button onClick={onEdit} style={iconBtnStyle} title="編集">
-            <EditIcon size={17} />
-          </button>
-          <button onClick={onDelete} style={iconBtnStyle} title="削除">
-            <TrashIcon size={17} />
-          </button>
+          <button onClick={onEdit} style={iconBtnStyle} title="編集"><EditIcon size={17} /></button>
+          <button onClick={onDelete} style={iconBtnStyle} title="削除"><TrashIcon size={17} /></button>
         </div>
       </div>
       {log.memo && <p style={{ margin: '8px 0 0', fontSize: 14, color: '#333', lineHeight: 1.5 }}>{log.memo}</p>}
@@ -171,8 +178,11 @@ function LogCard({ log, onDelete, onImageClick, onEdit }: {
 const tabStyle: React.CSSProperties = { flex: 1, textAlign: 'center', padding: '10px', fontSize: 14, color: '#888', cursor: 'pointer' }
 const activeTabStyle: React.CSSProperties = { ...tabStyle, color: '#2d7a4f', borderBottom: '2px solid #2d7a4f', fontWeight: 600 }
 const addBtnStyle: React.CSSProperties = { display: 'block', width: '100%', padding: '14px', background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 10, fontSize: 16, fontWeight: 600, cursor: 'pointer' }
+const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }
+const deleteModalStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: 24, width: '100%', maxWidth: 400 }
+const cancelBtnStyle: React.CSSProperties = { flex: 1, padding: '12px', border: '1px solid #ddd', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 14 }
+const deleteBtnStyle: React.CSSProperties = { flex: 1, padding: '12px', border: 'none', borderRadius: 8, background: '#d32f2f', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }
 const modalOverlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }
 const modalContentStyle: React.CSSProperties = { position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }
 const modalImageStyle: React.CSSProperties = { maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: 8 }
 const modalCloseStyle: React.CSSProperties = { position: 'absolute', top: -40, right: 0, background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', fontSize: 32, width: 40, height: 40, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }
-const deleteModalStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: 24, maxWidth: 400, width: '90%' }

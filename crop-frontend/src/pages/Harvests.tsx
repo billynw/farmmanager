@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { itemsApi, harvestsApi } from '../api'
 import type { Harvest } from '../api'
 import AppHeader from '../components/AppHeader'
@@ -11,6 +12,7 @@ export default function Harvests() {
   const itemId = Number(id)
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null)
 
   const { data: item } = useQuery({
     queryKey: ['item', itemId],
@@ -23,7 +25,7 @@ export default function Harvests() {
 
   const deleteMut = useMutation({
     mutationFn: harvestsApi.delete,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['harvests', itemId] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['harvests', itemId] }); setDeleteTargetId(null) },
   })
 
   const totals = harvests.reduce<Record<string, number>>((acc, h) => {
@@ -67,7 +69,7 @@ export default function Harvests() {
           {harvests.map(h => (
             <HarvestCard key={h.id} harvest={h}
               onEdit={() => navigate(`/items/${itemId}/harvests/${h.id}/edit`)}
-              onDelete={() => { if (confirm('この収穫記録を削除しますか？')) deleteMut.mutate(h.id) }}
+              onDelete={() => setDeleteTargetId(h.id)}
             />
           ))}
         </div>
@@ -76,6 +78,19 @@ export default function Harvests() {
       <div style={{ position: 'fixed', bottom: 56, left: 0, right: 0, padding: '12px 16px', zIndex: 50 }}>
         <button style={addBtnStyle} onClick={() => navigate(`/items/${itemId}/harvests/new`)}>＋ 収穫を記録する</button>
       </div>
+
+      {deleteTargetId !== null && (
+        <div style={overlayStyle} onClick={() => setDeleteTargetId(null)}>
+          <div style={deleteModalStyle} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 700 }}>収穫記録を削除</h3>
+            <p style={{ margin: '0 0 20px', fontSize: 14, color: '#666', lineHeight: 1.6 }}>この収穫記録を削除しますか？</p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button style={cancelBtnStyle} onClick={() => setDeleteTargetId(null)}>キャンセル</button>
+              <button style={deleteBtnStyle} onClick={() => deleteMut.mutate(deleteTargetId)}>削除する</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <BottomNav />
     </div>
@@ -112,3 +127,7 @@ function HarvestCard({ harvest: h, onEdit, onDelete }: { harvest: Harvest; onEdi
 const tabStyle: React.CSSProperties = { flex: 1, textAlign: 'center', padding: '10px', fontSize: 14, color: '#888', cursor: 'pointer' }
 const activeTabStyle: React.CSSProperties = { ...tabStyle, color: '#2d7a4f', borderBottom: '2px solid #2d7a4f', fontWeight: 600 }
 const addBtnStyle: React.CSSProperties = { display: 'block', width: '100%', padding: '14px', background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 10, fontSize: 16, fontWeight: 600, cursor: 'pointer' }
+const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }
+const deleteModalStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: 24, width: '100%', maxWidth: 400 }
+const cancelBtnStyle: React.CSSProperties = { flex: 1, padding: '12px', border: '1px solid #ddd', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 14 }
+const deleteBtnStyle: React.CSSProperties = { flex: 1, padding: '12px', border: 'none', borderRadius: 8, background: '#d32f2f', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }
