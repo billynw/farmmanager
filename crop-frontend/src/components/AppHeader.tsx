@@ -20,9 +20,10 @@ export default function AppHeader({ backTo, title, subtitle, actions }: AppHeade
   const user = useAuth((s) => s.user)
 
   const currentPath = location.pathname
-  const isHome = currentPath === '/'
-  const isItems = currentPath === '/items' || currentPath.startsWith('/items/')
-  const isSensors = currentPath === '/sensors'
+  // backTo がある詳細ページではタブをアクティブにしない
+  const isHome    = !backTo && currentPath === '/'
+  const isItems   = !backTo && currentPath === '/items'
+  const isSensors = !backTo && currentPath === '/sensors'
 
   return (
     <>
@@ -58,18 +59,9 @@ export default function AppHeader({ backTo, title, subtitle, actions }: AppHeade
 
       {/* ナビタブ */}
       <div style={navStyle}>
-        <div
-          style={isHome ? activeTabStyle : tabStyle}
-          onClick={() => navigate('/')}
-        >ホーム</div>
-        <div
-          style={isItems ? activeTabStyle : tabStyle}
-          onClick={() => navigate('/items')}
-        >作物一覧</div>
-        <div
-          style={isSensors ? activeTabStyle : tabStyle}
-          onClick={() => navigate('/sensors')}
-        >センサー</div>
+        <div style={isHome    ? activeTabStyle : tabStyle} onClick={() => navigate('/')}>ホーム</div>
+        <div style={isItems   ? activeTabStyle : tabStyle} onClick={() => navigate('/items')}>作物一覧</div>
+        <div style={isSensors ? activeTabStyle : tabStyle} onClick={() => navigate('/sensors')}>センサー</div>
       </div>
     </>
   )
