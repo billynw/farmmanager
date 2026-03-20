@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 from database import engine
 import models
-from routers import auth, items, work_logs, harvests, export, users
+from routers import auth, items, work_logs, harvests, export, users, sensors
 
 # テーブル自動作成（本番はAlembicに切り替え）
 models.Base.metadata.create_all(bind=engine)
@@ -24,6 +24,7 @@ app.include_router(work_logs.router)
 app.include_router(harvests.router)
 app.include_router(export.router)
 app.include_router(users.router)
+app.include_router(sensors.router)
 
 @app.get("/api/v1/health")
 def health():

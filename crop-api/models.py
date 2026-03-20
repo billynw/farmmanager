@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, Text, DateTime, Date,
-    Boolean, Numeric, ForeignKey, Enum
+    Boolean, Numeric, ForeignKey, Enum, Float
 )
 from sqlalchemy.orm import relationship
 from database import Base
@@ -100,6 +100,7 @@ class Field(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     items = relationship("Item", back_populates="field")
     user_fields = relationship("UserField", back_populates="field", cascade="all, delete-orphan")
+    sensors = relationship("Sensor", back_populates="field", cascade="all, delete-orphan")
 
     @property
     def users(self):
@@ -175,3 +176,27 @@ class Harvest(Base):
     shipped = Column(Boolean, default=False)
     memo = Column(Text, nullable=True)
     item = relationship("Item", back_populates="harvests")
+
+
+class Sensor(Base):
+    """圃場に設置されたセンサー機器"""
+    __tablename__ = "sensors"
+    id = Column(Integer, primary_key=True)
+    field_id = Column(Integer, ForeignKey("fields.id"), nullable=False)
+    name = Column(String(100), nullable=False)  # 例: "水口センサー"
+    active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    field = relationship("Field", back_populates="sensors")
+    readings = relationship("SensorReading", back_populates="sensor", cascade="all, delete-orphan")
+
+
+class SensorReading(Base):
+    """センサーの計測値（metric単位で1レコード）"""
+    __tablename__ = "sensor_readings"
+    id = Column(Integer, primary_key=True)
+    sensor_id = Column(Integer, ForeignKey("sensors.id"), nullable=False)
+    metric = Column(String(50), nullable=False)  # 例: "water_level", "water_temp", "ph", "gate_open"
+    value = Column(Float, nullable=False)
+    unit = Column(String(20), nullable=True)     # 例: "cm", "°C", "%", ""
+    recorded_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    sensor = relationship("Sensor", back_populates="readings")

@@ -37,7 +37,7 @@ class UserOut(BaseModel):
     name: str
     email: Optional[str] = None
     is_owner_of_any: bool = False
-    field_role: Optional[UserFieldRole] = None  # 圃場一覧取得時にセットされる
+    field_role: Optional[UserFieldRole] = None
     model_config = {"from_attributes": True}
 
 class FieldInviteItem(BaseModel):
@@ -149,3 +149,51 @@ class HarvestCreate(BaseModel):
 class HarvestOut(HarvestCreate):
     id: int
     model_config = {"from_attributes": True}
+
+# --- Sensor ---
+class SensorCreate(BaseModel):
+    field_id: int
+    name: str
+    active: bool = True
+
+class SensorOut(BaseModel):
+    id: int
+    field_id: int
+    name: str
+    active: bool
+    model_config = {"from_attributes": True}
+
+# --- SensorReading ---
+class SensorReadingCreate(BaseModel):
+    metric: str   # "water_level", "water_temp", "air_temp", "soil_moisture", "ph", "gate_open", etc.
+    value: float
+    unit: Optional[str] = None
+    recorded_at: Optional[datetime] = None
+
+class SensorReadingOut(BaseModel):
+    id: int
+    sensor_id: int
+    metric: str
+    value: float
+    unit: Optional[str]
+    recorded_at: datetime
+    model_config = {"from_attributes": True}
+
+# センサーの最新値をmetricごとにまとめたもの（フロント向け集約）
+class SensorLatestReading(BaseModel):
+    metric: str
+    value: float
+    unit: Optional[str]
+    recorded_at: datetime
+
+class SensorWithLatest(BaseModel):
+    id: int
+    name: str
+    active: bool
+    latest: List[SensorLatestReading] = []
+    model_config = {"from_attributes": True}
+
+class FieldSensorSummary(BaseModel):
+    field_id: int
+    field_name: str
+    sensors: List[SensorWithLatest] = []
