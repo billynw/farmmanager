@@ -1,5 +1,6 @@
 import os
 import uuid
+import shutil
 from datetime import datetime, timedelta
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
@@ -82,8 +83,16 @@ def delete_sensor(
     sensor = db.query(models.Sensor).filter(models.Sensor.id == sensor_id).first()
     if not sensor:
         raise HTTPException(status_code=404, detail="Sensor not found")
+
+    # DBレコード削除（cascade により readings・photos レコードも削除）
     db.delete(sensor)
     db.commit()
+
+    # 写真ディレクトリをまとめて削除
+    photo_dir = os.path.join(settings.SENSOR_PHOTO_DIR, str(sensor_id))
+    if os.path.exists(photo_dir):
+        shutil.rmtree(photo_dir)
+
     return {"ok": True}
 
 
