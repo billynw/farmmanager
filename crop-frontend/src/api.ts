@@ -104,6 +104,7 @@ export interface SensorOut {
   field_id: number
   name: string
   active: boolean
+  token: string
   wifi_ssid?: string
 }
 
@@ -179,10 +180,16 @@ export const itemsApi = {
   delete: (id: number) => api.delete(`/items/${id}`),
 }
 
+/** 英小文字+数字15文字のランダムトークンを生成する */
+export function generateSensorToken(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+  return Array.from({ length: 15 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+}
+
 export const sensorsApi = {
   list: (field_id?: number) => api.get<SensorOut[]>('/sensors', { params: { field_id } }),
   get: (id: number) => api.get<SensorOut>(`/sensors/${id}`),
-  create: (data: { field_id: number; name: string; active?: boolean }) =>
+  create: (data: { field_id: number; name: string; active?: boolean; token: string }) =>
     api.post<SensorOut>('/sensors', data),
   update: (id: number, data: { name?: string; active?: boolean; field_id?: number }) =>
     api.put<SensorOut>(`/sensors/${id}`, data),

@@ -47,12 +47,13 @@ export function sleep(ms: number): Promise<void> {
 
 /**
  * WIFI情報をggwaveで音声送信する
- * SSIDを送信 → 1秒待機 → パスワードを送信
+ * SSID → 1秒待機 → パスワード → 1秒待機 → トークン
  * onStatus コールバックで進行状況を通知
  */
 export async function transmitWifi(
   ssid: string,
   password: string,
+  token: string,
   onStatus: (msg: string) => void
 ): Promise<void> {
   onStatus('SSIDを送信中…')
@@ -61,5 +62,9 @@ export async function transmitWifi(
   await sleep(1000)
   onStatus('パスワードを送信中…')
   await transmitText(password)
+  onStatus('1秒待機中…')
+  await sleep(1000)
+  onStatus('トークンを送信中…')
+  await transmitText(token)
   onStatus('送信完了')
 }
