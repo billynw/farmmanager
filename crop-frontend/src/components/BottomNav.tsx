@@ -1,18 +1,13 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useAuth } from '../store'
 
 export default function BottomNav() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const user = useAuth((s) => s.user)
 
   const isHome    = pathname === '/'
   const isItems   = pathname === '/items' || pathname.startsWith('/items/')
   const isSensors = pathname === '/sensors'
   const isAdmin   = pathname.startsWith('/admin')
-
-  // owner または manager の圃場を持つユーザーのみ管理メニューを表示
-  const showAdmin = user?.is_manager_of_any
 
   return (
     <div style={navStyle}>
@@ -28,12 +23,10 @@ export default function BottomNav() {
         <NavIcon type="sensors" active={isSensors} />
         <span>センサー</span>
       </button>
-      {showAdmin && (
-        <button style={isAdmin ? activeItemStyle : itemStyle} onClick={() => navigate('/admin/users')}>
-          <NavIcon type="admin" active={isAdmin} />
-          <span>管理</span>
-        </button>
-      )}
+      <button style={isAdmin   ? activeItemStyle : itemStyle} onClick={() => navigate('/admin/users')}>
+        <NavIcon type="admin" active={isAdmin} />
+        <span>管理</span>
+      </button>
     </div>
   )
 }
