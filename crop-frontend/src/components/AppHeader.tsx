@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../store'
-import logoImg from '../assets/logo.png'
+import logoImg from '../assets/norawork.svg'
 
 interface AppHeaderProps {
   backTo?: string
@@ -18,7 +18,7 @@ export default function AppHeader({ backTo, title, subtitle, actions }: AppHeade
     <>
       {/* ロゴ + ユーザー名・ログアウト */}
       <div style={headerStyle}>
-        <img src={logoImg} alt="ロゴ" style={{ height: 32, objectFit: 'contain' }} />
+        <img src={logoImg} alt="ロゴ" style={{ height: 32, width: 107, objectFit: 'contain' }} />
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span style={{ fontSize: 13, color: '#666' }}>{user?.name}</span>
           <button onClick={logout} style={logoutBtnStyle} title="ログアウト">

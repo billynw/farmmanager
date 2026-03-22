@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../store'
-import logoImg from '../assets/logo.png'
+import logoImg from '../assets/norawork.svg'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -28,7 +28,7 @@ export default function Login() {
     <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f5f0' }}>
       <div style={{ background: '#fff', borderRadius: 16, padding: '2rem', width: '100%', maxWidth: 360, boxShadow: '0 2px 16px rgba(0,0,0,0.08)' }}>
         <div style={{ marginBottom: 8 }}>
-          <img src={logoImg} alt="ロゴ" style={{ height: 40, objectFit: 'contain' }} />
+          <img src={logoImg} alt="ロゴ" style={{ height: 40, width: 134, objectFit: 'contain' }} />
         </div>
         <p style={{ color: '#666', marginBottom: 24, fontSize: 14 }}>農作物管理システム</p>
         {error && <p style={{ color: '#c0392b', fontSize: 14, marginBottom: 12 }}>{error}</p>}
