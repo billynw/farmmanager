@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { usersApi, fieldsApi, sensorsApi, generateSensorToken } from '../api'
-import type { UserFieldRole, SensorOut } from '../api'
+import { usersApi, fieldsApi, sensorsApi, sensorFeatureTypesApi, generateSensorToken } from '../api'
+import type { UserFieldRole, SensorOut, SensorFeatureType } from '../api'
 import { useAuth } from '../store'
 import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
@@ -20,17 +20,19 @@ type SensorModal =
   | { mode: 'edit'; sensor: SensorOut }
   | { mode: 'wifi'; sensor: SensorOut }
 
-// センサー機能の定義
-// gate: null=未選択 / 'supply'=給水ゲート / 'drain'=排水ゲート
+// gate: null=未選択 / 'supply'=給水ゲート(id=2) / 'drain'=排水ゲート(id=3)
 type GateType = 'supply' | 'drain' | null
+// ハードコーディング: 給水/排水ゲートの feature_type id
+const GATE_SUPPLY_ID = 2
+const GATE_DRAIN_ID  = 3
 
 interface SensorFeatures {
-  camera: boolean
-  gate: GateType
-  tempHumidity: boolean    // 温湿度センサ
-  soilMoisture: boolean    // 土壌水分センサ
-  waterTemp: boolean       // 水温センサ
-  waterLevel: boolean      // 水位センサ
+  camera: boolean      // id=1
+  gate: GateType       // id=2 or 3
+  tempHumidity: boolean // id=4
+  soilMoisture: boolean // id=5
+  waterTemp: boolean    // id=6
+  waterLevel: boolean   // id=7
 }
 
 const defaultFeatures: SensorFeatures = {
@@ -40,6 +42,33 @@ const defaultFeatures: SensorFeatures = {
   soilMoisture: false,
   waterTemp: false,
   waterLevel: false,
+}
+
+/** features の数値IDリスト → SensorFeatures に変換 */
+function idsToFeatures(ids: number[]): SensorFeatures {
+  return {
+    camera:       ids.includes(1),
+    gate:         ids.includes(GATE_SUPPLY_ID) ? 'supply'
+                : ids.includes(GATE_DRAIN_ID)  ? 'drain'
+                : null,
+    tempHumidity: ids.includes(4),
+    soilMoisture: ids.includes(5),
+    waterTemp:    ids.includes(6),
+    waterLevel:   ids.includes(7),
+  }
+}
+
+/** SensorFeatures → features の数値IDリストに変換 */
+function featuresToIds(f: SensorFeatures): number[] {
+  const ids: number[] = []
+  if (f.camera)       ids.push(1)
+  if (f.gate === 'supply') ids.push(GATE_SUPPLY_ID)
+  if (f.gate === 'drain')  ids.push(GATE_DRAIN_ID)
+  if (f.tempHumidity) ids.push(4)
+  if (f.soilMoisture) ids.push(5)
+  if (f.waterTemp)    ids.push(6)
+  if (f.waterLevel)   ids.push(7)
+  return ids
 }
 
 const ROLE_LABEL: Record<UserFieldRole, string> = {
@@ -74,12 +103,10 @@ export default function AdminUsers() {
   const currentUser = useAuth((s) => s.user)
   const [tab, setTab] = useState<Tab>('fields')
 
-  // --- fields / users state ---
   const [selectedFieldId, setSelectedFieldId] = useState<number | null>(null)
   const [togglingUserId, setTogglingUserId] = useState<number | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
 
-  // --- sensors state ---
   const [sensorFieldId, setSensorFieldId] = useState<number | null>(null)
   const [sensorModal, setSensorModal] = useState<SensorModal | null>(null)
   const [sensorForm, setSensorForm] = useState({ name: '', active: true, field_id: 0, features: defaultFeatures })
@@ -105,16 +132,20 @@ export default function AdminUsers() {
     enabled: !!activeSensorFieldId,
   })
 
+  // 機能マスタをキャッシュ取得（モーダル表示時に使用）
+  const { data: featureTypes = [] } = useQuery({
+    queryKey: ['sensorFeatureTypes'],
+    queryFn: () => sensorFeatureTypesApi.list().then(r => r.data),
+  })
+
   useEffect(() => {
-    if (manageableFields.length > 0 && !selectedFieldId) {
+    if (manageableFields.length > 0 && !selectedFieldId)
       setSelectedFieldId(manageableFields[0].id)
-    }
   }, [manageableFields.length])
 
   useEffect(() => {
-    if (manageableFields.length > 0 && !sensorFieldId) {
+    if (manageableFields.length > 0 && !sensorFieldId)
       setSensorFieldId(manageableFields[0].id)
-    }
   }, [manageableFields.length])
 
   const deleteFieldMut = useMutation({
@@ -159,12 +190,21 @@ export default function AdminUsers() {
   }
 
   const openAddSensor = () => {
-    setSensorForm({ name: '', active: true, field_id: activeSensorFieldId ?? manageableFields[0]?.id ?? 0, features: defaultFeatures })
+    setSensorForm({
+      name: '', active: true,
+      field_id: activeSensorFieldId ?? manageableFields[0]?.id ?? 0,
+      features: defaultFeatures,
+    })
     setSensorModal({ mode: 'add' })
   }
 
   const openEditSensor = (sensor: SensorOut) => {
-    setSensorForm({ name: sensor.name, active: sensor.active, field_id: sensor.field_id, features: defaultFeatures })
+    setSensorForm({
+      name: sensor.name,
+      active: sensor.active,
+      field_id: sensor.field_id,
+      features: idsToFeatures(sensor.features ?? []),
+    })
     setSensorModal({ mode: 'edit', sensor })
   }
 
@@ -179,11 +219,23 @@ export default function AdminUsers() {
     if (!sensorForm.name.trim() || !sensorForm.field_id) return
     setSensorSubmitting(true)
     try {
+      const featureIds = featuresToIds(sensorForm.features)
       if (sensorModal?.mode === 'add') {
         const token = generateSensorToken()
-        await sensorsApi.create({ field_id: sensorForm.field_id, name: sensorForm.name.trim(), active: sensorForm.active, token })
+        await sensorsApi.create({
+          field_id: sensorForm.field_id,
+          name: sensorForm.name.trim(),
+          active: sensorForm.active,
+          token,
+          features: featureIds,
+        })
       } else if (sensorModal?.mode === 'edit') {
-        await sensorsApi.update((sensorModal as any).sensor.id, { name: sensorForm.name.trim(), active: sensorForm.active, field_id: sensorForm.field_id })
+        await sensorsApi.update((sensorModal as any).sensor.id, {
+          name: sensorForm.name.trim(),
+          active: sensorForm.active,
+          field_id: sensorForm.field_id,
+          features: featureIds,
+        })
       }
       qc.invalidateQueries({ queryKey: ['sensors'] })
       setSensorModal(null)
@@ -217,28 +269,20 @@ export default function AdminUsers() {
     setSensorForm(f => ({ ...f, features: { ...f.features, [key]: checked } }))
   }
 
-  // チェックボックスのON/OFF: チェックを入れると給水、外すとnull
   const handleGateCheck = (checked: boolean) => {
     setSensorForm(f => ({
       ...f,
-      features: {
-        ...f.features,
-        gate: checked ? 'supply' : null,
-      },
+      features: { ...f.features, gate: checked ? 'supply' : null },
     }))
   }
 
-  // ラベルクリック: 給水↔排水をトグル（チェックON時のみ作用）
   const handleGateLabelClick = () => {
     setSensorForm(f => {
       const current = f.features.gate
-      if (current === null) return f  // チェックOFFなら無視
+      if (current === null) return f
       return {
         ...f,
-        features: {
-          ...f.features,
-          gate: current === 'supply' ? 'drain' : 'supply',
-        },
+        features: { ...f.features, gate: current === 'supply' ? 'drain' : 'supply' },
       }
     })
   }
@@ -402,7 +446,7 @@ export default function AdminUsers() {
                 {sensors.map(sensor => (
                   <div key={sensor.id} style={cardStyle}>
                     <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <span style={{ fontWeight: 600, fontSize: 15 }}>{sensor.name}</span>
                         <span style={{
                           fontSize: 11, padding: '1px 7px', borderRadius: 20, fontWeight: 600,
@@ -412,6 +456,17 @@ export default function AdminUsers() {
                           {sensor.active ? '有効' : '無効'}
                         </span>
                       </div>
+                      {/* 機能タグ表示 */}
+                      {(sensor.features ?? []).length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                          {(sensor.features ?? []).map(fid => {
+                            const ft = featureTypes.find(f => f.id === fid)
+                            return ft ? (
+                              <span key={fid} style={featureTagStyle}>{ft.label}</span>
+                            ) : null
+                          })}
+                        </div>
+                      )}
                     </div>
                     <div style={{ display: 'flex', gap: 2 }}>
                       <button style={iconBtnStyle} title="WIFI設定" onClick={() => openWifiSensor(sensor)}>
@@ -495,22 +550,17 @@ export default function AdminUsers() {
               />
             </div>
 
-            {/* ── センサーの機能 ── */}
+            {/* センサーの機能 */}
             <div style={{ marginBottom: 20 }}>
               <label style={{ ...labelStyle, marginBottom: 10 }}>センサーの機能</label>
               <div style={featureBoxStyle}>
 
-                {/* カメラ */}
                 <FeatureCheckbox
                   label="カメラ"
                   checked={sensorForm.features.camera}
                   onChange={v => handleFeatureChange('camera', v)}
                 />
 
-                {/* 給水ゲート / 排水ゲート
-                    ・チェックOFF → 機能なし
-                    ・チェックON  → 給水ゲート（初期値）
-                    ・ラベルクリック → 給水↔排水 をトグル           */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
                   <input
                     type="checkbox"
@@ -526,41 +576,32 @@ export default function AdminUsers() {
                       fontWeight: sensorForm.features.gate !== null ? 600 : 400,
                       cursor: sensorForm.features.gate !== null ? 'pointer' : 'default',
                       userSelect: 'none',
-                      // チェックON時に下線で「クリックできる」ことを示す
                       borderBottom: sensorForm.features.gate !== null ? '1px dashed #2d7a4f' : 'none',
                       paddingBottom: 1,
                     }}
                   >
                     {sensorForm.features.gate === 'drain' ? '排水ゲート' : '給水ゲート'}
                   </span>
-                  {/* チェックON時にヒントを表示 */}
                   {sensorForm.features.gate !== null && (
                     <span style={{ fontSize: 11, color: '#aaa' }}>（タップで切替）</span>
                   )}
                 </div>
 
-                {/* 温湿度センサ */}
                 <FeatureCheckbox
                   label="温湿度センサ"
                   checked={sensorForm.features.tempHumidity}
                   onChange={v => handleFeatureChange('tempHumidity', v)}
                 />
-
-                {/* 土壌水分センサ */}
                 <FeatureCheckbox
                   label="土壌水分センサ"
                   checked={sensorForm.features.soilMoisture}
                   onChange={v => handleFeatureChange('soilMoisture', v)}
                 />
-
-                {/* 水温センサ */}
                 <FeatureCheckbox
                   label="水温センサ"
                   checked={sensorForm.features.waterTemp}
                   onChange={v => handleFeatureChange('waterTemp', v)}
                 />
-
-                {/* 水位センサ */}
                 <FeatureCheckbox
                   label="水位センサ"
                   checked={sensorForm.features.waterLevel}
@@ -572,7 +613,11 @@ export default function AdminUsers() {
 
             <div style={{ display: 'flex', gap: 8 }}>
               <button style={cancelBtnStyle} onClick={() => setSensorModal(null)}>キャンセル</button>
-              <button style={saveBtnStyle} onClick={handleSensorSubmit} disabled={sensorSubmitting || !sensorForm.name.trim() || !sensorForm.field_id}>
+              <button
+                style={saveBtnStyle}
+                onClick={handleSensorSubmit}
+                disabled={sensorSubmitting || !sensorForm.name.trim() || !sensorForm.field_id}
+              >
                 {sensorSubmitting ? '保存中…' : '保存'}
               </button>
             </div>
@@ -675,8 +720,6 @@ export default function AdminUsers() {
   )
 }
 
-// ─── 小コンポーネント ───────────────────────────────────────────
-
 function FeatureCheckbox({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '4px 0' }}>
@@ -731,6 +774,7 @@ const cancelBtnStyle: React.CSSProperties = { flex: 1, padding: '12px', border: 
 const deleteBtnStyle: React.CSSProperties = { flex: 1, padding: '12px', border: 'none', borderRadius: 8, background: '#d32f2f', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }
 const saveBtnStyle: React.CSSProperties = { flex: 1, padding: '12px', border: 'none', borderRadius: 8, background: '#2d7a4f', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }
 const featureBoxStyle: React.CSSProperties = { background: '#f8f9fa', borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8, border: '1px solid #eee' }
+const featureTagStyle: React.CSSProperties = { fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#2d7a4f18', color: '#2d7a4f', fontWeight: 600, border: '1px solid #2d7a4f33' }
 const fabStyle: React.CSSProperties = {
   position: 'fixed', bottom: 64, left: '50%', transform: 'translateX(-50%)',
   background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 10,

@@ -80,6 +80,12 @@ export interface Harvest {
 }
 
 // --- Sensor Types ---
+export interface SensorFeatureType {
+  id: number
+  key: string
+  label: string
+}
+
 export interface SensorLatestReading {
   metric: string
   value: number
@@ -106,7 +112,7 @@ export interface SensorOut {
   name: string
   active: boolean
   token: string
-  wifi_ssid?: string
+  features: number[]   // sensor_feature_types.id のリスト
 }
 
 export interface SensorReadingOut {
@@ -187,12 +193,16 @@ export function generateSensorToken(): string {
   return Array.from({ length: 15 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
 }
 
+export const sensorFeatureTypesApi = {
+  list: () => api.get<SensorFeatureType[]>('/sensor-feature-types'),
+}
+
 export const sensorsApi = {
   list: (field_id?: number) => api.get<SensorOut[]>('/sensors', { params: { field_id } }),
   get: (id: number) => api.get<SensorOut>(`/sensors/${id}`),
-  create: (data: { field_id: number; name: string; active?: boolean; token: string }) =>
+  create: (data: { field_id: number; name: string; active?: boolean; token: string; features?: number[] }) =>
     api.post<SensorOut>('/sensors', data),
-  update: (id: number, data: { name?: string; active?: boolean; field_id?: number }) =>
+  update: (id: number, data: { name?: string; active?: boolean; field_id?: number; features?: number[] }) =>
     api.put<SensorOut>(`/sensors/${id}`, data),
   delete: (id: number) => api.delete(`/sensors/${id}`),
   readings: (sensor_id: number, metric?: string, limit = 24) =>
