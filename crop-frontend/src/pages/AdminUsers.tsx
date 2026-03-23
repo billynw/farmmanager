@@ -20,6 +20,27 @@ type SensorModal =
   | { mode: 'edit'; sensor: SensorOut }
   | { mode: 'wifi'; sensor: SensorOut }
 
+// センサー機能の定義
+type GateType = 'supply' | 'drain' | null  // 給水ゲート or 排水ゲート (排他)
+
+interface SensorFeatures {
+  camera: boolean
+  gate: GateType           // 給水ゲート or 排水ゲート（トグル）
+  tempHumidity: boolean    // 温湿度センサ
+  soilMoisture: boolean    // 土壌水分センサ
+  waterTemp: boolean       // 水温センサ
+  waterLevel: boolean      // 水位センサ
+}
+
+const defaultFeatures: SensorFeatures = {
+  camera: false,
+  gate: null,
+  tempHumidity: false,
+  soilMoisture: false,
+  waterTemp: false,
+  waterLevel: false,
+}
+
 const ROLE_LABEL: Record<UserFieldRole, string> = {
   owner: 'オーナー',
   manager: 'マネージャー',
@@ -60,7 +81,7 @@ export default function AdminUsers() {
   // --- sensors state ---
   const [sensorFieldId, setSensorFieldId] = useState<number | null>(null)
   const [sensorModal, setSensorModal] = useState<SensorModal | null>(null)
-  const [sensorForm, setSensorForm] = useState({ name: '', active: true, field_id: 0 })
+  const [sensorForm, setSensorForm] = useState({ name: '', active: true, field_id: 0, features: defaultFeatures })
   const [wifiForm, setWifiForm] = useState({ ssid: '', password: '' })
   const [showWifiPassword, setShowWifiPassword] = useState(false)
   const [sensorSubmitting, setSensorSubmitting] = useState(false)
@@ -140,12 +161,12 @@ export default function AdminUsers() {
   }
 
   const openAddSensor = () => {
-    setSensorForm({ name: '', active: true, field_id: activeSensorFieldId ?? manageableFields[0]?.id ?? 0 })
+    setSensorForm({ name: '', active: true, field_id: activeSensorFieldId ?? manageableFields[0]?.id ?? 0, features: defaultFeatures })
     setSensorModal({ mode: 'add' })
   }
 
   const openEditSensor = (sensor: SensorOut) => {
-    setSensorForm({ name: sensor.name, active: sensor.active, field_id: sensor.field_id })
+    setSensorForm({ name: sensor.name, active: sensor.active, field_id: sensor.field_id, features: defaultFeatures })
     setSensorModal({ mode: 'edit', sensor })
   }
 
@@ -181,19 +202,34 @@ export default function AdminUsers() {
     setSensorSubmitting(true)
     setWifiStatus('')
     try {
-      //await transmitWifi(wifiForm.ssid.trim(), wifiForm.password, sensor.token, setWifiStatus)
       await transmitWifi(
-        'S' + wifiForm.ssid.trim(), 
-        'P' + wifiForm.password, 
+        'S' + wifiForm.ssid.trim(),
+        'P' + wifiForm.password,
         'T' + sensor.token,
         setWifiStatus
       )
-
     } catch (err: any) {
       setWifiStatus('エラー: ' + (err?.message ?? '送信に失敗しました'))
     } finally {
       setSensorSubmitting(false)
     }
+  }
+
+  // センサー機能のチェックボックス変更ハンドラ
+  const handleFeatureChange = (key: keyof Omit<SensorFeatures, 'gate'>, checked: boolean) => {
+    setSensorForm(f => ({ ...f, features: { ...f.features, [key]: checked } }))
+  }
+
+  // 給水・排水ゲートのトグルハンドラ
+  const handleGateToggle = (value: GateType) => {
+    setSensorForm(f => ({
+      ...f,
+      features: {
+        ...f.features,
+        // 同じボタンを押したら解除、違うボタンなら切り替え
+        gate: f.features.gate === value ? null : value,
+      },
+    }))
   }
 
   const tabs: { key: Tab; label: string }[] = [
@@ -411,7 +447,7 @@ export default function AdminUsers() {
       {/* センサー追加・編集モーダル - manageableFields のみ選択可 */}
       {(sensorModal?.mode === 'add' || sensorModal?.mode === 'edit') && (
         <div style={overlayStyle} onClick={() => setSensorModal(null)}>
-          <div style={modalStyle} onClick={e => e.stopPropagation()}>
+          <div style={{ ...modalStyle, maxHeight: '90dvh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
             <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700 }}>
               {sensorModal.mode === 'add' ? 'センサーを追加' : 'センサーを編集'}
             </h3>
@@ -438,7 +474,7 @@ export default function AdminUsers() {
               />
             </div>
 
-            <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
               <label style={{ fontSize: 14, color: '#333' }}>有効</label>
               <input
                 type="checkbox"
@@ -446,6 +482,66 @@ export default function AdminUsers() {
                 onChange={e => setSensorForm(f => ({ ...f, active: e.target.checked }))}
                 style={{ width: 18, height: 18, accentColor: '#2d7a4f' }}
               />
+            </div>
+
+            {/* ── センサーの機能 ── */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ ...labelStyle, marginBottom: 10 }}>センサーの機能</label>
+              <div style={featureBoxStyle}>
+
+                {/* カメラ */}
+                <FeatureCheckbox
+                  label="カメラ"
+                  checked={sensorForm.features.camera}
+                  onChange={v => handleFeatureChange('camera', v)}
+                />
+
+                {/* 給水ゲート・排水ゲート（トグル） */}
+                <div style={{ marginBottom: 2 }}>
+                  <span style={{ fontSize: 13, color: '#555', fontWeight: 500 }}>給水ゲート / 排水ゲート</span>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                    <GateToggleButton
+                      label="給水ゲート"
+                      active={sensorForm.features.gate === 'supply'}
+                      onClick={() => handleGateToggle('supply')}
+                    />
+                    <GateToggleButton
+                      label="排水ゲート"
+                      active={sensorForm.features.gate === 'drain'}
+                      onClick={() => handleGateToggle('drain')}
+                    />
+                  </div>
+                </div>
+
+                {/* 温湿度センサ */}
+                <FeatureCheckbox
+                  label="温湿度センサ"
+                  checked={sensorForm.features.tempHumidity}
+                  onChange={v => handleFeatureChange('tempHumidity', v)}
+                />
+
+                {/* 土壌水分センサ */}
+                <FeatureCheckbox
+                  label="土壌水分センサ"
+                  checked={sensorForm.features.soilMoisture}
+                  onChange={v => handleFeatureChange('soilMoisture', v)}
+                />
+
+                {/* 水温センサ */}
+                <FeatureCheckbox
+                  label="水温センサ"
+                  checked={sensorForm.features.waterTemp}
+                  onChange={v => handleFeatureChange('waterTemp', v)}
+                />
+
+                {/* 水位センサ */}
+                <FeatureCheckbox
+                  label="水位センサ"
+                  checked={sensorForm.features.waterLevel}
+                  onChange={v => handleFeatureChange('waterLevel', v)}
+                />
+
+              </div>
             </div>
 
             <div style={{ display: 'flex', gap: 8 }}>
@@ -554,6 +650,44 @@ export default function AdminUsers() {
   )
 }
 
+// ─── 小コンポーネント ───────────────────────────────────────────
+
+function FeatureCheckbox({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '4px 0' }}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={e => onChange(e.target.checked)}
+        style={{ width: 18, height: 18, accentColor: '#2d7a4f', flexShrink: 0 }}
+      />
+      <span style={{ fontSize: 14, color: '#333' }}>{label}</span>
+    </label>
+  )
+}
+
+function GateToggleButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        flex: 1,
+        padding: '8px 0',
+        borderRadius: 8,
+        border: active ? '2px solid #2d7a4f' : '1px solid #ddd',
+        background: active ? '#2d7a4f18' : '#fafafa',
+        color: active ? '#2d7a4f' : '#666',
+        fontWeight: active ? 700 : 400,
+        fontSize: 13,
+        cursor: 'pointer',
+        transition: 'all 0.15s',
+      }}
+    >
+      {label}
+    </button>
+  )
+}
+
 function EyeIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
@@ -594,6 +728,7 @@ const inputStyle: React.CSSProperties = { width: '100%', padding: '10px 12px', b
 const cancelBtnStyle: React.CSSProperties = { flex: 1, padding: '12px', border: '1px solid #ddd', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 14 }
 const deleteBtnStyle: React.CSSProperties = { flex: 1, padding: '12px', border: 'none', borderRadius: 8, background: '#d32f2f', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }
 const saveBtnStyle: React.CSSProperties = { flex: 1, padding: '12px', border: 'none', borderRadius: 8, background: '#2d7a4f', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }
+const featureBoxStyle: React.CSSProperties = { background: '#f8f9fa', borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8, border: '1px solid #eee' }
 const fabStyle: React.CSSProperties = {
   position: 'fixed', bottom: 64, left: '50%', transform: 'translateX(-50%)',
   background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 10,
