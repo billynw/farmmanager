@@ -21,11 +21,12 @@ type SensorModal =
   | { mode: 'wifi'; sensor: SensorOut }
 
 // センサー機能の定義
-type GateType = 'supply' | 'drain' | null  // 給水ゲート or 排水ゲート (排他)
+// gate: null=未選択 / 'supply'=給水ゲート / 'drain'=排水ゲート
+type GateType = 'supply' | 'drain' | null
 
 interface SensorFeatures {
   camera: boolean
-  gate: GateType           // 給水ゲート or 排水ゲート（トグル）
+  gate: GateType
   tempHumidity: boolean    // 温湿度センサ
   soilMoisture: boolean    // 土壌水分センサ
   waterTemp: boolean       // 水温センサ
@@ -97,7 +98,6 @@ export default function AdminUsers() {
     enabled: !!selectedFieldId,
   })
 
-  // センサータブは manageableFields のみ対象
   const activeSensorFieldId = sensorFieldId ?? manageableFields[0]?.id ?? null
   const { data: sensors = [], refetch: refetchSensors } = useQuery({
     queryKey: ['sensors', activeSensorFieldId],
@@ -117,7 +117,6 @@ export default function AdminUsers() {
     }
   }, [manageableFields.length])
 
-  // --- field / user mutations ---
   const deleteFieldMut = useMutation({
     mutationFn: (id: number) => fieldsApi.delete(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['fields'] }); setDeleteTarget(null) },
@@ -131,7 +130,6 @@ export default function AdminUsers() {
     onError: (err: any) => alert(err.response?.data?.detail ?? '削除に失敗しました'),
   })
 
-  // --- sensor mutations ---
   const deleteSensorMut = useMutation({
     mutationFn: (id: number) => sensorsApi.delete(id),
     onSuccess: () => { refetchSensors(); setDeleteTarget(null) },
@@ -215,21 +213,34 @@ export default function AdminUsers() {
     }
   }
 
-  // センサー機能のチェックボックス変更ハンドラ
   const handleFeatureChange = (key: keyof Omit<SensorFeatures, 'gate'>, checked: boolean) => {
     setSensorForm(f => ({ ...f, features: { ...f.features, [key]: checked } }))
   }
 
-  // 給水・排水ゲートのトグルハンドラ
-  const handleGateToggle = (value: GateType) => {
+  // チェックボックスのON/OFF: チェックを入れると給水、外すとnull
+  const handleGateCheck = (checked: boolean) => {
     setSensorForm(f => ({
       ...f,
       features: {
         ...f.features,
-        // 同じボタンを押したら解除、違うボタンなら切り替え
-        gate: f.features.gate === value ? null : value,
+        gate: checked ? 'supply' : null,
       },
     }))
+  }
+
+  // ラベルクリック: 給水↔排水をトグル（チェックON時のみ作用）
+  const handleGateLabelClick = () => {
+    setSensorForm(f => {
+      const current = f.features.gate
+      if (current === null) return f  // チェックOFFなら無視
+      return {
+        ...f,
+        features: {
+          ...f.features,
+          gate: current === 'supply' ? 'drain' : 'supply',
+        },
+      }
+    })
   }
 
   const tabs: { key: Tab; label: string }[] = [
@@ -366,7 +377,7 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {/* センサータブ - manageableFields のみ対象 */}
+      {/* センサータブ */}
       {tab === 'sensors' && (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', paddingBottom: 100 }}>
           {manageableFields.length === 0 ? (
@@ -444,7 +455,7 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {/* センサー追加・編集モーダル - manageableFields のみ選択可 */}
+      {/* センサー追加・編集モーダル */}
       {(sensorModal?.mode === 'add' || sensorModal?.mode === 'edit') && (
         <div style={overlayStyle} onClick={() => setSensorModal(null)}>
           <div style={{ ...modalStyle, maxHeight: '90dvh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
@@ -496,21 +507,36 @@ export default function AdminUsers() {
                   onChange={v => handleFeatureChange('camera', v)}
                 />
 
-                {/* 給水ゲート・排水ゲート（トグル） */}
-                <div style={{ marginBottom: 2 }}>
-                  <span style={{ fontSize: 13, color: '#555', fontWeight: 500 }}>給水ゲート / 排水ゲート</span>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                    <GateToggleButton
-                      label="給水ゲート"
-                      active={sensorForm.features.gate === 'supply'}
-                      onClick={() => handleGateToggle('supply')}
-                    />
-                    <GateToggleButton
-                      label="排水ゲート"
-                      active={sensorForm.features.gate === 'drain'}
-                      onClick={() => handleGateToggle('drain')}
-                    />
-                  </div>
+                {/* 給水ゲート / 排水ゲート
+                    ・チェックOFF → 機能なし
+                    ・チェックON  → 給水ゲート（初期値）
+                    ・ラベルクリック → 給水↔排水 をトグル           */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
+                  <input
+                    type="checkbox"
+                    checked={sensorForm.features.gate !== null}
+                    onChange={e => handleGateCheck(e.target.checked)}
+                    style={{ width: 18, height: 18, accentColor: '#2d7a4f', flexShrink: 0 }}
+                  />
+                  <span
+                    onClick={handleGateLabelClick}
+                    style={{
+                      fontSize: 14,
+                      color: sensorForm.features.gate !== null ? '#2d7a4f' : '#333',
+                      fontWeight: sensorForm.features.gate !== null ? 600 : 400,
+                      cursor: sensorForm.features.gate !== null ? 'pointer' : 'default',
+                      userSelect: 'none',
+                      // チェックON時に下線で「クリックできる」ことを示す
+                      borderBottom: sensorForm.features.gate !== null ? '1px dashed #2d7a4f' : 'none',
+                      paddingBottom: 1,
+                    }}
+                  >
+                    {sensorForm.features.gate === 'drain' ? '排水ゲート' : '給水ゲート'}
+                  </span>
+                  {/* チェックON時にヒントを表示 */}
+                  {sensorForm.features.gate !== null && (
+                    <span style={{ fontSize: 11, color: '#aaa' }}>（タップで切替）</span>
+                  )}
                 </div>
 
                 {/* 温湿度センサ */}
@@ -554,7 +580,7 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {/* WIFI設定モーダル（ggwave音声送信） */}
+      {/* WIFI設定モーダル */}
       {sensorModal?.mode === 'wifi' && (
         <div style={overlayStyle} onClick={() => !sensorSubmitting && setSensorModal(null)}>
           <div style={modalStyle} onClick={e => e.stopPropagation()}>
@@ -602,7 +628,6 @@ export default function AdminUsers() {
               </div>
             </div>
 
-            {/* 送信ステータス */}
             {wifiStatus !== '' && (
               <div style={{
                 marginBottom: 16, padding: '10px 14px', borderRadius: 8,
@@ -666,28 +691,6 @@ function FeatureCheckbox({ label, checked, onChange }: { label: string; checked:
   )
 }
 
-function GateToggleButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        flex: 1,
-        padding: '8px 0',
-        borderRadius: 8,
-        border: active ? '2px solid #2d7a4f' : '1px solid #ddd',
-        background: active ? '#2d7a4f18' : '#fafafa',
-        color: active ? '#2d7a4f' : '#666',
-        fontWeight: active ? 700 : 400,
-        fontSize: 13,
-        cursor: 'pointer',
-        transition: 'all 0.15s',
-      }}
-    >
-      {label}
-    </button>
-  )
-}
-
 function EyeIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
@@ -723,7 +726,6 @@ const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, p
 const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }
 const modalStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: 24, width: '100%', maxWidth: 400 }
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: 13, color: '#555', marginBottom: 6, fontWeight: 500 }
-// font-size を 16px に設定することで iOS でのズームを防止
 const inputStyle: React.CSSProperties = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 16, boxSizing: 'border-box' }
 const cancelBtnStyle: React.CSSProperties = { flex: 1, padding: '12px', border: '1px solid #ddd', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 14 }
 const deleteBtnStyle: React.CSSProperties = { flex: 1, padding: '12px', border: 'none', borderRadius: 8, background: '#d32f2f', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }
