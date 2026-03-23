@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, Text, DateTime, Date,
-    Boolean, Numeric, ForeignKey, Enum, Float
+    Boolean, Numeric, ForeignKey, Enum, Float, JSON
 )
 from sqlalchemy.orm import relationship
 from database import Base
@@ -182,28 +182,39 @@ class Harvest(Base):
     item = relationship("Item", back_populates="harvests")
 
 
+class SensorFeatureType(Base):
+    """センサー機能マスタ（sensor_feature_types テーブル）"""
+    __tablename__ = "sensor_feature_types"
+    id    = Column(Integer, primary_key=True)
+    key   = Column(String(50), nullable=False, unique=True)
+    label = Column(String(100), nullable=False)
+
+
 class Sensor(Base):
     """圃場に設置されたセンサー機器"""
     __tablename__ = "sensors"
-    id = Column(Integer, primary_key=True)
-    field_id = Column(Integer, ForeignKey("fields.id"), nullable=False)
-    name = Column(String(100), nullable=False)
-    active = Column(Boolean, default=True)
-    token = Column(String(15), nullable=False)
+    id         = Column(Integer, primary_key=True)
+    field_id   = Column(Integer, ForeignKey("fields.id"), nullable=False)
+    name       = Column(String(100), nullable=False)
+    active     = Column(Boolean, default=True)
+    token      = Column(String(15), nullable=False)
+    # features: sensor_feature_types.id のリスト  例: [2, 4, 7]
+    # MySQL JSON型。未設定は空リスト
+    features   = Column(JSON, nullable=False, default=list)
     created_at = Column(DateTime, default=datetime.utcnow)
-    field = relationship("Field", back_populates="sensors")
+    field    = relationship("Field", back_populates="sensors")
     readings = relationship("SensorReading", back_populates="sensor", cascade="all, delete-orphan")
-    photos = relationship("SensorPhoto", back_populates="sensor", cascade="all, delete-orphan")
+    photos   = relationship("SensorPhoto",   back_populates="sensor", cascade="all, delete-orphan")
 
 
 class SensorReading(Base):
     """センサーの計測値（metric単位で1レコード）"""
     __tablename__ = "sensor_readings"
-    id = Column(Integer, primary_key=True)
-    sensor_id = Column(Integer, ForeignKey("sensors.id"), nullable=False)
-    metric = Column(String(50), nullable=False)
-    value = Column(Float, nullable=False)
-    unit = Column(String(20), nullable=True)
+    id          = Column(Integer, primary_key=True)
+    sensor_id   = Column(Integer, ForeignKey("sensors.id"), nullable=False)
+    metric      = Column(String(50), nullable=False)
+    value       = Column(Float, nullable=False)
+    unit        = Column(String(20), nullable=True)
     recorded_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     sensor = relationship("Sensor", back_populates="readings")
 
@@ -211,9 +222,9 @@ class SensorReading(Base):
 class SensorPhoto(Base):
     """センサーカメラが送ってくる写真"""
     __tablename__ = "sensor_photos"
-    id = Column(Integer, primary_key=True)
-    sensor_id = Column(Integer, ForeignKey("sensors.id"), nullable=False)
-    file_path = Column(String(500), nullable=False)
-    taken_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    id         = Column(Integer, primary_key=True)
+    sensor_id  = Column(Integer, ForeignKey("sensors.id"), nullable=False)
+    file_path  = Column(String(500), nullable=False)
+    taken_at   = Column(DateTime, default=datetime.utcnow, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     sensor = relationship("Sensor", back_populates="photos")

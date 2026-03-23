@@ -1,6 +1,6 @@
 from datetime import datetime, date
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from models import UserFieldRole, ItemStatus
 
 # --- Auth ---
@@ -151,17 +151,47 @@ class HarvestOut(HarvestCreate):
     id: int
     model_config = {"from_attributes": True}
 
+# --- SensorFeatureType ---
+class SensorFeatureTypeOut(BaseModel):
+    id: int
+    key: str
+    label: str
+    model_config = {"from_attributes": True}
+
 # --- Sensor ---
 class SensorCreate(BaseModel):
     field_id: int
     name: str
     active: bool = True
     token: str
+    features: List[int] = []   # sensor_feature_types.id のリスト
+
+    @field_validator("features")
+    @classmethod
+    def features_unique(cls, v: List[int]) -> List[int]:
+        """重複IDを除去して返す"""
+        seen = []
+        for x in v:
+            if x not in seen:
+                seen.append(x)
+        return seen
 
 class SensorUpdate(BaseModel):
     name: Optional[str] = None
     active: Optional[bool] = None
     field_id: Optional[int] = None
+    features: Optional[List[int]] = None   # None のとき更新しない
+
+    @field_validator("features")
+    @classmethod
+    def features_unique(cls, v: Optional[List[int]]) -> Optional[List[int]]:
+        if v is None:
+            return v
+        seen = []
+        for x in v:
+            if x not in seen:
+                seen.append(x)
+        return seen
 
 class SensorOut(BaseModel):
     id: int
@@ -169,6 +199,7 @@ class SensorOut(BaseModel):
     name: str
     active: bool
     token: str
+    features: List[int] = []   # sensor_feature_types.id のリスト
     model_config = {"from_attributes": True}
 
 # --- SensorReading ---

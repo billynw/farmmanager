@@ -28,6 +28,37 @@ def verify_sensor_token(sensor: models.Sensor, token: str):
         raise HTTPException(status_code=403, detail="Invalid sensor token")
 
 
+def validate_feature_ids(feature_ids: List[int], db: Session) -> None:
+    """features に含まれる ID がすべて sensor_feature_types に存在するか検証"""
+    if not feature_ids:
+        return
+    existing = (
+        db.query(models.SensorFeatureType.id)
+        .filter(models.SensorFeatureType.id.in_(feature_ids))
+        .all()
+    )
+    existing_ids = {row.id for row in existing}
+    invalid = set(feature_ids) - existing_ids
+    if invalid:
+        raise HTTPException(
+            status_code=422,
+            detail=f"無効な feature ID が含まれています: {sorted(invalid)}",
+        )
+
+
+# ----------------------------------------------------------------
+# センサー機能マスタ取得
+# ----------------------------------------------------------------
+
+@router.get("/sensor-feature-types", response_model=List[schemas.SensorFeatureTypeOut])
+def list_sensor_feature_types(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """sensor_feature_types マスタを全件返す"""
+    return db.query(models.SensorFeatureType).order_by(models.SensorFeatureType.id).all()
+
+
 # ----------------------------------------------------------------
 # センサー管理（CRUD）
 # ----------------------------------------------------------------
@@ -50,6 +81,7 @@ def create_sensor(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    validate_feature_ids(body.features, db)
     sensor = models.Sensor(**body.model_dump())
     db.add(sensor)
     db.commit()
@@ -67,7 +99,12 @@ def update_sensor(
     sensor = db.query(models.Sensor).filter(models.Sensor.id == sensor_id).first()
     if not sensor:
         raise HTTPException(status_code=404, detail="Sensor not found")
-    for key, value in body.model_dump(exclude_unset=True).items():
+
+    data = body.model_dump(exclude_unset=True)
+    if "features" in data and data["features"] is not None:
+        validate_feature_ids(data["features"], db)
+
+    for key, value in data.items():
         setattr(sensor, key, value)
     db.commit()
     db.refresh(sensor)
@@ -84,11 +121,9 @@ def delete_sensor(
     if not sensor:
         raise HTTPException(status_code=404, detail="Sensor not found")
 
-    # DBレコード削除（cascade により readings・photos レコードも削除）
     db.delete(sensor)
     db.commit()
 
-    # 写真ディレクトリをまとめて削除
     photo_dir = os.path.join(settings.SENSOR_PHOTO_DIR, str(sensor_id))
     if os.path.exists(photo_dir):
         shutil.rmtree(photo_dir)
@@ -195,7 +230,6 @@ def get_sensor_photos(
 
 # ----------------------------------------------------------------
 # 圃場ごとの最新センサー値サマリー（フロントのホーム画面向け）
-# 圃場内の有効センサーをID昇順で並べ、最小ID（最も古い）のセンサーの値のみ返す
 # ----------------------------------------------------------------
 
 @router.get("/fields/{field_id}/sensor-summary", response_model=schemas.FieldSensorSummary)
@@ -208,7 +242,6 @@ def field_sensor_summary(
     if not field:
         raise HTTPException(status_code=404, detail="Field not found")
 
-    # 最小IDの有効センサーだけを取得
     primary_sensor = (
         db.query(models.Sensor)
         .filter(models.Sensor.field_id == field_id, models.Sensor.active == True)
@@ -279,7 +312,13 @@ def seed_sensor_dummy(
             continue
 
         dummy_token = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=15))
-        sensor = models.Sensor(field_id=field.id, name=f"{field.name}センサー", active=True, token=dummy_token)
+        sensor = models.Sensor(
+            field_id=field.id,
+            name=f"{field.name}センサー",
+            active=True,
+            token=dummy_token,
+            features=[],
+        )
         db.add(sensor)
         db.flush()
         created_sensors += 1
