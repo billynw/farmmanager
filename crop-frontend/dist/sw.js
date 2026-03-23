@@ -1,6 +1,6 @@
-const CACHE_NAME = 'cropworks-v1'
-const API_CACHE = 'cropworks-api-v1'
-const PHOTO_CACHE = 'cropworks-photos-v1'
+const CACHE_NAME = 'cropworks-v2'
+const API_CACHE = 'cropworks-api-v2'
+const PHOTO_CACHE = 'cropworks-photos-v2'
 
 const PRECACHE_URLS = ['/', '/index.html']
 

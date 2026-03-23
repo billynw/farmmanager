@@ -181,7 +181,14 @@ export default function AdminUsers() {
     setSensorSubmitting(true)
     setWifiStatus('')
     try {
-      await transmitWifi(wifiForm.ssid.trim(), wifiForm.password, sensor.token, setWifiStatus)
+      //await transmitWifi(wifiForm.ssid.trim(), wifiForm.password, sensor.token, setWifiStatus)
+      await transmitWifi(
+        'S' + wifiForm.ssid.trim(), 
+        'P' + wifiForm.password, 
+        'T' + sensor.token,
+        setWifiStatus
+      )
+
     } catch (err: any) {
       setWifiStatus('エラー: ' + (err?.message ?? '送信に失敗しました'))
     } finally {
