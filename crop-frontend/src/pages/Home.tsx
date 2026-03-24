@@ -130,22 +130,19 @@ function FieldSensorBlock({ field }: { field: Field }) {
   const useFallback = !!activeSensor && showOnHomeIds.length === 0
 
   return (
-    <div style={{ marginBottom: 12 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>
-        {field.name}
-      </div>
+    <div style={{ marginBottom: 10 }}>
       {useFallback ? (
-        <FallbackSensorGrid fieldId={field.id} />
+        <FallbackSensorGrid fieldName={field.name} fieldId={field.id} />
       ) : targetMetrics.length > 0 ? (
-        <SensorReadingsGrid sensorId={activeSensor!.id} targetMetrics={targetMetrics} />
+        <SensorReadingsGrid fieldName={field.name} sensorId={activeSensor!.id} targetMetrics={targetMetrics} />
       ) : (
-        <EmptySensorGrid />
+        <EmptySensorGrid fieldName={field.name} />
       )}
     </div>
   )
 }
 
-function SensorReadingsGrid({ sensorId, targetMetrics }: { sensorId: number; targetMetrics: string[] }) {
+function SensorReadingsGrid({ fieldName, sensorId, targetMetrics }: { fieldName: string; sensorId: number; targetMetrics: string[] }) {
   const { data: readings = [] } = useQuery<SensorReadingOut[]>({
     queryKey: ['sensor-readings-home', sensorId],
     queryFn: () => sensorsApi.readings(sensorId, undefined, 200).then(r => r.data),
@@ -161,55 +158,75 @@ function SensorReadingsGrid({ sensorId, targetMetrics }: { sensorId: number; tar
     .filter(m => latestByMetric[m] !== undefined)
     .map(m => ({ metric: m, ...latestByMetric[m] }))
 
-  if (displayReadings.length === 0) return <EmptySensorGrid />
+  if (displayReadings.length === 0) return <EmptySensorGrid fieldName={fieldName} />
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 4 }}>
+    <SensorBox fieldName={fieldName}>
       {displayReadings.map(r => {
         const cfg = METRIC_CONFIG[r.metric]
         if (!cfg) return null
         const pct = (r.value - cfg.min) / (cfg.max - cfg.min) * 100
         return <SensorCard key={r.metric} label={cfg.label} value={r.value} unit={r.unit ?? cfg.unit} color={cfg.color} pct={pct} />
       })}
-    </div>
+    </SensorBox>
   )
 }
 
-function FallbackSensorGrid({ fieldId }: { fieldId: number }) {
+function FallbackSensorGrid({ fieldName, fieldId }: { fieldName: string; fieldId: number }) {
   const { data: sensorSummary } = useQuery({
     queryKey: ['sensor-summary', fieldId],
     queryFn: () => fieldsApi.sensorSummary(fieldId).then(r => r.data),
   })
   const readings = sensorSummary?.sensors[0]?.latest ?? []
-  if (readings.length === 0) return <EmptySensorGrid />
+  if (readings.length === 0) return <EmptySensorGrid fieldName={fieldName} />
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 4 }}>
+    <SensorBox fieldName={fieldName}>
       {readings.map(r => {
         const cfg = METRIC_CONFIG[r.metric]
         if (!cfg) return null
         const pct = (r.value - cfg.min) / (cfg.max - cfg.min) * 100
         return <SensorCard key={r.metric} label={cfg.label} value={r.value} unit={r.unit ?? cfg.unit} color={cfg.color} pct={pct} />
       })}
-    </div>
+    </SensorBox>
   )
 }
 
-function EmptySensorGrid() {
+function EmptySensorGrid({ fieldName }: { fieldName: string }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 4, opacity: 0.4 }}>
+    <SensorBox fieldName={fieldName}>
       {['水位', '水温', '気温', '地中水分'].map(label => (
-        <div key={label} style={{ background: '#fff', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px' }}>
+        <div key={label} style={{ background: '#f5f5f5', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px', opacity: 0.5 }}>
           <div style={{ fontSize: 10, color: '#999', marginBottom: 3 }}>{label}</div>
           <div style={{ fontSize: 16, fontWeight: 500, color: '#bbb' }}>--</div>
         </div>
       ))}
+    </SensorBox>
+  )
+}
+
+/** センサーカードを囲む白枠。上部に圃場名を表示 */
+function SensorBox({ fieldName, children }: { fieldName: string; children: React.ReactNode }) {
+  return (
+    <div style={{
+      background: '#fff',
+      border: '1px solid #eee',
+      borderRadius: 10,
+      padding: '10px 10px 8px',
+      boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: '#888', marginBottom: 8 }}>
+        {fieldName}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+        {children}
+      </div>
     </div>
   )
 }
 
 function SensorCard({ label, value, unit, color, pct }: { label: string; value: number; unit: string; color: string; pct: number }) {
   return (
-    <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px' }}>
+    <div style={{ background: '#f8f9fa', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px' }}>
       <div style={{ fontSize: 10, color: '#999', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 3 }}>
         <div style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
         {label}
