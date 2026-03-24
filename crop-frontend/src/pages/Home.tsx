@@ -1,18 +1,30 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { fieldsApi, itemsApi } from '../api'
-import type { Item, Field, FieldSensorSummary, SensorLatestReading } from '../api'
+import { fieldsApi, sensorsApi, itemsApi } from '../api'
+import type { Item, Field } from '../api'
 import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
 
 const METRIC_CONFIG: Record<string, { label: string; unit: string; color: string; max: number; min: number }> = {
-  water_level:   { label: '水位',    unit: 'cm', color: '#378ADD', max: 25,  min: 0  },
+  water_level:   { label: '水位',    unit: 'cm',  color: '#378ADD', max: 25,  min: 0  },
   water_temp:    { label: '水温',    unit: '\u00b0C', color: '#1D9E75', max: 35,  min: 10 },
   air_temp:      { label: '気温',    unit: '\u00b0C', color: '#BA7517', max: 40,  min: 0  },
-  soil_moisture: { label: '地中水分', unit: '%',  color: '#639922', max: 100, min: 0  },
-  ph:            { label: 'pH',      unit: '',   color: '#8e44ad', max: 14,  min: 0  },
-  gate_open:     { label: 'ゲート',  unit: '',   color: '#e67e22', max: 1,   min: 0  },
+  soil_moisture: { label: '地中水分', unit: '%',   color: '#639922', max: 100, min: 0  },
+  ph:            { label: 'pH',      unit: '',    color: '#8e44ad', max: 14,  min: 0  },
+  gate_open:     { label: 'ゲート',  unit: '',    color: '#e67e22', max: 1,   min: 0  },
+}
+
+// feature_type id → metric 名のマッピング（ハードコーディング）
+// カメラ(1)は計測値なし、給水/排水ゲートは同じ metric
+const FEATURE_TO_METRIC: Record<number, string | null> = {
+  1: null,           // カメラ（計測値なし）
+  2: 'gate_open',    // 給水ゲート
+  3: 'gate_open',    // 排水ゲート
+  4: 'air_temp',     // 温湿度センサ
+  5: 'soil_moisture',// 土壌水分センサ
+  6: 'water_temp',   // 水温センサ
+  7: 'water_level',  // 水位センサ
 }
 
 const STATUS_LABEL: Record<string, string> = { growing: '栽培中', finished: '終了' }
@@ -41,19 +53,52 @@ export default function Home() {
     if (!selectedFieldId && fields.length > 0) setSelectedFieldId(fields[0].id)
   }, [fields, selectedFieldId])
 
-  const { data: sensorSummary } = useQuery<FieldSensorSummary>({
-    queryKey: ['sensor-summary', activeFieldId],
-    queryFn: () => fieldsApi.sensorSummary(activeFieldId!).then(r => r.data),
+  // 選択圃場のセンサー一覧を取得（show_on_home の情報を使うため直接取得）
+  const { data: sensors = [] } = useQuery({
+    queryKey: ['sensors-home', activeFieldId],
+    queryFn: () => sensorsApi.list(activeFieldId!).then(r => r.data),
     enabled: !!activeFieldId,
   })
 
-  // 圃場内の最小 ID（最も古い）の有効センサーの値だけ使う
-  const sensorReadings: SensorLatestReading[] = sensorSummary?.sensors[0]?.latest ?? []
+  // show_on_home が設定されているセンサーを優先、なければ最小IDの有効センサー
+  const activeSensor = (() => {
+    const active = sensors.filter(s => s.active)
+    const withHome = active.filter(s => (s.show_on_home ?? []).length > 0)
+    if (withHome.length > 0) return withHome.sort((a, b) => a.id - b.id)[0]
+    return active.sort((a, b) => a.id - b.id)[0] ?? null
+  })()
+
+  // show_on_home のfeature IDから表示すべき metric を決定
+  const showOnHomeIds: number[] = activeSensor?.show_on_home ?? []
+  const targetMetrics: string[] = showOnHomeIds.length > 0
+    ? [...new Set(showOnHomeIds.map(id => FEATURE_TO_METRIC[id]).filter((m): m is string => m !== null))]
+    : []  // show_on_home 未設定なら何も表示しない（従来の sensor_summary は使わない）
+
+  // センサーの最新計測値を取得
+  const { data: readings = [] } = useQuery({
+    queryKey: ['sensor-readings-home', activeSensor?.id],
+    queryFn: () => sensorsApi.readings(activeSensor!.id, undefined, 200).then(r => r.data),
+    enabled: !!activeSensor,
+  })
+
+  // metric ごとに最新値だけ抽出し、targetMetrics の順で並べる
+  const latestByMetric: Record<string, { value: number; unit?: string }> = {}
+  for (const r of readings) {
+    if (!latestByMetric[r.metric]) {
+      latestByMetric[r.metric] = { value: r.value, unit: r.unit ?? undefined }
+    }
+  }
+  const displayReadings = targetMetrics
+    .filter(m => latestByMetric[m] !== undefined)
+    .map(m => ({ metric: m, ...latestByMetric[m] }))
 
   const recentItems = [...items]
     .filter(item => item.latest_work_log)
     .sort((a, b) => new Date(b.latest_work_log!.worked_at).getTime() - new Date(a.latest_work_log!.worked_at).getTime())
     .slice(0, 5)
+
+  // show_on_home 未設定かつセンサーあり → 従来表示（全metric）にフォールバック
+  const useFallback = !!activeSensor && showOnHomeIds.length === 0
 
   return (
     <div style={pageStyle}>
@@ -72,9 +117,12 @@ export default function Home() {
           </div>
         )}
 
-        {sensorReadings.length > 0 ? (
+        {useFallback ? (
+          // show_on_home 未設定 → 従来どおり sensor_summary から全metric表示
+          <FallbackSensorGrid fieldId={activeFieldId} />
+        ) : displayReadings.length > 0 ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 16 }}>
-            {sensorReadings.map(r => {
+            {displayReadings.map(r => {
               const cfg = METRIC_CONFIG[r.metric]
               if (!cfg) return null
               const pct = (r.value - cfg.min) / (cfg.max - cfg.min) * 100
@@ -137,6 +185,38 @@ export default function Home() {
         </div>
       </div>
       <BottomNav />
+    </div>
+  )
+}
+
+/** show_on_home 未設定時のフォールバック: 従来の sensor_summary を使う */
+function FallbackSensorGrid({ fieldId }: { fieldId: number | null }) {
+  const { data: sensorSummary } = useQuery({
+    queryKey: ['sensor-summary', fieldId],
+    queryFn: () => fieldsApi.sensorSummary(fieldId!).then(r => r.data),
+    enabled: !!fieldId,
+  })
+  const readings = sensorSummary?.sensors[0]?.latest ?? []
+  if (readings.length === 0) {
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 16, opacity: 0.4 }}>
+        {['水位', '水温', '気温', '地中水分'].map(label => (
+          <div key={label} style={{ background: '#fff', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px' }}>
+            <div style={{ fontSize: 10, color: '#999', marginBottom: 3 }}>{label}</div>
+            <div style={{ fontSize: 16, fontWeight: 500, color: '#bbb' }}>--</div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 16 }}>
+      {readings.map(r => {
+        const cfg = METRIC_CONFIG[r.metric]
+        if (!cfg) return null
+        const pct = (r.value - cfg.min) / (cfg.max - cfg.min) * 100
+        return <SensorCard key={r.metric} label={cfg.label} value={r.value} unit={r.unit ?? cfg.unit} color={cfg.color} pct={pct} />
+      })}
     </div>
   )
 }
