@@ -141,8 +141,6 @@ export default function AdminUsers() {
       setSelectedFieldId(manageableFields[0].id)
   }, [manageableFields.length])
 
-  // センサータブはデフォルト null（全て）のまま — 自動選択しない
-
   const deleteFieldMut = useMutation({
     mutationFn: (id: number) => fieldsApi.delete(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['fields'] }); setDeleteTarget(null) },
@@ -471,6 +469,7 @@ export default function AdminUsers() {
                           {sensor.active ? '有効' : '無効'}
                         </span>
                       </div>
+                      {/* 機能バッジ: 全機能を表示、ホーム表示のものは緑・そうでないものはグレー */}
                       {(sensor.features ?? []).length > 0 && (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
                           {(sensor.features ?? []).map(fid => {
@@ -478,12 +477,12 @@ export default function AdminUsers() {
                             const onHome = (sensor.show_on_home ?? []).includes(fid)
                             return ft ? (
                               <span key={fid} style={{
-                                ...featureTagStyle,
+                                fontSize: 11, padding: '2px 8px', borderRadius: 20, fontWeight: 600,
                                 background: onHome ? '#2d7a4f22' : '#eee',
                                 color: onHome ? '#2d7a4f' : '#999',
                                 border: onHome ? '1px solid #2d7a4f33' : '1px solid #ddd',
                               }}>
-                                {onHome ? '★ ' : '☆ '}{ft.label}
+                                {ft.label}
                               </span>
                             ) : null
                           })}
@@ -836,7 +835,6 @@ const cancelBtnStyle: React.CSSProperties = { flex: 1, padding: '12px', border: 
 const deleteBtnStyle: React.CSSProperties = { flex: 1, padding: '12px', border: 'none', borderRadius: 8, background: '#d32f2f', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }
 const saveBtnStyle: React.CSSProperties = { flex: 1, padding: '12px', border: 'none', borderRadius: 8, background: '#2d7a4f', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }
 const featureBoxStyle: React.CSSProperties = { background: '#f8f9fa', borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8, border: '1px solid #eee' }
-const featureTagStyle: React.CSSProperties = { fontSize: 11, padding: '2px 8px', borderRadius: 20, fontWeight: 600 }
 const fabStyle: React.CSSProperties = {
   position: 'fixed', bottom: 64, left: '50%', transform: 'translateX(-50%)',
   background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 10,
