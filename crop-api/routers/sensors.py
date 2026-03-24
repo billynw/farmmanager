@@ -16,20 +16,17 @@ router = APIRouter(prefix="/api/v1", tags=["sensors"])
 
 
 def get_sensor_photo_dir(sensor_id: int) -> str:
-    """センサーIDごとのディレクトリパスを返す"""
     path = os.path.join(settings.SENSOR_PHOTO_DIR, str(sensor_id))
     os.makedirs(path, exist_ok=True)
     return path
 
 
 def verify_sensor_token(sensor: models.Sensor, token: str):
-    """センサーのtokenを検証する。不一致なら403を返す"""
     if sensor.token != token:
         raise HTTPException(status_code=403, detail="Invalid sensor token")
 
 
 def validate_feature_ids(feature_ids: List[int], db: Session) -> None:
-    """features に含まれる ID がすべて sensor_feature_types に存在するか検証"""
     if not feature_ids:
         return
     existing = (
@@ -55,7 +52,6 @@ def list_sensor_feature_types(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    """sensor_feature_types マスタを全件返す"""
     return db.query(models.SensorFeatureType).order_by(models.SensorFeatureType.id).all()
 
 
@@ -132,7 +128,7 @@ def delete_sensor(
 
 
 # ----------------------------------------------------------------
-# 計測値の記録（センサーデバイスからのPOST・tokenで認証）
+# 計測値の記録
 # ----------------------------------------------------------------
 
 @router.post("/sensors/{sensor_id}/readings", response_model=schemas.SensorReadingOut)
@@ -141,7 +137,6 @@ def post_reading(
     body: schemas.SensorReadingCreate,
     db: Session = Depends(get_db),
 ):
-    """センサーデバイスから計測値を受け取る（tokenで認証）"""
     sensor = db.query(models.Sensor).filter(models.Sensor.id == sensor_id).first()
     if not sensor:
         raise HTTPException(status_code=404, detail="Sensor not found")
@@ -174,7 +169,7 @@ def get_readings(
 
 
 # ----------------------------------------------------------------
-# 写真のアップロード・取得（センサーカメラ対応・tokenで認証）
+# 写真のアップロード・取得
 # ----------------------------------------------------------------
 
 @router.post("/sensors/{sensor_id}/photos", response_model=schemas.SensorPhotoOut)
@@ -185,7 +180,6 @@ async def upload_sensor_photo(
     taken_at: Optional[datetime] = None,
     db: Session = Depends(get_db),
 ):
-    """センサーカメラから写真を受け取る（tokenで認証）"""
     sensor = db.query(models.Sensor).filter(models.Sensor.id == sensor_id).first()
     if not sensor:
         raise HTTPException(status_code=404, detail="Sensor not found")
@@ -200,7 +194,6 @@ async def upload_sensor_photo(
         f.write(await file.read())
 
     url_path = f"/sensor-photos/{sensor_id}/{filename}"
-
     photo = models.SensorPhoto(
         sensor_id=sensor_id,
         file_path=url_path,
@@ -229,7 +222,8 @@ def get_sensor_photos(
 
 
 # ----------------------------------------------------------------
-# 圃場ごとの最新センサー値サマリー（フロントのホーム画面向け）
+# 圃場ごとの最新センサー値サマリー（ホーム画面向け）
+# show_on_home=True のセンサーを優先。なければ最小IDの有効センサー。
 # ----------------------------------------------------------------
 
 @router.get("/fields/{field_id}/sensor-summary", response_model=schemas.FieldSensorSummary)
@@ -242,12 +236,24 @@ def field_sensor_summary(
     if not field:
         raise HTTPException(status_code=404, detail="Field not found")
 
+    # show_on_home=True を優先、なければ最小IDの有効センサー
     primary_sensor = (
         db.query(models.Sensor)
-        .filter(models.Sensor.field_id == field_id, models.Sensor.active == True)
+        .filter(
+            models.Sensor.field_id == field_id,
+            models.Sensor.active == True,
+            models.Sensor.show_on_home == True,
+        )
         .order_by(models.Sensor.id.asc())
         .first()
     )
+    if not primary_sensor:
+        primary_sensor = (
+            db.query(models.Sensor)
+            .filter(models.Sensor.field_id == field_id, models.Sensor.active == True)
+            .order_by(models.Sensor.id.asc())
+            .first()
+        )
 
     if not primary_sensor:
         return schemas.FieldSensorSummary(
@@ -290,14 +296,13 @@ def field_sensor_summary(
 
 
 # ----------------------------------------------------------------
-# ダミーデータ生成（センサー未接続時の開発用・認証不要）
+# ダミーデータ生成（開発用）
 # ----------------------------------------------------------------
 
 @router.post("/dev/seed-sensor-dummy")
 def seed_sensor_dummy(
     db: Session = Depends(get_db),
 ):
-    """全圃場にダミーセンサーと計測値を生成する（開発用・認証不要）"""
     fields = db.query(models.Field).all()
     if not fields:
         raise HTTPException(status_code=400, detail="No fields found. Create fields first.")
@@ -318,6 +323,7 @@ def seed_sensor_dummy(
             active=True,
             token=dummy_token,
             features=[],
+            show_on_home=False,
         )
         db.add(sensor)
         db.flush()

@@ -193,15 +193,14 @@ class SensorFeatureType(Base):
 class Sensor(Base):
     """圃場に設置されたセンサー機器"""
     __tablename__ = "sensors"
-    id         = Column(Integer, primary_key=True)
-    field_id   = Column(Integer, ForeignKey("fields.id"), nullable=False)
-    name       = Column(String(100), nullable=False)
-    active     = Column(Boolean, default=True)
-    token      = Column(String(15), nullable=False)
-    # features: sensor_feature_types.id のリスト  例: [2, 4, 7]
-    # MySQL JSON型。未設定は空リスト
-    features   = Column(JSON, nullable=False, default=list)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    id           = Column(Integer, primary_key=True)
+    field_id     = Column(Integer, ForeignKey("fields.id"), nullable=False)
+    name         = Column(String(100), nullable=False)
+    active       = Column(Boolean, default=True)
+    token        = Column(String(15), nullable=False)
+    features     = Column(JSON, nullable=False, default=list)
+    show_on_home = Column(Boolean, default=False)  # ホーム画面に表示するか
+    created_at   = Column(DateTime, default=datetime.utcnow)
     field    = relationship("Field", back_populates="sensors")
     readings = relationship("SensorReading", back_populates="sensor", cascade="all, delete-orphan")
     photos   = relationship("SensorPhoto",   back_populates="sensor", cascade="all, delete-orphan")

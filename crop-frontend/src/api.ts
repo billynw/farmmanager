@@ -112,7 +112,8 @@ export interface SensorOut {
   name: string
   active: boolean
   token: string
-  features: number[]   // sensor_feature_types.id のリスト
+  features: number[]
+  show_on_home: boolean
 }
 
 export interface SensorReadingOut {
@@ -187,7 +188,6 @@ export const itemsApi = {
   delete: (id: number) => api.delete(`/items/${id}`),
 }
 
-/** 英大文字+英小文字+数字15文字のランダムトークンを生成する */
 export function generateSensorToken(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
   return Array.from({ length: 15 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
@@ -200,9 +200,9 @@ export const sensorFeatureTypesApi = {
 export const sensorsApi = {
   list: (field_id?: number) => api.get<SensorOut[]>('/sensors', { params: { field_id } }),
   get: (id: number) => api.get<SensorOut>(`/sensors/${id}`),
-  create: (data: { field_id: number; name: string; active?: boolean; token: string; features?: number[] }) =>
+  create: (data: { field_id: number; name: string; active?: boolean; token: string; features?: number[]; show_on_home?: boolean }) =>
     api.post<SensorOut>('/sensors', data),
-  update: (id: number, data: { name?: string; active?: boolean; field_id?: number; features?: number[] }) =>
+  update: (id: number, data: { name?: string; active?: boolean; field_id?: number; features?: number[]; show_on_home?: boolean }) =>
     api.put<SensorOut>(`/sensors/${id}`, data),
   delete: (id: number) => api.delete(`/sensors/${id}`),
   readings: (sensor_id: number, metric?: string, limit = 24) =>

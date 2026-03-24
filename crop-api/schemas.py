@@ -164,12 +164,12 @@ class SensorCreate(BaseModel):
     name: str
     active: bool = True
     token: str
-    features: List[int] = []   # sensor_feature_types.id のリスト
+    features: List[int] = []
+    show_on_home: bool = False
 
     @field_validator("features")
     @classmethod
     def features_unique(cls, v: List[int]) -> List[int]:
-        """重複IDを除去して返す"""
         seen = []
         for x in v:
             if x not in seen:
@@ -180,7 +180,8 @@ class SensorUpdate(BaseModel):
     name: Optional[str] = None
     active: Optional[bool] = None
     field_id: Optional[int] = None
-    features: Optional[List[int]] = None   # None のとき更新しない
+    features: Optional[List[int]] = None
+    show_on_home: Optional[bool] = None
 
     @field_validator("features")
     @classmethod
@@ -199,7 +200,8 @@ class SensorOut(BaseModel):
     name: str
     active: bool
     token: str
-    features: List[int] = []   # sensor_feature_types.id のリスト
+    features: List[int] = []
+    show_on_home: bool = False
     model_config = {"from_attributes": True}
 
 # --- SensorReading ---
@@ -227,7 +229,6 @@ class SensorPhotoOut(BaseModel):
     taken_at: datetime
     model_config = {"from_attributes": True}
 
-# センサーの最新値をmetricごとにまとめたもの（フロント向け集約）
 class SensorLatestReading(BaseModel):
     metric: str
     value: float
