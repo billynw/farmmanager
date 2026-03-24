@@ -92,7 +92,7 @@ class PhotoOut(BaseModel):
     taken_at: Optional[datetime]
     model_config = {"from_attributes": True}
 
-# --- WorkLog (簡易版) ---
+# --- WorkLog ---
 class WorkLogSimple(BaseModel):
     id: int
     worked_at: datetime
@@ -119,7 +119,6 @@ class ItemOut(BaseModel):
     latest_work_log: Optional[WorkLogSimple] = None
     model_config = {"from_attributes": True}
 
-# --- WorkLog ---
 class WorkLogCreate(BaseModel):
     item_id: int
     work_type_id: Optional[int] = None
@@ -159,40 +158,40 @@ class SensorFeatureTypeOut(BaseModel):
     model_config = {"from_attributes": True}
 
 # --- Sensor ---
+def _unique(v: List[int]) -> List[int]:
+    seen = []
+    for x in v:
+        if x not in seen:
+            seen.append(x)
+    return seen
+
 class SensorCreate(BaseModel):
     field_id: int
     name: str
     active: bool = True
     token: str
     features: List[int] = []
-    show_on_home: bool = False
+    # ホームに表示する feature_type id のリスト（featuresのサブセット）
+    show_on_home: List[int] = []
 
-    @field_validator("features")
+    @field_validator("features", "show_on_home")
     @classmethod
-    def features_unique(cls, v: List[int]) -> List[int]:
-        seen = []
-        for x in v:
-            if x not in seen:
-                seen.append(x)
-        return seen
+    def ids_unique(cls, v: List[int]) -> List[int]:
+        return _unique(v)
 
 class SensorUpdate(BaseModel):
     name: Optional[str] = None
     active: Optional[bool] = None
     field_id: Optional[int] = None
     features: Optional[List[int]] = None
-    show_on_home: Optional[bool] = None
+    show_on_home: Optional[List[int]] = None
 
-    @field_validator("features")
+    @field_validator("features", "show_on_home")
     @classmethod
-    def features_unique(cls, v: Optional[List[int]]) -> Optional[List[int]]:
+    def ids_unique(cls, v: Optional[List[int]]) -> Optional[List[int]]:
         if v is None:
             return v
-        seen = []
-        for x in v:
-            if x not in seen:
-                seen.append(x)
-        return seen
+        return _unique(v)
 
 class SensorOut(BaseModel):
     id: int
@@ -201,7 +200,7 @@ class SensorOut(BaseModel):
     active: bool
     token: str
     features: List[int] = []
-    show_on_home: bool = False
+    show_on_home: List[int] = []  # ホームに表示する feature_type id のリスト
     model_config = {"from_attributes": True}
 
 # --- SensorReading ---

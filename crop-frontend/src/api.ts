@@ -112,8 +112,8 @@ export interface SensorOut {
   name: string
   active: boolean
   token: string
-  features: number[]
-  show_on_home: boolean
+  features: number[]       // 有効な機能IDリスト
+  show_on_home: number[]   // ホームに表示する機能IDリスト
 }
 
 export interface SensorReadingOut {
@@ -200,9 +200,9 @@ export const sensorFeatureTypesApi = {
 export const sensorsApi = {
   list: (field_id?: number) => api.get<SensorOut[]>('/sensors', { params: { field_id } }),
   get: (id: number) => api.get<SensorOut>(`/sensors/${id}`),
-  create: (data: { field_id: number; name: string; active?: boolean; token: string; features?: number[]; show_on_home?: boolean }) =>
+  create: (data: { field_id: number; name: string; active?: boolean; token: string; features?: number[]; show_on_home?: number[] }) =>
     api.post<SensorOut>('/sensors', data),
-  update: (id: number, data: { name?: string; active?: boolean; field_id?: number; features?: number[]; show_on_home?: boolean }) =>
+  update: (id: number, data: { name?: string; active?: boolean; field_id?: number; features?: number[]; show_on_home?: number[] }) =>
     api.put<SensorOut>(`/sensors/${id}`, data),
   delete: (id: number) => api.delete(`/sensors/${id}`),
   readings: (sensor_id: number, metric?: string, limit = 24) =>

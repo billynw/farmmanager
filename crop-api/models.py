@@ -20,7 +20,6 @@ class ItemStatus(str, enum.Enum):
 
 
 class UserField(Base):
-    """User と Field の中間テーブル（圃場ごとの権限付き）"""
     __tablename__ = "user_fields"
     user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
     field_id = Column(Integer, ForeignKey("fields.id"), primary_key=True)
@@ -183,7 +182,6 @@ class Harvest(Base):
 
 
 class SensorFeatureType(Base):
-    """センサー機能マスタ（sensor_feature_types テーブル）"""
     __tablename__ = "sensor_feature_types"
     id    = Column(Integer, primary_key=True)
     key   = Column(String(50), nullable=False, unique=True)
@@ -191,15 +189,16 @@ class SensorFeatureType(Base):
 
 
 class Sensor(Base):
-    """圃場に設置されたセンサー機器"""
     __tablename__ = "sensors"
     id           = Column(Integer, primary_key=True)
     field_id     = Column(Integer, ForeignKey("fields.id"), nullable=False)
     name         = Column(String(100), nullable=False)
     active       = Column(Boolean, default=True)
     token        = Column(String(15), nullable=False)
+    # features: sensor_feature_types.id のリスト  例: [1, 4, 7]
     features     = Column(JSON, nullable=False, default=list)
-    show_on_home = Column(Boolean, default=False)  # ホーム画面に表示するか
+    # show_on_home: ホームに表示する feature_type id のリスト  例: [4, 7]
+    show_on_home = Column(JSON, nullable=False, default=list)
     created_at   = Column(DateTime, default=datetime.utcnow)
     field    = relationship("Field", back_populates="sensors")
     readings = relationship("SensorReading", back_populates="sensor", cascade="all, delete-orphan")
@@ -207,7 +206,6 @@ class Sensor(Base):
 
 
 class SensorReading(Base):
-    """センサーの計測値（metric単位で1レコード）"""
     __tablename__ = "sensor_readings"
     id          = Column(Integer, primary_key=True)
     sensor_id   = Column(Integer, ForeignKey("sensors.id"), nullable=False)
@@ -219,7 +217,6 @@ class SensorReading(Base):
 
 
 class SensorPhoto(Base):
-    """センサーカメラが送ってくる写真"""
     __tablename__ = "sensor_photos"
     id         = Column(Integer, primary_key=True)
     sensor_id  = Column(Integer, ForeignKey("sensors.id"), nullable=False)
