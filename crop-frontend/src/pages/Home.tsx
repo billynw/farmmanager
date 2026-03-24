@@ -115,29 +115,26 @@ function FieldSensorBlock({ field }: { field: Field }) {
     queryFn: () => sensorsApi.list(field.id).then(r => r.data),
   })
 
-  const activeSensor = (() => {
-    const active = sensors.filter(s => s.active)
-    const withHome = active.filter(s => (s.show_on_home ?? []).length > 0)
-    if (withHome.length > 0) return withHome.sort((a, b) => a.id - b.id)[0]
-    return active.sort((a, b) => a.id - b.id)[0] ?? null
-  })()
+  // show_on_home が1つ以上設定されている有効センサーだけ対象
+  const activeSensor = sensors
+    .filter(s => s.active && (s.show_on_home ?? []).length > 0)
+    .sort((a, b) => a.id - b.id)[0] ?? null
 
-  const showOnHomeIds: number[] = activeSensor?.show_on_home ?? []
-  const targetMetrics: string[] = showOnHomeIds.length > 0
-    ? [...new Set(showOnHomeIds.map(id => FEATURE_TO_METRIC[id]).filter((m): m is string => m !== null))]
+  // show_on_home のfeature IDから表示すべき metricを決定
+  const targetMetrics: string[] = activeSensor
+    ? [...new Set(
+        (activeSensor.show_on_home ?? [])
+          .map(id => FEATURE_TO_METRIC[id])
+          .filter((m): m is string => m !== null)
+      )]
     : []
 
-  const useFallback = !!activeSensor && showOnHomeIds.length === 0
+  // show_on_home 設定済みセンサーがなければブロック自体を非表示
+  if (!activeSensor || targetMetrics.length === 0) return null
 
   return (
     <div style={{ marginBottom: 10 }}>
-      {useFallback ? (
-        <FallbackSensorGrid fieldName={field.name} fieldId={field.id} />
-      ) : targetMetrics.length > 0 ? (
-        <SensorReadingsGrid fieldName={field.name} sensorId={activeSensor!.id} targetMetrics={targetMetrics} />
-      ) : (
-        <EmptySensorGrid fieldName={field.name} />
-      )}
+      <SensorReadingsGrid fieldName={field.name} sensorId={activeSensor.id} targetMetrics={targetMetrics} />
     </div>
   )
 }
@@ -158,7 +155,7 @@ function SensorReadingsGrid({ fieldName, sensorId, targetMetrics }: { fieldName:
     .filter(m => latestByMetric[m] !== undefined)
     .map(m => ({ metric: m, ...latestByMetric[m] }))
 
-  if (displayReadings.length === 0) return <EmptySensorGrid fieldName={fieldName} />
+  if (displayReadings.length === 0) return null
 
   return (
     <SensorBox fieldName={fieldName}>
@@ -172,39 +169,6 @@ function SensorReadingsGrid({ fieldName, sensorId, targetMetrics }: { fieldName:
   )
 }
 
-function FallbackSensorGrid({ fieldName, fieldId }: { fieldName: string; fieldId: number }) {
-  const { data: sensorSummary } = useQuery({
-    queryKey: ['sensor-summary', fieldId],
-    queryFn: () => fieldsApi.sensorSummary(fieldId).then(r => r.data),
-  })
-  const readings = sensorSummary?.sensors[0]?.latest ?? []
-  if (readings.length === 0) return <EmptySensorGrid fieldName={fieldName} />
-  return (
-    <SensorBox fieldName={fieldName}>
-      {readings.map(r => {
-        const cfg = METRIC_CONFIG[r.metric]
-        if (!cfg) return null
-        const pct = (r.value - cfg.min) / (cfg.max - cfg.min) * 100
-        return <SensorCard key={r.metric} label={cfg.label} value={r.value} unit={r.unit ?? cfg.unit} color={cfg.color} pct={pct} />
-      })}
-    </SensorBox>
-  )
-}
-
-function EmptySensorGrid({ fieldName }: { fieldName: string }) {
-  return (
-    <SensorBox fieldName={fieldName}>
-      {['水位', '水温', '気温', '地中水分'].map(label => (
-        <div key={label} style={{ background: '#f5f5f5', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px', opacity: 0.5 }}>
-          <div style={{ fontSize: 10, color: '#999', marginBottom: 3 }}>{label}</div>
-          <div style={{ fontSize: 16, fontWeight: 500, color: '#bbb' }}>--</div>
-        </div>
-      ))}
-    </SensorBox>
-  )
-}
-
-/** センサーカードを囲む白枠。上部に圃場名を表示 */
 function SensorBox({ fieldName, children }: { fieldName: string; children: React.ReactNode }) {
   return (
     <div style={{
