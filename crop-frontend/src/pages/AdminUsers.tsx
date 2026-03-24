@@ -103,7 +103,7 @@ export default function AdminUsers() {
   const [togglingUserId, setTogglingUserId] = useState<number | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
 
-  const [sensorFieldId, setSensorFieldId] = useState<number | null>(null)
+  const [sensorFieldId, setSensorFieldId] = useState<number | null>(null)  // null = 全て
   const [sensorModal, setSensorModal] = useState<SensorModal | null>(null)
   const [sensorForm, setSensorForm] = useState({
     name: '', active: true, field_id: 0,
@@ -125,11 +125,10 @@ export default function AdminUsers() {
     enabled: !!selectedFieldId,
   })
 
-  const activeSensorFieldId = sensorFieldId ?? manageableFields[0]?.id ?? null
+  // sensorFieldId=null のとき「全て」= field_id 未指定で全センサー取得
   const { data: sensors = [], refetch: refetchSensors } = useQuery({
-    queryKey: ['sensors', activeSensorFieldId],
-    queryFn: () => sensorsApi.list(activeSensorFieldId!).then(r => r.data),
-    enabled: !!activeSensorFieldId,
+    queryKey: ['sensors', sensorFieldId],
+    queryFn: () => sensorsApi.list(sensorFieldId ?? undefined).then(r => r.data),
   })
 
   const { data: featureTypes = [] } = useQuery({
@@ -142,10 +141,7 @@ export default function AdminUsers() {
       setSelectedFieldId(manageableFields[0].id)
   }, [manageableFields.length])
 
-  useEffect(() => {
-    if (manageableFields.length > 0 && !sensorFieldId)
-      setSensorFieldId(manageableFields[0].id)
-  }, [manageableFields.length])
+  // センサータブはデフォルト null（全て）のまま — 自動選択しない
 
   const deleteFieldMut = useMutation({
     mutationFn: (id: number) => fieldsApi.delete(id),
@@ -191,7 +187,7 @@ export default function AdminUsers() {
   const openAddSensor = () => {
     setSensorForm({
       name: '', active: true,
-      field_id: activeSensorFieldId ?? manageableFields[0]?.id ?? 0,
+      field_id: sensorFieldId ?? manageableFields[0]?.id ?? 0,
       features: defaultFeatures,
       show_on_home: [],
     })
@@ -451,9 +447,10 @@ export default function AdminUsers() {
               <div style={{ padding: '8px 16px', background: '#fff', borderBottom: '1px solid #eee' }}>
                 <select
                   style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 16 }}
-                  value={activeSensorFieldId ?? ''}
-                  onChange={e => setSensorFieldId(Number(e.target.value))}
+                  value={sensorFieldId ?? ''}
+                  onChange={e => setSensorFieldId(e.target.value === '' ? null : Number(e.target.value))}
                 >
+                  <option value="">全て</option>
                   {manageableFields.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                 </select>
               </div>
