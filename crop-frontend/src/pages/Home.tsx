@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { fieldsApi, sensorsApi, itemsApi } from '../api'
@@ -34,6 +35,7 @@ function formatDate(dateStr: string) {
 
 export default function Home() {
   const navigate = useNavigate()
+  const [selectedFieldId, setSelectedFieldId] = useState<number | null>(null)
 
   const { data: fields = [] } = useQuery<Field[]>({
     queryKey: ['fields'],
@@ -43,6 +45,8 @@ export default function Home() {
     queryKey: ['items', 'home'],
     queryFn: () => itemsApi.list({ status: 'growing' }).then(r => r.data),
   })
+
+  const activeFieldId = selectedFieldId ?? fields[0]?.id ?? null
 
   const recentItems = [...items]
     .filter(item => item.latest_work_log)
@@ -56,9 +60,19 @@ export default function Home() {
 
         <div style={sectionLabelStyle}>センサー概要</div>
 
-        {fields.map(field => (
-          <FieldSensorBlock key={field.id} field={field} />
-        ))}
+        {/* 圃場切り替えピル */}
+        {fields.length > 1 && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10, overflowX: 'auto', paddingBottom: 2 }}>
+            {fields.map(f => (
+              <div key={f.id} onClick={() => setSelectedFieldId(f.id)}
+                style={f.id === activeFieldId ? activePillStyle : pillStyle}>
+                {f.name}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeFieldId && <FieldSensorBlock fieldId={activeFieldId} />}
 
         <div style={{ height: 1, background: '#eee', margin: '12px 0' }} />
 
@@ -109,10 +123,10 @@ export default function Home() {
   )
 }
 
-function FieldSensorBlock({ field }: { field: Field }) {
+function FieldSensorBlock({ fieldId }: { fieldId: number }) {
   const { data: sensors = [] } = useQuery<SensorOut[]>({
-    queryKey: ['sensors-home', field.id],
-    queryFn: () => sensorsApi.list(field.id).then(r => r.data),
+    queryKey: ['sensors-home', fieldId],
+    queryFn: () => sensorsApi.list(fieldId).then(r => r.data),
   })
 
   const activeSensor = sensors
@@ -127,16 +141,23 @@ function FieldSensorBlock({ field }: { field: Field }) {
       )]
     : []
 
-  if (!activeSensor || targetMetrics.length === 0) return null
+  if (!activeSensor || targetMetrics.length === 0) {
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 16, opacity: 0.4 }}>
+        {['水位', '水温', '気温', '地中水分'].map(label => (
+          <div key={label} style={{ background: '#fff', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px' }}>
+            <div style={{ fontSize: 10, color: '#999', marginBottom: 3 }}>{label}</div>
+            <div style={{ fontSize: 16, fontWeight: 500, color: '#bbb' }}>--</div>
+          </div>
+        ))}
+      </div>
+    )
+  }
 
-  return (
-    <div style={{ marginBottom: 10 }}>
-      <SensorReadingsGrid fieldName={field.name} sensorId={activeSensor.id} targetMetrics={targetMetrics} />
-    </div>
-  )
+  return <SensorReadingsGrid sensorId={activeSensor.id} targetMetrics={targetMetrics} />
 }
 
-function SensorReadingsGrid({ fieldName, sensorId, targetMetrics }: { fieldName: string; sensorId: number; targetMetrics: string[] }) {
+function SensorReadingsGrid({ sensorId, targetMetrics }: { sensorId: number; targetMetrics: string[] }) {
   const { data: readings = [] } = useQuery<SensorReadingOut[]>({
     queryKey: ['sensor-readings-home', sensorId],
     queryFn: () => sensorsApi.readings(sensorId, undefined, 200).then(r => r.data),
@@ -150,7 +171,7 @@ function SensorReadingsGrid({ fieldName, sensorId, targetMetrics }: { fieldName:
   }
 
   return (
-    <SensorBox fieldName={fieldName}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 16 }}>
       {targetMetrics.map(m => {
         const cfg = METRIC_CONFIG[m]
         if (!cfg) return null
@@ -159,35 +180,15 @@ function SensorReadingsGrid({ fieldName, sensorId, targetMetrics }: { fieldName:
           const pct = (data.value - cfg.min) / (cfg.max - cfg.min) * 100
           return <SensorCard key={m} label={cfg.label} value={data.value} unit={data.unit ?? cfg.unit} color={cfg.color} pct={pct} />
         }
-        // データなし → --プレースホルダー
         return <SensorCardEmpty key={m} label={cfg.label} color={cfg.color} />
       })}
-    </SensorBox>
-  )
-}
-
-function SensorBox({ fieldName, children }: { fieldName: string; children: React.ReactNode }) {
-  return (
-    <div style={{
-      background: '#fff',
-      border: '1px solid #eee',
-      borderRadius: 10,
-      padding: '10px 10px 8px',
-      boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
-    }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: '#888', marginBottom: 8 }}>
-        {fieldName}
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
-        {children}
-      </div>
     </div>
   )
 }
 
 function SensorCard({ label, value, unit, color, pct }: { label: string; value: number; unit: string; color: string; pct: number }) {
   return (
-    <div style={{ background: '#f8f9fa', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px' }}>
+    <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px' }}>
       <div style={{ fontSize: 10, color: '#999', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 3 }}>
         <div style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
         {label}
@@ -204,7 +205,7 @@ function SensorCard({ label, value, unit, color, pct }: { label: string; value: 
 
 function SensorCardEmpty({ label, color }: { label: string; color: string }) {
   return (
-    <div style={{ background: '#f8f9fa', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px', opacity: 0.5 }}>
+    <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px', opacity: 0.4 }}>
       <div style={{ fontSize: 10, color: '#999', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 3 }}>
         <div style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
         {label}
@@ -218,3 +219,5 @@ function SensorCardEmpty({ label, color }: { label: string; color: string }) {
 const pageStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', height: '100dvh', background: '#f5f5f0' }
 const sectionLabelStyle: React.CSSProperties = { fontSize: 12, color: '#999', marginBottom: 8, marginTop: 4 }
 const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 10, padding: '14px 16px', marginBottom: 8, cursor: 'pointer', border: '1px solid #eee' }
+const pillStyle: React.CSSProperties = { padding: '5px 12px', borderRadius: 20, border: '1px solid #ddd', background: '#fff', fontSize: 12, color: '#666', whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0 }
+const activePillStyle: React.CSSProperties = { ...pillStyle, background: '#2d7a4f', borderColor: '#2d7a4f', color: '#fff' }
