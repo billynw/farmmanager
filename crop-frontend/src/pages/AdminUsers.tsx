@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { usersApi, fieldsApi, sensorsApi, sensorFeatureTypesApi, generateSensorToken } from '../api'
-import type { UserFieldRole, SensorOut } from '../api'
+import type { UserFieldRole, SensorOut, SensorFeatureType } from '../api'
 import { useAuth } from '../store'
 import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
@@ -20,52 +20,8 @@ type SensorModal =
   | { mode: 'edit'; sensor: SensorOut }
   | { mode: 'wifi'; sensor: SensorOut }
 
-type GateType = 'supply' | 'drain' | null
-const GATE_SUPPLY_ID = 2
-const GATE_DRAIN_ID  = 3
-
-interface SensorFeatures {
-  camera: boolean
-  gate: GateType
-  tempHumidity: boolean
-  soilMoisture: boolean
-  waterTemp: boolean
-  waterLevel: boolean
-}
-
-const defaultFeatures: SensorFeatures = {
-  camera: false,
-  gate: null,
-  tempHumidity: false,
-  soilMoisture: false,
-  waterTemp: false,
-  waterLevel: false,
-}
-
-function idsToFeatures(ids: number[]): SensorFeatures {
-  return {
-    camera:       ids.includes(1),
-    gate:         ids.includes(GATE_SUPPLY_ID) ? 'supply'
-                : ids.includes(GATE_DRAIN_ID)  ? 'drain'
-                : null,
-    tempHumidity: ids.includes(4),
-    soilMoisture: ids.includes(5),
-    waterTemp:    ids.includes(6),
-    waterLevel:   ids.includes(7),
-  }
-}
-
-function featuresToIds(f: SensorFeatures): number[] {
-  const ids: number[] = []
-  if (f.camera)            ids.push(1)
-  if (f.gate === 'supply') ids.push(GATE_SUPPLY_ID)
-  if (f.gate === 'drain')  ids.push(GATE_DRAIN_ID)
-  if (f.tempHumidity)      ids.push(4)
-  if (f.soilMoisture)      ids.push(5)
-  if (f.waterTemp)         ids.push(6)
-  if (f.waterLevel)        ids.push(7)
-  return ids
-}
+// ゲート系 key（特殊UIのため個別処理）
+const GATE_KEYS = ['gate_supply', 'gate_drain']
 
 const ROLE_LABEL: Record<UserFieldRole, string> = {
   owner: 'オーナー',
@@ -105,9 +61,10 @@ export default function AdminUsers() {
 
   const [sensorFieldId, setSensorFieldId] = useState<number | null>(null)
   const [sensorModal, setSensorModal] = useState<SensorModal | null>(null)
+  // features は選択中の feature_type id のセット
   const [sensorForm, setSensorForm] = useState({
     name: '', active: true, field_id: 0,
-    features: defaultFeatures,
+    featureIds: [] as number[],
   })
   const [wifiForm, setWifiForm] = useState({ ssid: '', password: '' })
   const [showWifiPassword, setShowWifiPassword] = useState(false)
@@ -134,35 +91,44 @@ export default function AdminUsers() {
     queryFn: () => sensorFeatureTypesApi.list().then(r => r.data),
   })
 
+  // ゲート系 featureType
+  const gateSupplyFt = featureTypes.find(f => f.key === 'gate_supply')
+  const gateDrainFt  = featureTypes.find(f => f.key === 'gate_drain')
+  // ゲート以外
+  const normalFts = featureTypes.filter(f => !GATE_KEYS.includes(f.key))
+
+  // 現在選択中のゲート種別
+  const selectedGateId = sensorForm.featureIds.includes(gateSupplyFt?.id ?? -1)
+    ? gateSupplyFt?.id
+    : sensorForm.featureIds.includes(gateDrainFt?.id ?? -1)
+    ? gateDrainFt?.id
+    : null
+
   useEffect(() => {
     if (manageableFields.length > 0 && !selectedFieldId)
       setSelectedFieldId(manageableFields[0].id)
   }, [manageableFields.length])
 
-  const deleteFieldMut = useMutation({
-    mutationFn: (id: number) => fieldsApi.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['fields'] }); setDeleteTarget(null) },
-    onError: (err: any) => alert(err.response?.data?.detail ?? '削除に失敗しました'),
-  })
-
-  const deleteUserMut = useMutation({
-    mutationFn: ({ userId, fieldId }: { userId: number; fieldId: number }) =>
-      usersApi.removeFromField(userId, fieldId),
-    onSuccess: () => { refetchUsers(); setDeleteTarget(null) },
-    onError: (err: any) => alert(err.response?.data?.detail ?? '削除に失敗しました'),
-  })
-
-  const deleteSensorMut = useMutation({
-    mutationFn: (id: number) => sensorsApi.delete(id),
-    onSuccess: () => { refetchSensors(); setDeleteTarget(null) },
-    onError: (err: any) => alert(err.response?.data?.detail ?? '削除に失敗しました'),
-  })
-
   const handleConfirmDelete = () => {
     if (!deleteTarget) return
-    if (deleteTarget.type === 'field') deleteFieldMut.mutate(deleteTarget.id)
-    if (deleteTarget.type === 'user') deleteUserMut.mutate({ userId: deleteTarget.id, fieldId: (deleteTarget as any).fieldId })
-    if (deleteTarget.type === 'sensor') deleteSensorMut.mutate(deleteTarget.id)
+    if (deleteTarget.type === 'field') {
+      fieldsApi.delete(deleteTarget.id).then(() => {
+        qc.invalidateQueries({ queryKey: ['fields'] })
+        setDeleteTarget(null)
+      }).catch((err: any) => alert(err.response?.data?.detail ?? '削除に失敗しました'))
+    }
+    if (deleteTarget.type === 'user') {
+      usersApi.removeFromField(deleteTarget.id, (deleteTarget as any).fieldId).then(() => {
+        refetchUsers()
+        setDeleteTarget(null)
+      }).catch((err: any) => alert(err.response?.data?.detail ?? '削除に失敗しました'))
+    }
+    if (deleteTarget.type === 'sensor') {
+      sensorsApi.delete(deleteTarget.id).then(() => {
+        refetchSensors()
+        setDeleteTarget(null)
+      }).catch((err: any) => alert(err.response?.data?.detail ?? '削除に失敗しました'))
+    }
   }
 
   const handleRoleToggle = async (userId: number, currentRole: UserFieldRole) => {
@@ -184,7 +150,7 @@ export default function AdminUsers() {
     setSensorForm({
       name: '', active: true,
       field_id: sensorFieldId ?? manageableFields[0]?.id ?? 0,
-      features: defaultFeatures,
+      featureIds: [],
     })
     setSensorModal({ mode: 'add' })
   }
@@ -194,7 +160,7 @@ export default function AdminUsers() {
       name: sensor.name,
       active: sensor.active,
       field_id: sensor.field_id,
-      features: idsToFeatures(sensor.features ?? []),
+      featureIds: sensor.features ?? [],
     })
     setSensorModal({ mode: 'edit', sensor })
   }
@@ -206,30 +172,59 @@ export default function AdminUsers() {
     setSensorModal({ mode: 'wifi', sensor })
   }
 
+  const toggleFeatureId = (id: number, checked: boolean) => {
+    setSensorForm(f => ({
+      ...f,
+      featureIds: checked
+        ? [...f.featureIds, id]
+        : f.featureIds.filter(x => x !== id),
+    }))
+  }
+
+  // ゲートのチェックON/OFF
+  const handleGateCheck = (checked: boolean) => {
+    if (!gateSupplyFt) return
+    setSensorForm(f => ({
+      ...f,
+      featureIds: checked
+        ? [...f.featureIds.filter(x => x !== gateDrainFt?.id), gateSupplyFt.id]
+        : f.featureIds.filter(x => x !== gateSupplyFt.id && x !== gateDrainFt?.id),
+    }))
+  }
+
+  // ゲートの給水↔排水トグル
+  const handleGateToggle = () => {
+    if (!gateSupplyFt || !gateDrainFt) return
+    setSensorForm(f => {
+      const hasSupply = f.featureIds.includes(gateSupplyFt.id)
+      const hasDrain  = f.featureIds.includes(gateDrainFt.id)
+      if (!hasSupply && !hasDrain) return f
+      const without = f.featureIds.filter(x => x !== gateSupplyFt.id && x !== gateDrainFt.id)
+      return { ...f, featureIds: [...without, hasSupply ? gateDrainFt.id : gateSupplyFt.id] }
+    })
+  }
+
   const handleSensorSubmit = async () => {
     if (!sensorForm.name.trim() || !sensorForm.field_id) return
     setSensorSubmitting(true)
     try {
-      const featureIds = featuresToIds(sensorForm.features)
       if (sensorModal?.mode === 'add') {
-        const token = generateSensorToken()
         await sensorsApi.create({
           field_id: sensorForm.field_id,
           name: sensorForm.name.trim(),
           active: sensorForm.active,
-          token,
-          features: featureIds,
+          token: generateSensorToken(),
+          features: sensorForm.featureIds,
           show_on_home: [],
         })
       } else if (sensorModal?.mode === 'edit') {
         const prev = (sensorModal as { mode: 'edit'; sensor: SensorOut }).sensor
-        // show_on_home は features に含まれるIDのみ残す（features変更で消えたものを除去）
-        const showOnHome = (prev.show_on_home ?? []).filter(id => featureIds.includes(id))
+        const showOnHome = (prev.show_on_home ?? []).filter(id => sensorForm.featureIds.includes(id))
         await sensorsApi.update(prev.id, {
           name: sensorForm.name.trim(),
           active: sensorForm.active,
           field_id: sensorForm.field_id,
-          features: featureIds,
+          features: sensorForm.featureIds,
           show_on_home: showOnHome,
         })
       }
@@ -242,7 +237,6 @@ export default function AdminUsers() {
     }
   }
 
-  // バッジタップで show_on_home をトグルして即保存
   const handleBadgeToggle = async (sensor: SensorOut, featureId: number) => {
     const current = sensor.show_on_home ?? []
     const next = current.includes(featureId)
@@ -273,28 +267,6 @@ export default function AdminUsers() {
     } finally {
       setSensorSubmitting(false)
     }
-  }
-
-  const handleFeatureChange = (key: keyof Omit<SensorFeatures, 'gate'>, checked: boolean) => {
-    setSensorForm(f => ({ ...f, features: { ...f.features, [key]: checked } }))
-  }
-
-  const handleGateCheck = (checked: boolean) => {
-    setSensorForm(f => ({
-      ...f,
-      features: { ...f.features, gate: checked ? 'supply' : null },
-    }))
-  }
-
-  const handleGateLabelClick = () => {
-    setSensorForm(f => {
-      const current = f.features.gate
-      if (current === null) return f
-      return {
-        ...f,
-        features: { ...f.features, gate: current === 'supply' ? 'drain' : 'supply' },
-      }
-    })
   }
 
   const tabs: { key: Tab; label: string }[] = [
@@ -466,7 +438,6 @@ export default function AdminUsers() {
                           {sensor.active ? '有効' : '無効'}
                         </span>
                       </div>
-                      {/* 機能バッジ: タップで show_on_home をトグル */}
                       {(sensor.features ?? []).length > 0 && (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
                           {(sensor.features ?? []).map(fid => {
@@ -581,42 +552,44 @@ export default function AdminUsers() {
               <label style={{ ...labelStyle, marginBottom: 10 }}>センサーの機能</label>
               <div style={featureBoxStyle}>
 
-                <FeatureCheckbox
-                  label="カメラ"
-                  checked={sensorForm.features.camera}
-                  onChange={v => handleFeatureChange('camera', v)}
-                />
+                {/* ゲート（特殊UI: 給水↔排水トグル） */}
+                {gateSupplyFt && gateDrainFt && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedGateId != null}
+                      onChange={e => handleGateCheck(e.target.checked)}
+                      style={{ width: 18, height: 18, accentColor: '#2d7a4f', flexShrink: 0 }}
+                    />
+                    <span
+                      onClick={handleGateToggle}
+                      style={{
+                        flex: 1, fontSize: 14,
+                        color: selectedGateId != null ? '#2d7a4f' : '#333',
+                        fontWeight: selectedGateId != null ? 600 : 400,
+                        cursor: selectedGateId != null ? 'pointer' : 'default',
+                        userSelect: 'none',
+                        borderBottom: selectedGateId != null ? '1px dashed #2d7a4f' : 'none',
+                        paddingBottom: 1,
+                      }}
+                    >
+                      {selectedGateId === gateDrainFt.id ? gateDrainFt.label : gateSupplyFt.label}
+                      {selectedGateId != null && (
+                        <span style={{ fontSize: 11, color: '#aaa', marginLeft: 6, fontWeight: 400 }}>（タップで切替）</span>
+                      )}
+                    </span>
+                  </div>
+                )}
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
-                  <input
-                    type="checkbox"
-                    checked={sensorForm.features.gate !== null}
-                    onChange={e => handleGateCheck(e.target.checked)}
-                    style={{ width: 18, height: 18, accentColor: '#2d7a4f', flexShrink: 0 }}
+                {/* 通常機能: DBから動的に描画 */}
+                {normalFts.map(ft => (
+                  <FeatureCheckbox
+                    key={ft.id}
+                    label={ft.label}
+                    checked={sensorForm.featureIds.includes(ft.id)}
+                    onChange={v => toggleFeatureId(ft.id, v)}
                   />
-                  <span
-                    onClick={handleGateLabelClick}
-                    style={{
-                      flex: 1, fontSize: 14,
-                      color: sensorForm.features.gate !== null ? '#2d7a4f' : '#333',
-                      fontWeight: sensorForm.features.gate !== null ? 600 : 400,
-                      cursor: sensorForm.features.gate !== null ? 'pointer' : 'default',
-                      userSelect: 'none',
-                      borderBottom: sensorForm.features.gate !== null ? '1px dashed #2d7a4f' : 'none',
-                      paddingBottom: 1,
-                    }}
-                  >
-                    {sensorForm.features.gate === 'drain' ? '排水ゲート' : '給水ゲート'}
-                    {sensorForm.features.gate !== null && (
-                      <span style={{ fontSize: 11, color: '#aaa', marginLeft: 6, fontWeight: 400 }}>（タップで切替）</span>
-                    )}
-                  </span>
-                </div>
-
-                <FeatureCheckbox label="温湿度センサ" checked={sensorForm.features.tempHumidity} onChange={v => handleFeatureChange('tempHumidity', v)} />
-                <FeatureCheckbox label="土壌水分センサ" checked={sensorForm.features.soilMoisture} onChange={v => handleFeatureChange('soilMoisture', v)} />
-                <FeatureCheckbox label="水温センサ" checked={sensorForm.features.waterTemp} onChange={v => handleFeatureChange('waterTemp', v)} />
-                <FeatureCheckbox label="水位センサ" checked={sensorForm.features.waterLevel} onChange={v => handleFeatureChange('waterLevel', v)} />
+                ))}
 
               </div>
             </div>
