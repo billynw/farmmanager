@@ -1,33 +1,30 @@
-import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { fieldsApi, sensorsApi, itemsApi } from '../api'
-import type { Item, Field } from '../api'
+import type { Item, Field, SensorOut, SensorReadingOut } from '../api'
 import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
 
 const METRIC_CONFIG: Record<string, { label: string; unit: string; color: string; max: number; min: number }> = {
-  water_level:   { label: '水位',    unit: 'cm',  color: '#378ADD', max: 25,  min: 0  },
-  water_temp:    { label: '水温',    unit: '\u00b0C', color: '#1D9E75', max: 35,  min: 10 },
-  air_temp:      { label: '気温',    unit: '\u00b0C', color: '#BA7517', max: 40,  min: 0  },
-  soil_moisture: { label: '地中水分', unit: '%',   color: '#639922', max: 100, min: 0  },
+  water_level:   { label: '\u6c34\u4f4d',    unit: 'cm',  color: '#378ADD', max: 25,  min: 0  },
+  water_temp:    { label: '\u6c34\u6e29',    unit: '\u00b0C', color: '#1D9E75', max: 35,  min: 10 },
+  air_temp:      { label: '\u6c17\u6e29',    unit: '\u00b0C', color: '#BA7517', max: 40,  min: 0  },
+  soil_moisture: { label: '\u5730\u4e2d\u6c34\u5206', unit: '%',   color: '#639922', max: 100, min: 0  },
   ph:            { label: 'pH',      unit: '',    color: '#8e44ad', max: 14,  min: 0  },
-  gate_open:     { label: 'ゲート',  unit: '',    color: '#e67e22', max: 1,   min: 0  },
+  gate_open:     { label: '\u30b2\u30fc\u30c8',  unit: '',    color: '#e67e22', max: 1,   min: 0  },
 }
 
-// feature_type id → metric 名のマッピング（ハードコーディング）
-// カメラ(1)は計測値なし、給水/排水ゲートは同じ metric
 const FEATURE_TO_METRIC: Record<number, string | null> = {
-  1: null,           // カメラ（計測値なし）
-  2: 'gate_open',    // 給水ゲート
-  3: 'gate_open',    // 排水ゲート
-  4: 'air_temp',     // 温湿度センサ
-  5: 'soil_moisture',// 土壌水分センサ
-  6: 'water_temp',   // 水温センサ
-  7: 'water_level',  // 水位センサ
+  1: null,
+  2: 'gate_open',
+  3: 'gate_open',
+  4: 'air_temp',
+  5: 'soil_moisture',
+  6: 'water_temp',
+  7: 'water_level',
 }
 
-const STATUS_LABEL: Record<string, string> = { growing: '栽培中', finished: '終了' }
+const STATUS_LABEL: Record<string, string> = { growing: '\u6d3b\u57f9\u4e2d', finished: '\u7d42\u4e86' }
 const STATUS_COLOR: Record<string, string> = { growing: '#2d7a4f', finished: '#888' }
 
 function formatDate(dateStr: string) {
@@ -37,7 +34,6 @@ function formatDate(dateStr: string) {
 
 export default function Home() {
   const navigate = useNavigate()
-  const [selectedFieldId, setSelectedFieldId] = useState<number | null>(null)
 
   const { data: fields = [] } = useQuery<Field[]>({
     queryKey: ['fields'],
@@ -48,104 +44,29 @@ export default function Home() {
     queryFn: () => itemsApi.list({ status: 'growing' }).then(r => r.data),
   })
 
-  const activeFieldId = selectedFieldId ?? fields[0]?.id ?? null
-  useEffect(() => {
-    if (!selectedFieldId && fields.length > 0) setSelectedFieldId(fields[0].id)
-  }, [fields, selectedFieldId])
-
-  // 選択圃場のセンサー一覧を取得（show_on_home の情報を使うため直接取得）
-  const { data: sensors = [] } = useQuery({
-    queryKey: ['sensors-home', activeFieldId],
-    queryFn: () => sensorsApi.list(activeFieldId!).then(r => r.data),
-    enabled: !!activeFieldId,
-  })
-
-  // show_on_home が設定されているセンサーを優先、なければ最小IDの有効センサー
-  const activeSensor = (() => {
-    const active = sensors.filter(s => s.active)
-    const withHome = active.filter(s => (s.show_on_home ?? []).length > 0)
-    if (withHome.length > 0) return withHome.sort((a, b) => a.id - b.id)[0]
-    return active.sort((a, b) => a.id - b.id)[0] ?? null
-  })()
-
-  // show_on_home のfeature IDから表示すべき metric を決定
-  const showOnHomeIds: number[] = activeSensor?.show_on_home ?? []
-  const targetMetrics: string[] = showOnHomeIds.length > 0
-    ? [...new Set(showOnHomeIds.map(id => FEATURE_TO_METRIC[id]).filter((m): m is string => m !== null))]
-    : []  // show_on_home 未設定なら何も表示しない（従来の sensor_summary は使わない）
-
-  // センサーの最新計測値を取得
-  const { data: readings = [] } = useQuery({
-    queryKey: ['sensor-readings-home', activeSensor?.id],
-    queryFn: () => sensorsApi.readings(activeSensor!.id, undefined, 200).then(r => r.data),
-    enabled: !!activeSensor,
-  })
-
-  // metric ごとに最新値だけ抽出し、targetMetrics の順で並べる
-  const latestByMetric: Record<string, { value: number; unit?: string }> = {}
-  for (const r of readings) {
-    if (!latestByMetric[r.metric]) {
-      latestByMetric[r.metric] = { value: r.value, unit: r.unit ?? undefined }
-    }
-  }
-  const displayReadings = targetMetrics
-    .filter(m => latestByMetric[m] !== undefined)
-    .map(m => ({ metric: m, ...latestByMetric[m] }))
-
   const recentItems = [...items]
     .filter(item => item.latest_work_log)
     .sort((a, b) => new Date(b.latest_work_log!.worked_at).getTime() - new Date(a.latest_work_log!.worked_at).getTime())
     .slice(0, 5)
-
-  // show_on_home 未設定かつセンサーあり → 従来表示（全metric）にフォールバック
-  const useFallback = !!activeSensor && showOnHomeIds.length === 0
 
   return (
     <div style={pageStyle}>
       <AppHeader />
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', paddingBottom: 72 }}>
 
-        <div style={sectionLabelStyle}>センサー概要</div>
-        {fields.length > 0 && (
-          <div style={{ display: 'flex', gap: 6, marginBottom: 10, overflowX: 'auto', paddingBottom: 2 }}>
-            {fields.map(f => (
-              <div key={f.id} onClick={() => setSelectedFieldId(f.id)}
-                style={f.id === activeFieldId ? activePillStyle : pillStyle}>
-                {f.name}
-              </div>
-            ))}
-          </div>
-        )}
+        <div style={sectionLabelStyle}>\u30bb\u30f3\u30b5\u30fc\u6982\u8981</div>
 
-        {useFallback ? (
-          // show_on_home 未設定 → 従来どおり sensor_summary から全metric表示
-          <FallbackSensorGrid fieldId={activeFieldId} />
-        ) : displayReadings.length > 0 ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 16 }}>
-            {displayReadings.map(r => {
-              const cfg = METRIC_CONFIG[r.metric]
-              if (!cfg) return null
-              const pct = (r.value - cfg.min) / (cfg.max - cfg.min) * 100
-              return <SensorCard key={r.metric} label={cfg.label} value={r.value} unit={r.unit ?? cfg.unit} color={cfg.color} pct={pct} />
-            })}
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 16, opacity: 0.4 }}>
-            {['水位', '水温', '気温', '地中水分'].map(label => (
-              <div key={label} style={{ background: '#fff', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px' }}>
-                <div style={{ fontSize: 10, color: '#999', marginBottom: 3 }}>{label}</div>
-                <div style={{ fontSize: 16, fontWeight: 500, color: '#bbb' }}>--</div>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* 圃場ごとにセンサーブロックを表示 */}
+        {fields.map(field => (
+          <FieldSensorBlock key={field.id} field={field} />
+        ))}
 
         <div style={{ height: 1, background: '#eee', margin: '12px 0' }} />
 
-        <div style={sectionLabelStyle}>最近の作業</div>
-        {itemsLoading && <p style={{ color: '#aaa', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>読み込み中...</p>}
+        <div style={sectionLabelStyle}>\u6700\u8fd1\u306e\u4f5c\u696d</div>
+        {itemsLoading && <p style={{ color: '#aaa', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>\u8aad\u307f\u8fbc\u307f\u4e2d...</p>}
         {!itemsLoading && recentItems.length === 0 && (
-          <p style={{ color: '#aaa', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>作業記録がありません</p>
+          <p style={{ color: '#aaa', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>\u4f5c\u696d\u8a18\u9332\u304c\u3042\u308a\u307e\u305b\u3093</p>
         )}
         {recentItems.map((item: Item) => (
           <div key={item.id} onClick={() => navigate(`/items/${item.id}`)} style={cardStyle}>
@@ -181,7 +102,7 @@ export default function Home() {
         ))}
         <div style={{ textAlign: 'center', fontSize: 13, color: '#2d7a4f', padding: 8, cursor: 'pointer' }}
           onClick={() => navigate('/items')}>
-          作物一覧をすべて見る →
+          \u4f5c\u7269\u4e00\u89a7\u3092\u3059\u3079\u3066\u898b\u308b \u2192
         </div>
       </div>
       <BottomNav />
@@ -189,34 +110,104 @@ export default function Home() {
   )
 }
 
-/** show_on_home 未設定時のフォールバック: 従来の sensor_summary を使う */
-function FallbackSensorGrid({ fieldId }: { fieldId: number | null }) {
+/** 圃場1つ分のセンサーブロック */
+function FieldSensorBlock({ field }: { field: Field }) {
+  const { data: sensors = [] } = useQuery<SensorOut[]>({
+    queryKey: ['sensors-home', field.id],
+    queryFn: () => sensorsApi.list(field.id).then(r => r.data),
+  })
+
+  const activeSensor = (() => {
+    const active = sensors.filter(s => s.active)
+    const withHome = active.filter(s => (s.show_on_home ?? []).length > 0)
+    if (withHome.length > 0) return withHome.sort((a, b) => a.id - b.id)[0]
+    return active.sort((a, b) => a.id - b.id)[0] ?? null
+  })()
+
+  const showOnHomeIds: number[] = activeSensor?.show_on_home ?? []
+  const targetMetrics: string[] = showOnHomeIds.length > 0
+    ? [...new Set(showOnHomeIds.map(id => FEATURE_TO_METRIC[id]).filter((m): m is string => m !== null))]
+    : []
+
+  const useFallback = !!activeSensor && showOnHomeIds.length === 0
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      {/* 圃場名 */}
+      <div style={{ fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>
+        {field.name}
+      </div>
+      {useFallback ? (
+        <FallbackSensorGrid fieldId={field.id} />
+      ) : targetMetrics.length > 0 ? (
+        <SensorReadingsGrid sensorId={activeSensor!.id} targetMetrics={targetMetrics} />
+      ) : (
+        <EmptySensorGrid />
+      )}
+    </div>
+  )
+}
+
+/** show_on_home 設定済み: readings を取得して表示 */
+function SensorReadingsGrid({ sensorId, targetMetrics }: { sensorId: number; targetMetrics: string[] }) {
+  const { data: readings = [] } = useQuery<SensorReadingOut[]>({
+    queryKey: ['sensor-readings-home', sensorId],
+    queryFn: () => sensorsApi.readings(sensorId, undefined, 200).then(r => r.data),
+  })
+
+  const latestByMetric: Record<string, { value: number; unit?: string }> = {}
+  for (const r of readings) {
+    if (!latestByMetric[r.metric]) {
+      latestByMetric[r.metric] = { value: r.value, unit: r.unit ?? undefined }
+    }
+  }
+  const displayReadings = targetMetrics
+    .filter(m => latestByMetric[m] !== undefined)
+    .map(m => ({ metric: m, ...latestByMetric[m] }))
+
+  if (displayReadings.length === 0) return <EmptySensorGrid />
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 4 }}>
+      {displayReadings.map(r => {
+        const cfg = METRIC_CONFIG[r.metric]
+        if (!cfg) return null
+        const pct = (r.value - cfg.min) / (cfg.max - cfg.min) * 100
+        return <SensorCard key={r.metric} label={cfg.label} value={r.value} unit={r.unit ?? cfg.unit} color={cfg.color} pct={pct} />
+      })}
+    </div>
+  )
+}
+
+/** show_on_home 未設定: sensor_summary にフォールバック */
+function FallbackSensorGrid({ fieldId }: { fieldId: number }) {
   const { data: sensorSummary } = useQuery({
     queryKey: ['sensor-summary', fieldId],
-    queryFn: () => fieldsApi.sensorSummary(fieldId!).then(r => r.data),
-    enabled: !!fieldId,
+    queryFn: () => fieldsApi.sensorSummary(fieldId).then(r => r.data),
   })
   const readings = sensorSummary?.sensors[0]?.latest ?? []
-  if (readings.length === 0) {
-    return (
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 16, opacity: 0.4 }}>
-        {['水位', '水温', '気温', '地中水分'].map(label => (
-          <div key={label} style={{ background: '#fff', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px' }}>
-            <div style={{ fontSize: 10, color: '#999', marginBottom: 3 }}>{label}</div>
-            <div style={{ fontSize: 16, fontWeight: 500, color: '#bbb' }}>--</div>
-          </div>
-        ))}
-      </div>
-    )
-  }
+  if (readings.length === 0) return <EmptySensorGrid />
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 16 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 4 }}>
       {readings.map(r => {
         const cfg = METRIC_CONFIG[r.metric]
         if (!cfg) return null
         const pct = (r.value - cfg.min) / (cfg.max - cfg.min) * 100
         return <SensorCard key={r.metric} label={cfg.label} value={r.value} unit={r.unit ?? cfg.unit} color={cfg.color} pct={pct} />
       })}
+    </div>
+  )
+}
+
+function EmptySensorGrid() {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 4, opacity: 0.4 }}>
+      {['\u6c34\u4f4d', '\u6c34\u6e29', '\u6c17\u6e29', '\u5730\u4e2d\u6c34\u5206'].map(label => (
+        <div key={label} style={{ background: '#fff', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px' }}>
+          <div style={{ fontSize: 10, color: '#999', marginBottom: 3 }}>{label}</div>
+          <div style={{ fontSize: 16, fontWeight: 500, color: '#bbb' }}>--</div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -241,5 +232,3 @@ function SensorCard({ label, value, unit, color, pct }: { label: string; value: 
 const pageStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', height: '100dvh', background: '#f5f5f0' }
 const sectionLabelStyle: React.CSSProperties = { fontSize: 12, color: '#999', marginBottom: 8, marginTop: 4 }
 const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 10, padding: '14px 16px', marginBottom: 8, cursor: 'pointer', border: '1px solid #eee' }
-const pillStyle: React.CSSProperties = { padding: '5px 12px', borderRadius: 20, border: '1px solid #ddd', background: '#fff', fontSize: 12, color: '#666', whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0 }
-const activePillStyle: React.CSSProperties = { ...pillStyle, background: '#2d7a4f', borderColor: '#2d7a4f', color: '#fff' }
