@@ -1,6 +1,6 @@
 from datetime import datetime, date
-from typing import Optional, List
-from pydantic import BaseModel, field_validator
+from typing import Optional, List, Any
+from pydantic import BaseModel, field_validator, model_validator
 from models import UserFieldRole, ItemStatus
 
 # --- Auth ---
@@ -165,13 +165,18 @@ def _unique(v: List[int]) -> List[int]:
             seen.append(x)
     return seen
 
+def _to_int_list(v: Any) -> List[int]:
+    """DBのカラム値がリストでない場合（旧TINYINT=0など）は空リストに変換"""
+    if isinstance(v, list):
+        return v
+    return []
+
 class SensorCreate(BaseModel):
     field_id: int
     name: str
     active: bool = True
     token: str
     features: List[int] = []
-    # ホームに表示する feature_type id のリスト（featuresのサブセット）
     show_on_home: List[int] = []
 
     @field_validator("features", "show_on_home")
@@ -200,8 +205,24 @@ class SensorOut(BaseModel):
     active: bool
     token: str
     features: List[int] = []
-    show_on_home: List[int] = []  # ホームに表示する feature_type id のリスト
+    show_on_home: List[int] = []
     model_config = {"from_attributes": True}
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_json_fields(cls, data: Any) -> Any:
+        """旧データ互換: features/show_on_home がリスト以外(0など)なら空リストに"""
+        if hasattr(data, "__dict__"):
+            # SQLAlchemy モデルオブジェクトの場合
+            for field in ("features", "show_on_home"):
+                val = getattr(data, field, None)
+                if not isinstance(val, list):
+                    setattr(data, field, [])
+        elif isinstance(data, dict):
+            for field in ("features", "show_on_home"):
+                if not isinstance(data.get(field), list):
+                    data[field] = []
+        return data
 
 # --- SensorReading ---
 class SensorReadingCreate(BaseModel):
