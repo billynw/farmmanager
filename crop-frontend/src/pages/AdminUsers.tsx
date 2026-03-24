@@ -108,7 +108,7 @@ export default function AdminUsers() {
   const [sensorForm, setSensorForm] = useState({
     name: '', active: true, field_id: 0,
     features: defaultFeatures,
-    show_on_home: false,
+    show_on_home: [] as number[],  // ホームに表示する feature_type id リスト
   })
   const [wifiForm, setWifiForm] = useState({ ssid: '', password: '' })
   const [showWifiPassword, setShowWifiPassword] = useState(false)
@@ -193,7 +193,7 @@ export default function AdminUsers() {
       name: '', active: true,
       field_id: activeSensorFieldId ?? manageableFields[0]?.id ?? 0,
       features: defaultFeatures,
-      show_on_home: false,
+      show_on_home: [],
     })
     setSensorModal({ mode: 'add' })
   }
@@ -204,7 +204,7 @@ export default function AdminUsers() {
       active: sensor.active,
       field_id: sensor.field_id,
       features: idsToFeatures(sensor.features ?? []),
-      show_on_home: sensor.show_on_home,
+      show_on_home: sensor.show_on_home ?? [],
     })
     setSensorModal({ mode: 'edit', sensor })
   }
@@ -221,6 +221,8 @@ export default function AdminUsers() {
     setSensorSubmitting(true)
     try {
       const featureIds = featuresToIds(sensorForm.features)
+      // show_on_home は features に含まれるIDのみ有効（チェックを外した機能は除去）
+      const showOnHome = sensorForm.show_on_home.filter(id => featureIds.includes(id))
       if (sensorModal?.mode === 'add') {
         const token = generateSensorToken()
         await sensorsApi.create({
@@ -229,7 +231,7 @@ export default function AdminUsers() {
           active: sensorForm.active,
           token,
           features: featureIds,
-          show_on_home: sensorForm.show_on_home,
+          show_on_home: showOnHome,
         })
       } else if (sensorModal?.mode === 'edit') {
         await sensorsApi.update((sensorModal as any).sensor.id, {
@@ -237,7 +239,7 @@ export default function AdminUsers() {
           active: sensorForm.active,
           field_id: sensorForm.field_id,
           features: featureIds,
-          show_on_home: sensorForm.show_on_home,
+          show_on_home: showOnHome,
         })
       }
       qc.invalidateQueries({ queryKey: ['sensors'] })
@@ -289,6 +291,22 @@ export default function AdminUsers() {
       }
     })
   }
+
+  // ★ のトグル: feature_id を show_on_home に追加/削除
+  const handleStarToggle = (featureId: number) => {
+    setSensorForm(f => {
+      const current = f.show_on_home
+      const next = current.includes(featureId)
+        ? current.filter(id => id !== featureId)
+        : [...current, featureId]
+      return { ...f, show_on_home: next }
+    })
+  }
+
+  // ゲートの現在の feature_id を返す（給水 or 排水）
+  const gateFeatureId = sensorForm.features.gate === 'supply' ? GATE_SUPPLY_ID
+                      : sensorForm.features.gate === 'drain'  ? GATE_DRAIN_ID
+                      : null
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'fields', label: '圃場' },
@@ -458,19 +476,21 @@ export default function AdminUsers() {
                         }}>
                           {sensor.active ? '有効' : '無効'}
                         </span>
-                        {sensor.show_on_home && (
-                          <span style={{
-                            fontSize: 11, padding: '1px 7px', borderRadius: 20, fontWeight: 600,
-                            background: '#1a5fa822', color: '#1a5fa8',
-                          }}>ホーム表示</span>
-                        )}
                       </div>
                       {(sensor.features ?? []).length > 0 && (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
                           {(sensor.features ?? []).map(fid => {
                             const ft = featureTypes.find(f => f.id === fid)
+                            const onHome = (sensor.show_on_home ?? []).includes(fid)
                             return ft ? (
-                              <span key={fid} style={featureTagStyle}>{ft.label}</span>
+                              <span key={fid} style={{
+                                ...featureTagStyle,
+                                background: onHome ? '#2d7a4f22' : '#eee',
+                                color: onHome ? '#2d7a4f' : '#999',
+                                border: onHome ? '1px solid #2d7a4f33' : '1px solid #ddd',
+                              }}>
+                                {onHome ? '★ ' : '☆ '}{ft.label}
+                              </span>
                             ) : null
                           })}
                         </div>
@@ -548,7 +568,7 @@ export default function AdminUsers() {
               />
             </div>
 
-            <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
               <label style={{ fontSize: 14, color: '#333' }}>有効</label>
               <input
                 type="checkbox"
@@ -558,27 +578,25 @@ export default function AdminUsers() {
               />
             </div>
 
-            <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
-              <label style={{ fontSize: 14, color: '#333' }}>ホームに表示</label>
-              <input
-                type="checkbox"
-                checked={sensorForm.show_on_home}
-                onChange={e => setSensorForm(f => ({ ...f, show_on_home: e.target.checked }))}
-                style={{ width: 18, height: 18, accentColor: '#2d7a4f' }}
-              />
-            </div>
-
-            {/* センサーの機能 */}
+            {/* センサーの機能 ── ★でホーム表示を機能ごとに選択 */}
             <div style={{ marginBottom: 20 }}>
-              <label style={{ ...labelStyle, marginBottom: 10 }}>センサーの機能</label>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 10 }}>
+                <label style={labelStyle}>センサーの機能</label>
+                <span style={{ fontSize: 11, color: '#aaa' }}>★ = ホームに表示</span>
+              </div>
               <div style={featureBoxStyle}>
 
-                <FeatureCheckbox
+                {/* カメラ */}
+                <FeatureRow
                   label="カメラ"
+                  featureId={1}
                   checked={sensorForm.features.camera}
-                  onChange={v => handleFeatureChange('camera', v)}
+                  onCheck={v => handleFeatureChange('camera', v)}
+                  starred={sensorForm.show_on_home.includes(1)}
+                  onStar={() => handleStarToggle(1)}
                 />
 
+                {/* 給水/排水ゲート */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
                   <input
                     type="checkbox"
@@ -589,7 +607,7 @@ export default function AdminUsers() {
                   <span
                     onClick={handleGateLabelClick}
                     style={{
-                      fontSize: 14,
+                      flex: 1, fontSize: 14,
                       color: sensorForm.features.gate !== null ? '#2d7a4f' : '#333',
                       fontWeight: sensorForm.features.gate !== null ? 600 : 400,
                       cursor: sensorForm.features.gate !== null ? 'pointer' : 'default',
@@ -599,31 +617,53 @@ export default function AdminUsers() {
                     }}
                   >
                     {sensorForm.features.gate === 'drain' ? '排水ゲート' : '給水ゲート'}
+                    {sensorForm.features.gate !== null && (
+                      <span style={{ fontSize: 11, color: '#aaa', marginLeft: 6, fontWeight: 400 }}>（タップで切替）</span>
+                    )}
                   </span>
-                  {sensorForm.features.gate !== null && (
-                    <span style={{ fontSize: 11, color: '#aaa' }}>（タップで切替）</span>
+                  {/* ゲートが有効なときだけ ★ を表示 */}
+                  {gateFeatureId !== null && (
+                    <span
+                      onClick={() => handleStarToggle(gateFeatureId)}
+                      style={{
+                        fontSize: 16, cursor: 'pointer', userSelect: 'none', lineHeight: 1,
+                        color: sensorForm.show_on_home.includes(gateFeatureId) ? '#f59e0b' : '#ccc',
+                      }}
+                    >★</span>
                   )}
                 </div>
 
-                <FeatureCheckbox
+                <FeatureRow
                   label="温湿度センサ"
+                  featureId={4}
                   checked={sensorForm.features.tempHumidity}
-                  onChange={v => handleFeatureChange('tempHumidity', v)}
+                  onCheck={v => handleFeatureChange('tempHumidity', v)}
+                  starred={sensorForm.show_on_home.includes(4)}
+                  onStar={() => handleStarToggle(4)}
                 />
-                <FeatureCheckbox
+                <FeatureRow
                   label="土壌水分センサ"
+                  featureId={5}
                   checked={sensorForm.features.soilMoisture}
-                  onChange={v => handleFeatureChange('soilMoisture', v)}
+                  onCheck={v => handleFeatureChange('soilMoisture', v)}
+                  starred={sensorForm.show_on_home.includes(5)}
+                  onStar={() => handleStarToggle(5)}
                 />
-                <FeatureCheckbox
+                <FeatureRow
                   label="水温センサ"
+                  featureId={6}
                   checked={sensorForm.features.waterTemp}
-                  onChange={v => handleFeatureChange('waterTemp', v)}
+                  onCheck={v => handleFeatureChange('waterTemp', v)}
+                  starred={sensorForm.show_on_home.includes(6)}
+                  onStar={() => handleStarToggle(6)}
                 />
-                <FeatureCheckbox
+                <FeatureRow
                   label="水位センサ"
+                  featureId={7}
                   checked={sensorForm.features.waterLevel}
-                  onChange={v => handleFeatureChange('waterLevel', v)}
+                  onCheck={v => handleFeatureChange('waterLevel', v)}
+                  starred={sensorForm.show_on_home.includes(7)}
+                  onStar={() => handleStarToggle(7)}
                 />
 
               </div>
@@ -738,17 +778,36 @@ export default function AdminUsers() {
   )
 }
 
-function FeatureCheckbox({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+// ─── 小コンポーネント ───────────────────────────────────────────
+
+/** チェックボックス＋ラベル＋★ の1行 */
+function FeatureRow({
+  label, featureId, checked, onCheck, starred, onStar,
+}: {
+  label: string
+  featureId: number
+  checked: boolean
+  onCheck: (v: boolean) => void
+  starred: boolean
+  onStar: () => void
+}) {
   return (
-    <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '4px 0' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
       <input
         type="checkbox"
         checked={checked}
-        onChange={e => onChange(e.target.checked)}
+        onChange={e => onCheck(e.target.checked)}
         style={{ width: 18, height: 18, accentColor: '#2d7a4f', flexShrink: 0 }}
       />
-      <span style={{ fontSize: 14, color: '#333' }}>{label}</span>
-    </label>
+      <span style={{ flex: 1, fontSize: 14, color: '#333' }}>{label}</span>
+      <span
+        onClick={onStar}
+        style={{
+          fontSize: 16, cursor: 'pointer', userSelect: 'none', lineHeight: 1,
+          color: starred ? '#f59e0b' : '#ccc',
+        }}
+      >★</span>
+    </div>
   )
 }
 
@@ -786,13 +845,13 @@ const pageStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column
 const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: '12px 16px', marginBottom: 8, display: 'flex', alignItems: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }
 const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }
 const modalStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: 24, width: '100%', maxWidth: 400 }
-const labelStyle: React.CSSProperties = { display: 'block', fontSize: 13, color: '#555', marginBottom: 6, fontWeight: 500 }
+const labelStyle: React.CSSProperties = { display: 'block', fontSize: 13, color: '#555', marginBottom: 0, fontWeight: 500 }
 const inputStyle: React.CSSProperties = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 16, boxSizing: 'border-box' }
 const cancelBtnStyle: React.CSSProperties = { flex: 1, padding: '12px', border: '1px solid #ddd', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 14 }
 const deleteBtnStyle: React.CSSProperties = { flex: 1, padding: '12px', border: 'none', borderRadius: 8, background: '#d32f2f', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }
 const saveBtnStyle: React.CSSProperties = { flex: 1, padding: '12px', border: 'none', borderRadius: 8, background: '#2d7a4f', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }
 const featureBoxStyle: React.CSSProperties = { background: '#f8f9fa', borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8, border: '1px solid #eee' }
-const featureTagStyle: React.CSSProperties = { fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#2d7a4f18', color: '#2d7a4f', fontWeight: 600, border: '1px solid #2d7a4f33' }
+const featureTagStyle: React.CSSProperties = { fontSize: 11, padding: '2px 8px', borderRadius: 20, fontWeight: 600 }
 const fabStyle: React.CSSProperties = {
   position: 'fixed', bottom: 64, left: '50%', transform: 'translateX(-50%)',
   background: '#2d7a4f', color: '#fff', border: 'none', borderRadius: 10,
