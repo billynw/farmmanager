@@ -20,19 +20,17 @@ type SensorModal =
   | { mode: 'edit'; sensor: SensorOut }
   | { mode: 'wifi'; sensor: SensorOut }
 
-// gate: null=未選択 / 'supply'=給水ゲート(id=2) / 'drain'=排水ゲート(id=3)
 type GateType = 'supply' | 'drain' | null
-// ハードコーディング: 給水/排水ゲートの feature_type id
 const GATE_SUPPLY_ID = 2
 const GATE_DRAIN_ID  = 3
 
 interface SensorFeatures {
-  camera: boolean      // id=1
-  gate: GateType       // id=2 or 3
-  tempHumidity: boolean // id=4
-  soilMoisture: boolean // id=5
-  waterTemp: boolean    // id=6
-  waterLevel: boolean   // id=7
+  camera: boolean
+  gate: GateType
+  tempHumidity: boolean
+  soilMoisture: boolean
+  waterTemp: boolean
+  waterLevel: boolean
 }
 
 const defaultFeatures: SensorFeatures = {
@@ -44,7 +42,6 @@ const defaultFeatures: SensorFeatures = {
   waterLevel: false,
 }
 
-/** features の数値IDリスト → SensorFeatures に変換 */
 function idsToFeatures(ids: number[]): SensorFeatures {
   return {
     camera:       ids.includes(1),
@@ -58,16 +55,15 @@ function idsToFeatures(ids: number[]): SensorFeatures {
   }
 }
 
-/** SensorFeatures → features の数値IDリストに変換 */
 function featuresToIds(f: SensorFeatures): number[] {
   const ids: number[] = []
-  if (f.camera)       ids.push(1)
+  if (f.camera)            ids.push(1)
   if (f.gate === 'supply') ids.push(GATE_SUPPLY_ID)
   if (f.gate === 'drain')  ids.push(GATE_DRAIN_ID)
-  if (f.tempHumidity) ids.push(4)
-  if (f.soilMoisture) ids.push(5)
-  if (f.waterTemp)    ids.push(6)
-  if (f.waterLevel)   ids.push(7)
+  if (f.tempHumidity)      ids.push(4)
+  if (f.soilMoisture)      ids.push(5)
+  if (f.waterTemp)         ids.push(6)
+  if (f.waterLevel)        ids.push(7)
   return ids
 }
 
@@ -109,7 +105,11 @@ export default function AdminUsers() {
 
   const [sensorFieldId, setSensorFieldId] = useState<number | null>(null)
   const [sensorModal, setSensorModal] = useState<SensorModal | null>(null)
-  const [sensorForm, setSensorForm] = useState({ name: '', active: true, field_id: 0, features: defaultFeatures })
+  const [sensorForm, setSensorForm] = useState({
+    name: '', active: true, field_id: 0,
+    features: defaultFeatures,
+    show_on_home: false,
+  })
   const [wifiForm, setWifiForm] = useState({ ssid: '', password: '' })
   const [showWifiPassword, setShowWifiPassword] = useState(false)
   const [sensorSubmitting, setSensorSubmitting] = useState(false)
@@ -132,7 +132,6 @@ export default function AdminUsers() {
     enabled: !!activeSensorFieldId,
   })
 
-  // 機能マスタをキャッシュ取得（モーダル表示時に使用）
   const { data: featureTypes = [] } = useQuery({
     queryKey: ['sensorFeatureTypes'],
     queryFn: () => sensorFeatureTypesApi.list().then(r => r.data),
@@ -194,6 +193,7 @@ export default function AdminUsers() {
       name: '', active: true,
       field_id: activeSensorFieldId ?? manageableFields[0]?.id ?? 0,
       features: defaultFeatures,
+      show_on_home: false,
     })
     setSensorModal({ mode: 'add' })
   }
@@ -204,6 +204,7 @@ export default function AdminUsers() {
       active: sensor.active,
       field_id: sensor.field_id,
       features: idsToFeatures(sensor.features ?? []),
+      show_on_home: sensor.show_on_home,
     })
     setSensorModal({ mode: 'edit', sensor })
   }
@@ -228,6 +229,7 @@ export default function AdminUsers() {
           active: sensorForm.active,
           token,
           features: featureIds,
+          show_on_home: sensorForm.show_on_home,
         })
       } else if (sensorModal?.mode === 'edit') {
         await sensorsApi.update((sensorModal as any).sensor.id, {
@@ -235,6 +237,7 @@ export default function AdminUsers() {
           active: sensorForm.active,
           field_id: sensorForm.field_id,
           features: featureIds,
+          show_on_home: sensorForm.show_on_home,
         })
       }
       qc.invalidateQueries({ queryKey: ['sensors'] })
@@ -455,8 +458,13 @@ export default function AdminUsers() {
                         }}>
                           {sensor.active ? '有効' : '無効'}
                         </span>
+                        {sensor.show_on_home && (
+                          <span style={{
+                            fontSize: 11, padding: '1px 7px', borderRadius: 20, fontWeight: 600,
+                            background: '#1a5fa822', color: '#1a5fa8',
+                          }}>ホーム表示</span>
+                        )}
                       </div>
-                      {/* 機能タグ表示 */}
                       {(sensor.features ?? []).length > 0 && (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
                           {(sensor.features ?? []).map(fid => {
@@ -540,12 +548,22 @@ export default function AdminUsers() {
               />
             </div>
 
-            <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
               <label style={{ fontSize: 14, color: '#333' }}>有効</label>
               <input
                 type="checkbox"
                 checked={sensorForm.active}
                 onChange={e => setSensorForm(f => ({ ...f, active: e.target.checked }))}
+                style={{ width: 18, height: 18, accentColor: '#2d7a4f' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <label style={{ fontSize: 14, color: '#333' }}>ホームに表示</label>
+              <input
+                type="checkbox"
+                checked={sensorForm.show_on_home}
+                onChange={e => setSensorForm(f => ({ ...f, show_on_home: e.target.checked }))}
                 style={{ width: 18, height: 18, accentColor: '#2d7a4f' }}
               />
             </div>
