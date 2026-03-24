@@ -6,12 +6,12 @@ import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
 
 const METRIC_CONFIG: Record<string, { label: string; unit: string; color: string; max: number; min: number }> = {
-  water_level:   { label: '\u6c34\u4f4d',    unit: 'cm',  color: '#378ADD', max: 25,  min: 0  },
-  water_temp:    { label: '\u6c34\u6e29',    unit: '\u00b0C', color: '#1D9E75', max: 35,  min: 10 },
-  air_temp:      { label: '\u6c17\u6e29',    unit: '\u00b0C', color: '#BA7517', max: 40,  min: 0  },
-  soil_moisture: { label: '\u5730\u4e2d\u6c34\u5206', unit: '%',   color: '#639922', max: 100, min: 0  },
+  water_level:   { label: '水位',    unit: 'cm',  color: '#378ADD', max: 25,  min: 0  },
+  water_temp:    { label: '水温',    unit: '°C',  color: '#1D9E75', max: 35,  min: 10 },
+  air_temp:      { label: '気温',    unit: '°C',  color: '#BA7517', max: 40,  min: 0  },
+  soil_moisture: { label: '地中水分', unit: '%',   color: '#639922', max: 100, min: 0  },
   ph:            { label: 'pH',      unit: '',    color: '#8e44ad', max: 14,  min: 0  },
-  gate_open:     { label: '\u30b2\u30fc\u30c8',  unit: '',    color: '#e67e22', max: 1,   min: 0  },
+  gate_open:     { label: 'ゲート',  unit: '',    color: '#e67e22', max: 1,   min: 0  },
 }
 
 const FEATURE_TO_METRIC: Record<number, string | null> = {
@@ -24,7 +24,7 @@ const FEATURE_TO_METRIC: Record<number, string | null> = {
   7: 'water_level',
 }
 
-const STATUS_LABEL: Record<string, string> = { growing: '\u6d3b\u57f9\u4e2d', finished: '\u7d42\u4e86' }
+const STATUS_LABEL: Record<string, string> = { growing: '栽培中', finished: '終了' }
 const STATUS_COLOR: Record<string, string> = { growing: '#2d7a4f', finished: '#888' }
 
 function formatDate(dateStr: string) {
@@ -54,19 +54,18 @@ export default function Home() {
       <AppHeader />
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', paddingBottom: 72 }}>
 
-        <div style={sectionLabelStyle}>\u30bb\u30f3\u30b5\u30fc\u6982\u8981</div>
+        <div style={sectionLabelStyle}>センサー概要</div>
 
-        {/* 圃場ごとにセンサーブロックを表示 */}
         {fields.map(field => (
           <FieldSensorBlock key={field.id} field={field} />
         ))}
 
         <div style={{ height: 1, background: '#eee', margin: '12px 0' }} />
 
-        <div style={sectionLabelStyle}>\u6700\u8fd1\u306e\u4f5c\u696d</div>
-        {itemsLoading && <p style={{ color: '#aaa', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>\u8aad\u307f\u8fbc\u307f\u4e2d...</p>}
+        <div style={sectionLabelStyle}>最近の作業</div>
+        {itemsLoading && <p style={{ color: '#aaa', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>読み込み中...</p>}
         {!itemsLoading && recentItems.length === 0 && (
-          <p style={{ color: '#aaa', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>\u4f5c\u696d\u8a18\u9332\u304c\u3042\u308a\u307e\u305b\u3093</p>
+          <p style={{ color: '#aaa', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>作業記録がありません</p>
         )}
         {recentItems.map((item: Item) => (
           <div key={item.id} onClick={() => navigate(`/items/${item.id}`)} style={cardStyle}>
@@ -102,7 +101,7 @@ export default function Home() {
         ))}
         <div style={{ textAlign: 'center', fontSize: 13, color: '#2d7a4f', padding: 8, cursor: 'pointer' }}
           onClick={() => navigate('/items')}>
-          \u4f5c\u7269\u4e00\u89a7\u3092\u3059\u3079\u3066\u898b\u308b \u2192
+          作物一覧をすべて見る →
         </div>
       </div>
       <BottomNav />
@@ -110,7 +109,6 @@ export default function Home() {
   )
 }
 
-/** 圃場1つ分のセンサーブロック */
 function FieldSensorBlock({ field }: { field: Field }) {
   const { data: sensors = [] } = useQuery<SensorOut[]>({
     queryKey: ['sensors-home', field.id],
@@ -133,7 +131,6 @@ function FieldSensorBlock({ field }: { field: Field }) {
 
   return (
     <div style={{ marginBottom: 12 }}>
-      {/* 圃場名 */}
       <div style={{ fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>
         {field.name}
       </div>
@@ -148,7 +145,6 @@ function FieldSensorBlock({ field }: { field: Field }) {
   )
 }
 
-/** show_on_home 設定済み: readings を取得して表示 */
 function SensorReadingsGrid({ sensorId, targetMetrics }: { sensorId: number; targetMetrics: string[] }) {
   const { data: readings = [] } = useQuery<SensorReadingOut[]>({
     queryKey: ['sensor-readings-home', sensorId],
@@ -179,7 +175,6 @@ function SensorReadingsGrid({ sensorId, targetMetrics }: { sensorId: number; tar
   )
 }
 
-/** show_on_home 未設定: sensor_summary にフォールバック */
 function FallbackSensorGrid({ fieldId }: { fieldId: number }) {
   const { data: sensorSummary } = useQuery({
     queryKey: ['sensor-summary', fieldId],
@@ -202,7 +197,7 @@ function FallbackSensorGrid({ fieldId }: { fieldId: number }) {
 function EmptySensorGrid() {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 4, opacity: 0.4 }}>
-      {['\u6c34\u4f4d', '\u6c34\u6e29', '\u6c17\u6e29', '\u5730\u4e2d\u6c34\u5206'].map(label => (
+      {['水位', '水温', '気温', '地中水分'].map(label => (
         <div key={label} style={{ background: '#fff', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px' }}>
           <div style={{ fontSize: 10, color: '#999', marginBottom: 3 }}>{label}</div>
           <div style={{ fontSize: 16, fontWeight: 500, color: '#bbb' }}>--</div>
