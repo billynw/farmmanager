@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { usersApi, fieldsApi, sensorsApi, sensorFeatureTypesApi, generateSensorToken } from '../api'
-import type { UserFieldRole, SensorOut, SensorFeatureType } from '../api'
+import type { UserFieldRole, SensorOut } from '../api'
 import { useAuth } from '../store'
 import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
@@ -61,7 +61,6 @@ export default function AdminUsers() {
 
   const [sensorFieldId, setSensorFieldId] = useState<number | null>(null)
   const [sensorModal, setSensorModal] = useState<SensorModal | null>(null)
-  // features は選択中の feature_type id のセット
   const [sensorForm, setSensorForm] = useState({
     name: '', active: true, field_id: 0,
     featureIds: [] as number[],
@@ -91,13 +90,10 @@ export default function AdminUsers() {
     queryFn: () => sensorFeatureTypesApi.list().then(r => r.data),
   })
 
-  // ゲート系 featureType
   const gateSupplyFt = featureTypes.find(f => f.key === 'gate_supply')
   const gateDrainFt  = featureTypes.find(f => f.key === 'gate_drain')
-  // ゲート以外
   const normalFts = featureTypes.filter(f => !GATE_KEYS.includes(f.key))
 
-  // 現在選択中のゲート種別
   const selectedGateId = sensorForm.featureIds.includes(gateSupplyFt?.id ?? -1)
     ? gateSupplyFt?.id
     : sensorForm.featureIds.includes(gateDrainFt?.id ?? -1)
@@ -181,7 +177,6 @@ export default function AdminUsers() {
     }))
   }
 
-  // ゲートのチェックON/OFF
   const handleGateCheck = (checked: boolean) => {
     if (!gateSupplyFt) return
     setSensorForm(f => ({
@@ -192,7 +187,6 @@ export default function AdminUsers() {
     }))
   }
 
-  // ゲートの給水↔排水トグル
   const handleGateToggle = () => {
     if (!gateSupplyFt || !gateDrainFt) return
     setSensorForm(f => {
