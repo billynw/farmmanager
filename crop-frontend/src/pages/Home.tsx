@@ -115,12 +115,10 @@ function FieldSensorBlock({ field }: { field: Field }) {
     queryFn: () => sensorsApi.list(field.id).then(r => r.data),
   })
 
-  // show_on_home が1つ以上設定されている有効センサーだけ対象
   const activeSensor = sensors
     .filter(s => s.active && (s.show_on_home ?? []).length > 0)
     .sort((a, b) => a.id - b.id)[0] ?? null
 
-  // show_on_home のfeature IDから表示すべき metricを決定
   const targetMetrics: string[] = activeSensor
     ? [...new Set(
         (activeSensor.show_on_home ?? [])
@@ -129,7 +127,6 @@ function FieldSensorBlock({ field }: { field: Field }) {
       )]
     : []
 
-  // show_on_home 設定済みセンサーがなければブロック自体を非表示
   if (!activeSensor || targetMetrics.length === 0) return null
 
   return (
@@ -151,19 +148,19 @@ function SensorReadingsGrid({ fieldName, sensorId, targetMetrics }: { fieldName:
       latestByMetric[r.metric] = { value: r.value, unit: r.unit ?? undefined }
     }
   }
-  const displayReadings = targetMetrics
-    .filter(m => latestByMetric[m] !== undefined)
-    .map(m => ({ metric: m, ...latestByMetric[m] }))
-
-  if (displayReadings.length === 0) return null
 
   return (
     <SensorBox fieldName={fieldName}>
-      {displayReadings.map(r => {
-        const cfg = METRIC_CONFIG[r.metric]
+      {targetMetrics.map(m => {
+        const cfg = METRIC_CONFIG[m]
         if (!cfg) return null
-        const pct = (r.value - cfg.min) / (cfg.max - cfg.min) * 100
-        return <SensorCard key={r.metric} label={cfg.label} value={r.value} unit={r.unit ?? cfg.unit} color={cfg.color} pct={pct} />
+        const data = latestByMetric[m]
+        if (data) {
+          const pct = (data.value - cfg.min) / (cfg.max - cfg.min) * 100
+          return <SensorCard key={m} label={cfg.label} value={data.value} unit={data.unit ?? cfg.unit} color={cfg.color} pct={pct} />
+        }
+        // データなし → --プレースホルダー
+        return <SensorCardEmpty key={m} label={cfg.label} color={cfg.color} />
       })}
     </SensorBox>
   )
@@ -201,6 +198,19 @@ function SensorCard({ label, value, unit, color, pct }: { label: string; value: 
       <div style={{ height: 3, background: '#eee', borderRadius: 2, marginTop: 5, overflow: 'hidden' }}>
         <div style={{ height: '100%', borderRadius: 2, background: color, width: `${Math.min(100, Math.max(0, pct))}%` }} />
       </div>
+    </div>
+  )
+}
+
+function SensorCardEmpty({ label, color }: { label: string; color: string }) {
+  return (
+    <div style={{ background: '#f8f9fa', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px', opacity: 0.5 }}>
+      <div style={{ fontSize: 10, color: '#999', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 3 }}>
+        <div style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
+        {label}
+      </div>
+      <div style={{ fontSize: 16, fontWeight: 500, color: '#bbb', lineHeight: 1.2 }}>--</div>
+      <div style={{ height: 3, background: '#eee', borderRadius: 2, marginTop: 5 }} />
     </div>
   )
 }
