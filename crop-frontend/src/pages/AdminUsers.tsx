@@ -103,12 +103,11 @@ export default function AdminUsers() {
   const [togglingUserId, setTogglingUserId] = useState<number | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
 
-  const [sensorFieldId, setSensorFieldId] = useState<number | null>(null)  // null = 全て
+  const [sensorFieldId, setSensorFieldId] = useState<number | null>(null)
   const [sensorModal, setSensorModal] = useState<SensorModal | null>(null)
   const [sensorForm, setSensorForm] = useState({
     name: '', active: true, field_id: 0,
     features: defaultFeatures,
-    show_on_home: [] as number[],
   })
   const [wifiForm, setWifiForm] = useState({ ssid: '', password: '' })
   const [showWifiPassword, setShowWifiPassword] = useState(false)
@@ -125,7 +124,6 @@ export default function AdminUsers() {
     enabled: !!selectedFieldId,
   })
 
-  // sensorFieldId=null のとき「全て」= field_id 未指定で全センサー取得
   const { data: sensors = [], refetch: refetchSensors } = useQuery({
     queryKey: ['sensors', sensorFieldId],
     queryFn: () => sensorsApi.list(sensorFieldId ?? undefined).then(r => r.data),
@@ -187,7 +185,6 @@ export default function AdminUsers() {
       name: '', active: true,
       field_id: sensorFieldId ?? manageableFields[0]?.id ?? 0,
       features: defaultFeatures,
-      show_on_home: [],
     })
     setSensorModal({ mode: 'add' })
   }
@@ -198,7 +195,6 @@ export default function AdminUsers() {
       active: sensor.active,
       field_id: sensor.field_id,
       features: idsToFeatures(sensor.features ?? []),
-      show_on_home: sensor.show_on_home ?? [],
     })
     setSensorModal({ mode: 'edit', sensor })
   }
@@ -215,7 +211,6 @@ export default function AdminUsers() {
     setSensorSubmitting(true)
     try {
       const featureIds = featuresToIds(sensorForm.features)
-      const showOnHome = sensorForm.show_on_home.filter(id => featureIds.includes(id))
       if (sensorModal?.mode === 'add') {
         const token = generateSensorToken()
         await sensorsApi.create({
@@ -224,10 +219,13 @@ export default function AdminUsers() {
           active: sensorForm.active,
           token,
           features: featureIds,
-          show_on_home: showOnHome,
+          show_on_home: [],
         })
       } else if (sensorModal?.mode === 'edit') {
-        await sensorsApi.update((sensorModal as any).sensor.id, {
+        const prev = (sensorModal as { mode: 'edit'; sensor: SensorOut }).sensor
+        // show_on_home は features に含まれるIDのみ残す（features変更で消えたものを除去）
+        const showOnHome = (prev.show_on_home ?? []).filter(id => featureIds.includes(id))
+        await sensorsApi.update(prev.id, {
           name: sensorForm.name.trim(),
           active: sensorForm.active,
           field_id: sensorForm.field_id,
@@ -241,6 +239,20 @@ export default function AdminUsers() {
       alert(err.response?.data?.detail ?? '保存に失敗しました')
     } finally {
       setSensorSubmitting(false)
+    }
+  }
+
+  // バッジタップで show_on_home をトグルして即保存
+  const handleBadgeToggle = async (sensor: SensorOut, featureId: number) => {
+    const current = sensor.show_on_home ?? []
+    const next = current.includes(featureId)
+      ? current.filter(id => id !== featureId)
+      : [...current, featureId]
+    try {
+      await sensorsApi.update(sensor.id, { show_on_home: next })
+      qc.invalidateQueries({ queryKey: ['sensors'] })
+    } catch (err: any) {
+      alert(err.response?.data?.detail ?? '更新に失敗しました')
     }
   }
 
@@ -285,20 +297,6 @@ export default function AdminUsers() {
     })
   }
 
-  const handleStarToggle = (featureId: number) => {
-    setSensorForm(f => {
-      const current = f.show_on_home
-      const next = current.includes(featureId)
-        ? current.filter(id => id !== featureId)
-        : [...current, featureId]
-      return { ...f, show_on_home: next }
-    })
-  }
-
-  const gateFeatureId = sensorForm.features.gate === 'supply' ? GATE_SUPPLY_ID
-                      : sensorForm.features.gate === 'drain'  ? GATE_DRAIN_ID
-                      : null
-
   const tabs: { key: Tab; label: string }[] = [
     { key: 'fields', label: '圃場' },
     { key: 'users', label: 'ユーザー' },
@@ -313,7 +311,6 @@ export default function AdminUsers() {
     <div style={pageStyle}>
       <AppHeader />
 
-      {/* タブバー */}
       <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #eee' }}>
         {tabs.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)} style={{
@@ -469,27 +466,36 @@ export default function AdminUsers() {
                           {sensor.active ? '有効' : '無効'}
                         </span>
                       </div>
-                      {/* 機能バッジ: 全機能を表示、ホーム表示のものは緑・そうでないものはグレー */}
+                      {/* 機能バッジ: タップで show_on_home をトグル */}
                       {(sensor.features ?? []).length > 0 && (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
                           {(sensor.features ?? []).map(fid => {
                             const ft = featureTypes.find(f => f.id === fid)
                             const onHome = (sensor.show_on_home ?? []).includes(fid)
                             return ft ? (
-                              <span key={fid} style={{
-                                fontSize: 11, padding: '2px 8px', borderRadius: 20, fontWeight: 600,
-                                background: onHome ? '#2d7a4f22' : '#eee',
-                                color: onHome ? '#2d7a4f' : '#999',
-                                border: onHome ? '1px solid #2d7a4f33' : '1px solid #ddd',
-                              }}>
+                              <span
+                                key={fid}
+                                onClick={() => handleBadgeToggle(sensor, fid)}
+                                style={{
+                                  fontSize: 11, padding: '3px 10px', borderRadius: 20, fontWeight: 600,
+                                  cursor: 'pointer', userSelect: 'none',
+                                  background: onHome ? '#2d7a4f' : '#eee',
+                                  color: onHome ? '#fff' : '#999',
+                                  border: onHome ? '1px solid #2d7a4f' : '1px solid #ddd',
+                                  transition: 'all 0.15s',
+                                }}
+                              >
                                 {ft.label}
                               </span>
                             ) : null
                           })}
                         </div>
                       )}
+                      <div style={{ fontSize: 10, color: '#bbb', marginTop: 4 }}>
+                        バッジをタップでホーム表示切替
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 2 }}>
+                    <div style={{ display: 'flex', gap: 2, alignSelf: 'flex-start' }}>
                       <button style={iconBtnStyle} title="WIFI設定" onClick={() => openWifiSensor(sensor)}>
                         <WifiIcon size={17} />
                       </button>
@@ -571,23 +577,16 @@ export default function AdminUsers() {
               />
             </div>
 
-            {/* センサーの機能 ── ★でホーム表示を機能ごとに選択 */}
             <div style={{ marginBottom: 20 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 10 }}>
-                <label style={labelStyle}>センサーの機能</label>
-                <span style={{ fontSize: 11, color: '#aaa' }}>★ = ホームに表示</span>
-              </div>
+              <label style={{ ...labelStyle, marginBottom: 10 }}>センサーの機能</label>
               <div style={featureBoxStyle}>
 
-                <FeatureRow
+                <FeatureCheckbox
                   label="カメラ"
                   checked={sensorForm.features.camera}
-                  onCheck={v => handleFeatureChange('camera', v)}
-                  starred={sensorForm.show_on_home.includes(1)}
-                  onStar={() => handleStarToggle(1)}
+                  onChange={v => handleFeatureChange('camera', v)}
                 />
 
-                {/* 給水/排水ゲート */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
                   <input
                     type="checkbox"
@@ -612,45 +611,12 @@ export default function AdminUsers() {
                       <span style={{ fontSize: 11, color: '#aaa', marginLeft: 6, fontWeight: 400 }}>（タップで切替）</span>
                     )}
                   </span>
-                  {gateFeatureId !== null && (
-                    <span
-                      onClick={() => handleStarToggle(gateFeatureId)}
-                      style={{
-                        fontSize: 16, cursor: 'pointer', userSelect: 'none', lineHeight: 1,
-                        color: sensorForm.show_on_home.includes(gateFeatureId) ? '#f59e0b' : '#ccc',
-                      }}
-                    >★</span>
-                  )}
                 </div>
 
-                <FeatureRow
-                  label="温湿度センサ"
-                  checked={sensorForm.features.tempHumidity}
-                  onCheck={v => handleFeatureChange('tempHumidity', v)}
-                  starred={sensorForm.show_on_home.includes(4)}
-                  onStar={() => handleStarToggle(4)}
-                />
-                <FeatureRow
-                  label="土壌水分センサ"
-                  checked={sensorForm.features.soilMoisture}
-                  onCheck={v => handleFeatureChange('soilMoisture', v)}
-                  starred={sensorForm.show_on_home.includes(5)}
-                  onStar={() => handleStarToggle(5)}
-                />
-                <FeatureRow
-                  label="水温センサ"
-                  checked={sensorForm.features.waterTemp}
-                  onCheck={v => handleFeatureChange('waterTemp', v)}
-                  starred={sensorForm.show_on_home.includes(6)}
-                  onStar={() => handleStarToggle(6)}
-                />
-                <FeatureRow
-                  label="水位センサ"
-                  checked={sensorForm.features.waterLevel}
-                  onCheck={v => handleFeatureChange('waterLevel', v)}
-                  starred={sensorForm.show_on_home.includes(7)}
-                  onStar={() => handleStarToggle(7)}
-                />
+                <FeatureCheckbox label="温湿度センサ" checked={sensorForm.features.tempHumidity} onChange={v => handleFeatureChange('tempHumidity', v)} />
+                <FeatureCheckbox label="土壌水分センサ" checked={sensorForm.features.soilMoisture} onChange={v => handleFeatureChange('soilMoisture', v)} />
+                <FeatureCheckbox label="水温センサ" checked={sensorForm.features.waterTemp} onChange={v => handleFeatureChange('waterTemp', v)} />
+                <FeatureCheckbox label="水位センサ" checked={sensorForm.features.waterLevel} onChange={v => handleFeatureChange('waterLevel', v)} />
 
               </div>
             </div>
@@ -748,7 +714,6 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {/* FABボタン */}
       {tab !== 'sensors' || manageableFields.length > 0 ? (
         <button style={fabStyle} onClick={() => {
           if (tab === 'users') navigate('/admin/users/invite')
@@ -764,34 +729,17 @@ export default function AdminUsers() {
   )
 }
 
-// ─── 小コンポーネント ───────────────────────────────────────────
-
-function FeatureRow({
-  label, checked, onCheck, starred, onStar,
-}: {
-  label: string
-  checked: boolean
-  onCheck: (v: boolean) => void
-  starred: boolean
-  onStar: () => void
-}) {
+function FeatureCheckbox({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
+    <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '4px 0' }}>
       <input
         type="checkbox"
         checked={checked}
-        onChange={e => onCheck(e.target.checked)}
+        onChange={e => onChange(e.target.checked)}
         style={{ width: 18, height: 18, accentColor: '#2d7a4f', flexShrink: 0 }}
       />
-      <span style={{ flex: 1, fontSize: 14, color: '#333' }}>{label}</span>
-      <span
-        onClick={onStar}
-        style={{
-          fontSize: 16, cursor: 'pointer', userSelect: 'none', lineHeight: 1,
-          color: starred ? '#f59e0b' : '#ccc',
-        }}
-      >★</span>
-    </div>
+      <span style={{ fontSize: 14, color: '#333' }}>{label}</span>
+    </label>
   )
 }
 
@@ -826,7 +774,7 @@ function WifiIcon({ size = 20 }: { size?: number }) {
 }
 
 const pageStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', height: '100dvh', background: '#f5f5f0' }
-const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: '12px 16px', marginBottom: 8, display: 'flex', alignItems: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }
+const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: '12px 16px', marginBottom: 8, display: 'flex', alignItems: 'flex-start', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }
 const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }
 const modalStyle: React.CSSProperties = { background: '#fff', borderRadius: 12, padding: 24, width: '100%', maxWidth: 400 }
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: 13, color: '#555', marginBottom: 0, fontWeight: 500 }
