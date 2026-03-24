@@ -108,7 +108,7 @@ export default function AdminUsers() {
   const [sensorForm, setSensorForm] = useState({
     name: '', active: true, field_id: 0,
     features: defaultFeatures,
-    show_on_home: [] as number[],  // ホームに表示する feature_type id リスト
+    show_on_home: [] as number[],
   })
   const [wifiForm, setWifiForm] = useState({ ssid: '', password: '' })
   const [showWifiPassword, setShowWifiPassword] = useState(false)
@@ -221,7 +221,6 @@ export default function AdminUsers() {
     setSensorSubmitting(true)
     try {
       const featureIds = featuresToIds(sensorForm.features)
-      // show_on_home は features に含まれるIDのみ有効（チェックを外した機能は除去）
       const showOnHome = sensorForm.show_on_home.filter(id => featureIds.includes(id))
       if (sensorModal?.mode === 'add') {
         const token = generateSensorToken()
@@ -292,7 +291,6 @@ export default function AdminUsers() {
     })
   }
 
-  // ★ のトグル: feature_id を show_on_home に追加/削除
   const handleStarToggle = (featureId: number) => {
     setSensorForm(f => {
       const current = f.show_on_home
@@ -303,7 +301,6 @@ export default function AdminUsers() {
     })
   }
 
-  // ゲートの現在の feature_id を返す（給水 or 排水）
   const gateFeatureId = sensorForm.features.gate === 'supply' ? GATE_SUPPLY_ID
                       : sensorForm.features.gate === 'drain'  ? GATE_DRAIN_ID
                       : null
@@ -586,10 +583,8 @@ export default function AdminUsers() {
               </div>
               <div style={featureBoxStyle}>
 
-                {/* カメラ */}
                 <FeatureRow
                   label="カメラ"
-                  featureId={1}
                   checked={sensorForm.features.camera}
                   onCheck={v => handleFeatureChange('camera', v)}
                   starred={sensorForm.show_on_home.includes(1)}
@@ -621,7 +616,6 @@ export default function AdminUsers() {
                       <span style={{ fontSize: 11, color: '#aaa', marginLeft: 6, fontWeight: 400 }}>（タップで切替）</span>
                     )}
                   </span>
-                  {/* ゲートが有効なときだけ ★ を表示 */}
                   {gateFeatureId !== null && (
                     <span
                       onClick={() => handleStarToggle(gateFeatureId)}
@@ -635,7 +629,6 @@ export default function AdminUsers() {
 
                 <FeatureRow
                   label="温湿度センサ"
-                  featureId={4}
                   checked={sensorForm.features.tempHumidity}
                   onCheck={v => handleFeatureChange('tempHumidity', v)}
                   starred={sensorForm.show_on_home.includes(4)}
@@ -643,7 +636,6 @@ export default function AdminUsers() {
                 />
                 <FeatureRow
                   label="土壌水分センサ"
-                  featureId={5}
                   checked={sensorForm.features.soilMoisture}
                   onCheck={v => handleFeatureChange('soilMoisture', v)}
                   starred={sensorForm.show_on_home.includes(5)}
@@ -651,7 +643,6 @@ export default function AdminUsers() {
                 />
                 <FeatureRow
                   label="水温センサ"
-                  featureId={6}
                   checked={sensorForm.features.waterTemp}
                   onCheck={v => handleFeatureChange('waterTemp', v)}
                   starred={sensorForm.show_on_home.includes(6)}
@@ -659,7 +650,6 @@ export default function AdminUsers() {
                 />
                 <FeatureRow
                   label="水位センサ"
-                  featureId={7}
                   checked={sensorForm.features.waterLevel}
                   onCheck={v => handleFeatureChange('waterLevel', v)}
                   starred={sensorForm.show_on_home.includes(7)}
@@ -780,12 +770,10 @@ export default function AdminUsers() {
 
 // ─── 小コンポーネント ───────────────────────────────────────────
 
-/** チェックボックス＋ラベル＋★ の1行 */
 function FeatureRow({
-  label, featureId, checked, onCheck, starred, onStar,
+  label, checked, onCheck, starred, onStar,
 }: {
   label: string
-  featureId: number
   checked: boolean
   onCheck: (v: boolean) => void
   starred: boolean
