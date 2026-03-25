@@ -238,7 +238,7 @@ class DeviceCommand(Base):
     __tablename__ = "device_commands"
     id = Column(Integer, primary_key=True)
     sensor_id = Column(Integer, ForeignKey("sensors.id"), nullable=False)
-    command = Column(String(10), nullable=False)
+    command = Column(String(50), nullable=False)
     status = Column(Enum(DeviceCommandStatus), default=DeviceCommandStatus.pending, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     delivered_at = Column(DateTime, nullable=True)
