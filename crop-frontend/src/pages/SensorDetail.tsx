@@ -9,14 +9,25 @@ const METRIC_CONFIG: Record<string, { label: string; unit: string; color: string
   water_level:   { label: '水位',    unit: 'cm', color: '#378ADD', max: 25,  min: 0  },
   water_temp:    { label: '水温',    unit: '°C', color: '#1D9E75', max: 35,  min: 10 },
   air_temp:      { label: '気温',    unit: '°C', color: '#BA7517', max: 40,  min: 0  },
+  temperature:   { label: '温度',    unit: '°C', color: '#BA7517', max: 40,  min: 0  },
+  humidity:      { label: '湿度',    unit: '%',  color: '#639922', max: 100, min: 0  },
   soil_moisture: { label: '地中水分', unit: '%',  color: '#639922', max: 100, min: 0  },
   ph:            { label: 'pH',      unit: '',   color: '#8e44ad', max: 14,  min: 0  },
   gate_open:     { label: 'ゲート',  unit: '',   color: '#e67e22', max: 1,   min: 0  },
+  gate_supply:   { label: '給水ゲート', unit: '', color: '#e67e22', max: 1,   min: 0  },
+  gate_drain:    { label: '排水ゲート', unit: '', color: '#e67e22', max: 1,   min: 0  },
 }
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr)
   return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+function formatGateValue(metric: string, value: number): string {
+  if (metric === 'gate_supply' || metric === 'gate_drain' || metric === 'gate_open') {
+    return value === 0 ? 'CLOSE' : 'OPEN'
+  }
+  return String(value)
 }
 
 export default function SensorDetail() {
@@ -139,6 +150,8 @@ export default function SensorDetail() {
                     if (!mc) return null
                     const pct = Math.min(100, Math.max(0, (r.value - mc.min) / (mc.max - mc.min) * 100))
                     const isSelected = r.metric === selectedMetric
+                    const isGate = r.metric === 'gate_supply' || r.metric === 'gate_drain' || r.metric === 'gate_open'
+                    const displayValue = formatGateValue(r.metric, r.value)
                     return (
                       <div key={r.metric} onClick={() => setSelectedMetric(r.metric)}
                         style={{ background: '#fff', border: `1.5px solid ${isSelected ? mc.color : '#eee'}`, borderRadius: 8, padding: '8px 6px', cursor: 'pointer' }}>
@@ -147,7 +160,7 @@ export default function SensorDetail() {
                           {mc.label}
                         </div>
                         <div style={{ fontSize: 16, fontWeight: 500, color: '#1a1a1a', lineHeight: 1.2 }}>
-                          {r.value}<span style={{ fontSize: 10, fontWeight: 400, color: '#999' }}>{r.unit ?? mc.unit}</span>
+                          {displayValue}{!isGate && <span style={{ fontSize: 10, fontWeight: 400, color: '#999' }}>{r.unit ?? mc.unit}</span>}
                         </div>
                         <div style={{ height: 3, background: '#eee', borderRadius: 2, marginTop: 5, overflow: 'hidden' }}>
                           <div style={{ height: '100%', borderRadius: 2, background: mc.color, width: `${pct}%` }} />
