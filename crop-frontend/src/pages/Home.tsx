@@ -159,4 +159,239 @@ function FieldSensorBlock({ fieldId }: { fieldId: number }) {
     )
   }
 
-  return <SensorReadingsGrid s
+  return <SensorReadingsGrid sensorId={activeSensor.id} targetMetrics={targetMetrics} featureTypes={featureTypes} />
+}
+
+function SensorReadingsGrid({ sensorId, targetMetrics, featureTypes }: { sensorId: number; targetMetrics: string[]; featureTypes: SensorFeatureType[] }) {
+  const [commandModal, setCommandModal] = useState<{ sensorId: number; metric: string; label: string } | null>(null)
+
+  const { data: readings = [] } = useQuery<SensorReadingOut[]>({
+    queryKey: ['sensor-readings-home', sensorId],
+    queryFn: () => sensorsApi.readings(sensorId, undefined, 200).then(r => r.data),
+  })
+
+  const latestByMetric: Record<string, { value: number; unit?: string }> = {}
+  for (const r of readings) {
+    if (!latestByMetric[r.metric]) {
+      latestByMetric[r.metric] = { value: r.value, unit: r.unit ?? undefined }
+    }
+  }
+
+  const featureTypeByKey = Object.fromEntries(featureTypes.map(ft => [ft.key, ft]))
+
+  return (
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 16 }}>
+        {targetMetrics.map(m => {
+          const featureType = featureTypeByKey[m]
+          if (!featureType) return null
+          const data = latestByMetric[m]
+          if (data) {
+            const vMin = featureType.value_min ?? 0
+            const vMax = featureType.value_max ?? 100
+            const pct = (data.value - vMin) / (vMax - vMin) * 100
+            const unit = data.unit ?? featureType.unit ?? ''
+            return (
+              <SensorCard
+                key={m}
+                sensorId={sensorId}
+                metric={m}
+                label={featureType.label}
+                value={data.value}
+                unit={unit}
+                color={featureType.color ?? '#888'}
+                pct={pct}
+                onCommandClick={(metric, label) => setCommandModal({ sensorId, metric, label })}
+              />
+            )
+          }
+          return <SensorCardEmpty key={m} label={featureType.label} color={featureType.color ?? '#888'} />
+        })}
+      </div>
+      {commandModal && (
+        <GateCommandModal
+          sensorId={commandModal.sensorId}
+          metric={commandModal.metric}
+          label={commandModal.label}
+          onClose={() => setCommandModal(null)}
+        />
+      )}
+    </>
+  )
+}
+
+function SensorCard({
+  sensorId,
+  metric,
+  label,
+  value,
+  unit,
+  color,
+  pct,
+  onCommandClick
+}: {
+  sensorId: number
+  metric: string
+  label: string
+  value: number
+  unit: string
+  color: string
+  pct: number
+  onCommandClick: (metric: string, label: string) => void
+}) {
+  const displayValue = formatGateValue(metric, value)
+  const isGate = metric === 'gate_supply' || metric === 'gate_drain'
+
+  const { data: commands = [] } = useQuery<DeviceCommandOut[]>({
+    queryKey: ['device-commands', sensorId],
+    queryFn: () => deviceCommandsApi.list(sensorId, 1).then(r => r.data),
+    enabled: isGate,
+  })
+
+  const hasPendingCommand = isGate && commands.some(c => c.status === 'pending')
+
+  const cardStyle: React.CSSProperties = {
+    background: hasPendingCommand ? '#fff3cd' : '#fff',
+    border: hasPendingCommand ? '1px solid #ffc107' : '1px solid #eee',
+    borderRadius: 8,
+    padding: '8px 6px',
+    cursor: isGate ? 'pointer' : 'default',
+  }
+
+  const handleClick = () => {
+    if (isGate) {
+      onCommandClick(metric, label)
+    }
+  }
+
+  return (
+    <div style={cardStyle} onClick={handleClick}>
+      <div style={{ fontSize: 10, color: '#999', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 3 }}>
+        <div style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
+        {label}
+      </div>
+      <div style={{ fontSize: 16, fontWeight: 500, color: '#1a1a1a', lineHeight: 1.2 }}>
+        {displayValue}{!isGate && <span style={{ fontSize: 10, fontWeight: 400, color: '#999' }}>{unit}</span>}
+      </div>
+      {hasPendingCommand && (
+        <div style={{ fontSize: 9, color: '#ff8800', marginTop: 2 }}>命令送信中...</div>
+      )}
+      {!isGate && (
+        <div style={{ height: 3, background: '#eee', borderRadius: 2, marginTop: 5, overflow: 'hidden' }}>
+          <div style={{ height: '100%', borderRadius: 2, background: color, width: `${Math.min(100, Math.max(0, pct))}%` }} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SensorCardEmpty({ label, color }: { label: string; color: string }) {
+  return (
+    <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px', opacity: 0.4 }}>
+      <div style={{ fontSize: 10, color: '#999', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 3 }}>
+        <div style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
+        {label}
+      </div>
+      <div style={{ fontSize: 16, fontWeight: 500, color: '#bbb', lineHeight: 1.2 }}>--</div>
+      <div style={{ height: 3, background: '#eee', borderRadius: 2, marginTop: 5 }} />
+    </div>
+  )
+}
+
+function GateCommandModal({
+  sensorId,
+  metric,
+  label,
+  onClose
+}: {
+  sensorId: number
+  metric: string
+  label: string
+  onClose: () => void
+}) {
+  const queryClient = useQueryClient()
+
+  const sendCommand = useMutation({
+    mutationFn: (command: string) => deviceCommandsApi.send(sensorId, command),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['device-commands', sensorId] })
+      onClose()
+    },
+  })
+
+  return (
+    <div style={modalOverlayStyle} onClick={onClose}>
+      <div style={modalContentStyle} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 16, color: '#1a1a1a' }}>{label}制御</div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            style={commandButtonStyle}
+            onClick={() => sendCommand.mutate('OPEN')}
+            disabled={sendCommand.isPending}
+          >
+            OPEN
+          </button>
+          <button
+            style={commandButtonStyle}
+            onClick={() => sendCommand.mutate('CLOSE')}
+            disabled={sendCommand.isPending}
+          >
+            CLOSE
+          </button>
+        </div>
+        <button style={cancelButtonStyle} onClick={onClose}>キャンセル</button>
+      </div>
+    </div>
+  )
+}
+
+const pageStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', height: '100dvh', background: '#f5f5f0' }
+const sectionLabelStyle: React.CSSProperties = { fontSize: 12, color: '#999', marginBottom: 8, marginTop: 4 }
+const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 10, padding: '14px 16px', marginBottom: 8, cursor: 'pointer', border: '1px solid #eee' }
+const pillStyle: React.CSSProperties = { padding: '5px 12px', borderRadius: 20, border: '1px solid #ddd', background: '#fff', fontSize: 12, color: '#666', whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0 }
+const activePillStyle: React.CSSProperties = { ...pillStyle, background: '#2d7a4f', borderColor: '#2d7a4f', color: '#fff' }
+
+const modalOverlayStyle: React.CSSProperties = {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  background: 'rgba(0,0,0,0.5)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 1000,
+}
+
+const modalContentStyle: React.CSSProperties = {
+  background: '#fff',
+  borderRadius: 12,
+  padding: 24,
+  maxWidth: 300,
+  width: '90%',
+}
+
+const commandButtonStyle: React.CSSProperties = {
+  flex: 1,
+  padding: '12px 20px',
+  background: '#2d7a4f',
+  color: '#fff',
+  border: 'none',
+  borderRadius: 8,
+  fontSize: 14,
+  fontWeight: 500,
+  cursor: 'pointer',
+}
+
+const cancelButtonStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '10px',
+  background: '#f0f0f0',
+  color: '#666',
+  border: 'none',
+  borderRadius: 8,
+  fontSize: 13,
+  marginTop: 12,
+  cursor: 'pointer',
+}
