@@ -25,6 +25,13 @@ function formatDate(dateStr: string) {
   return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
+function formatGateValue(metric: string, value: number): string {
+  if (metric === 'gate_supply' || metric === 'gate_drain') {
+    return value === 0 ? 'CLOSE' : 'OPEN'
+  }
+  return String(value)
+}
+
 export default function Home() {
   const navigate = useNavigate()
   const [selectedFieldId, setSelectedFieldId] = useState<number | null>(null)
@@ -181,7 +188,7 @@ function SensorReadingsGrid({ sensorId, targetMetrics, featureTypes }: { sensorI
           const vMax = featureType.value_max ?? 100
           const pct = (data.value - vMin) / (vMax - vMin) * 100
           const unit = data.unit ?? featureType.unit ?? ''
-          return <SensorCard key={m} label={featureType.label} value={data.value} unit={unit} color={featureType.color ?? '#888'} pct={pct} />
+          return <SensorCard key={m} metric={m} label={featureType.label} value={data.value} unit={unit} color={featureType.color ?? '#888'} pct={pct} />
         }
         return <SensorCardEmpty key={m} label={featureType.label} color={featureType.color ?? '#888'} />
       })}
@@ -189,7 +196,10 @@ function SensorReadingsGrid({ sensorId, targetMetrics, featureTypes }: { sensorI
   )
 }
 
-function SensorCard({ label, value, unit, color, pct }: { label: string; value: number; unit: string; color: string; pct: number }) {
+function SensorCard({ metric, label, value, unit, color, pct }: { metric: string; label: string; value: number; unit: string; color: string; pct: number }) {
+  const displayValue = formatGateValue(metric, value)
+  const isGate = metric === 'gate_supply' || metric === 'gate_drain'
+  
   return (
     <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px' }}>
       <div style={{ fontSize: 10, color: '#999', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 3 }}>
@@ -197,7 +207,7 @@ function SensorCard({ label, value, unit, color, pct }: { label: string; value: 
         {label}
       </div>
       <div style={{ fontSize: 16, fontWeight: 500, color: '#1a1a1a', lineHeight: 1.2 }}>
-        {value}<span style={{ fontSize: 10, fontWeight: 400, color: '#999' }}>{unit}</span>
+        {displayValue}{!isGate && <span style={{ fontSize: 10, fontWeight: 400, color: '#999' }}>{unit}</span>}
       </div>
       <div style={{ height: 3, background: '#eee', borderRadius: 2, marginTop: 5, overflow: 'hidden' }}>
         <div style={{ height: '100%', borderRadius: 2, background: color, width: `${Math.min(100, Math.max(0, pct))}%` }} />
