@@ -186,6 +186,9 @@ class SensorFeatureType(Base):
     id    = Column(Integer, primary_key=True)
     key   = Column(String(50), nullable=False, unique=True)
     label = Column(String(100), nullable=False)
+    color = Column(String(7), nullable=True)
+    value_max = Column(Float, nullable=True)
+    value_min = Column(Float, nullable=True)
 
 
 class Sensor(Base):

@@ -84,6 +84,9 @@ export interface SensorFeatureType {
   id: number
   key: string
   label: string
+  color?: string
+  value_max?: number
+  value_min?: number
 }
 
 export interface SensorLatestReading {

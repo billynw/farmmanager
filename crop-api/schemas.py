@@ -155,6 +155,9 @@ class SensorFeatureTypeOut(BaseModel):
     id: int
     key: str
     label: str
+    color: Optional[str] = None
+    value_max: Optional[float] = None
+    value_min: Optional[float] = None
     model_config = {"from_attributes": True}
 
 # --- Sensor ---
