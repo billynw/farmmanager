@@ -419,61 +419,67 @@ export default function AdminUsers() {
                 {sensors.length === 0 && (
                   <p style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>センサーが登録されていません。</p>
                 )}
-                {sensors.map(sensor => (
-                  <div key={sensor.id} style={cardStyle}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 600, fontSize: 15 }}>{sensor.name}</span>
-                        <span style={{
-                          fontSize: 11, padding: '1px 7px', borderRadius: 20, fontWeight: 600,
-                          background: sensor.active ? '#2d7a4f22' : '#88888822',
-                          color: sensor.active ? '#2d7a4f' : '#888',
-                        }}>
-                          {sensor.active ? '有効' : '無効'}
-                        </span>
-                      </div>
-                      {(sensor.features ?? []).length > 0 && (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
-                          {(sensor.features ?? []).map(fid => {
-                            const ft = featureTypes.find(f => f.id === fid)
-                            const onHome = (sensor.show_on_home ?? []).includes(fid)
-                            return ft ? (
-                              <span
-                                key={fid}
-                                onClick={() => handleBadgeToggle(sensor, fid)}
-                                style={{
-                                  fontSize: 11, padding: '3px 10px', borderRadius: 20, fontWeight: 600,
-                                  cursor: 'pointer', userSelect: 'none',
-                                  background: onHome ? '#2d7a4f' : '#eee',
-                                  color: onHome ? '#fff' : '#999',
-                                  border: onHome ? '1px solid #2d7a4f' : '1px solid #ddd',
-                                  transition: 'all 0.15s',
-                                }}
-                              >
-                                {ft.label}
-                              </span>
-                            ) : null
-                          })}
+                {sensors.map(sensor => {
+                  const sortedFeatureIds = (sensor.features ?? [])
+                    .slice()
+                    .sort((a, b) => a - b)
+                  
+                  return (
+                    <div key={sensor.id} style={cardStyle}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 600, fontSize: 15 }}>{sensor.name}</span>
+                          <span style={{
+                            fontSize: 11, padding: '1px 7px', borderRadius: 20, fontWeight: 600,
+                            background: sensor.active ? '#2d7a4f22' : '#88888822',
+                            color: sensor.active ? '#2d7a4f' : '#888',
+                          }}>
+                            {sensor.active ? '有効' : '無効'}
+                          </span>
                         </div>
-                      )}
-                      <div style={{ fontSize: 10, color: '#bbb', marginTop: 4 }}>
-                        バッジをタップでホーム表示切替
+                        {sortedFeatureIds.length > 0 && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+                            {sortedFeatureIds.map(fid => {
+                              const ft = featureTypes.find(f => f.id === fid)
+                              const onHome = (sensor.show_on_home ?? []).includes(fid)
+                              return ft ? (
+                                <span
+                                  key={fid}
+                                  onClick={() => handleBadgeToggle(sensor, fid)}
+                                  style={{
+                                    fontSize: 11, padding: '3px 10px', borderRadius: 20, fontWeight: 600,
+                                    cursor: 'pointer', userSelect: 'none',
+                                    background: onHome ? '#2d7a4f' : '#eee',
+                                    color: onHome ? '#fff' : '#999',
+                                    border: onHome ? '1px solid #2d7a4f' : '1px solid #ddd',
+                                    transition: 'all 0.15s',
+                                  }}
+                                >
+                                  {ft.label}
+                                </span>
+                              ) : null
+                            })}
+                          </div>
+                        )}
+                        <div style={{ fontSize: 10, color: '#bbb', marginTop: 4 }}>
+                          バッジをタップでホーム表示切替
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 2, alignSelf: 'flex-start' }}>
+                        <button style={iconBtnStyle} title="WIFI設定" onClick={() => openWifiSensor(sensor)}>
+                          <WifiIcon size={17} />
+                        </button>
+                        <button style={iconBtnStyle} title="編集" onClick={() => openEditSensor(sensor)}>
+                          <EditIcon size={17} color="#555" />
+                        </button>
+                        <button style={iconBtnStyle} title="削除"
+                          onClick={() => setDeleteTarget({ type: 'sensor', id: sensor.id, name: sensor.name })}>
+                          <TrashIcon size={17} />
+                        </button>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 2, alignSelf: 'flex-start' }}>
-                      <button style={iconBtnStyle} title="WIFI設定" onClick={() => openWifiSensor(sensor)}>
-                        <WifiIcon size={17} />
-                      </button>
-                      <button style={iconBtnStyle} title="編集" onClick={() => openEditSensor(sensor)}>
-                        <EditIcon size={17} color="#555" />
-                      </button>
-                      <button style={iconBtnStyle} title="削除"
-                        onClick={() => setDeleteTarget({ type: 'sensor', id: sensor.id, name: sensor.name })}>
-                        <TrashIcon size={17} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </>
           )}
