@@ -224,7 +224,6 @@ function SensorReadingsGrid({
           const featureType = featureTypeByKey[m]
           if (!featureType) return null
           const data = latestByMetric[m]
-          const isGate = m === 'gate_supply' || m === 'gate_drain'
           
           if (data) {
             const vMin = featureType.value_min ?? 0
