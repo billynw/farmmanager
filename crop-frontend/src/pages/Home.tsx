@@ -6,15 +6,6 @@ import type { Item, Field, SensorOut, SensorReadingOut, SensorFeatureType } from
 import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
 
-const METRIC_CONFIG: Record<string, { color: string; max: number; min: number }> = {
-  water_level:   { color: '#378ADD', max: 25,  min: 0  },
-  water_temp:    { color: '#1D9E75', max: 35,  min: 10 },
-  air_temp:      { color: '#BA7517', max: 40,  min: 0  },
-  soil_moisture: { color: '#639922', max: 100, min: 0  },
-  ph:            { color: '#8e44ad', max: 14,  min: 0  },
-  gate_open:     { color: '#e67e22', max: 1,   min: 0  },
-}
-
 const FEATURE_TO_METRIC: Record<number, string | null> = {
   1: null,
   2: 'gate_open',
@@ -181,15 +172,16 @@ function SensorReadingsGrid({ sensorId, targetMetrics, featureTypes }: { sensorI
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 16 }}>
       {targetMetrics.map(m => {
-        const cfg = METRIC_CONFIG[m]
         const featureType = featureTypeByKey[m]
-        if (!cfg || !featureType) return null
+        if (!featureType) return null
         const data = latestByMetric[m]
         if (data) {
-          const pct = (data.value - cfg.min) / (cfg.max - cfg.min) * 100
-          return <SensorCard key={m} label={featureType.label} value={data.value} unit={data.unit ?? ''} color={cfg.color} pct={pct} />
+          const vMin = featureType.value_min ?? 0
+          const vMax = featureType.value_max ?? 100
+          const pct = (data.value - vMin) / (vMax - vMin) * 100
+          return <SensorCard key={m} label={featureType.label} value={data.value} unit={data.unit ?? ''} color={featureType.color ?? '#888'} pct={pct} />
         }
-        return <SensorCardEmpty key={m} label={featureType.label} color={cfg.color} />
+        return <SensorCardEmpty key={m} label={featureType.label} color={featureType.color ?? '#888'} />
       })}
     </div>
   )
