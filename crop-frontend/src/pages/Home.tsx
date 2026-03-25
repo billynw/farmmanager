@@ -7,13 +7,14 @@ import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
 
 const FEATURE_TO_METRIC: Record<number, string | null> = {
-  1: null,
-  2: 'gate_open',
-  3: 'gate_open',
-  4: 'air_temp',
-  5: 'soil_moisture',
-  6: 'water_temp',
-  7: 'water_level',
+  1: null,           // camera
+  2: 'gate_supply',  // 給水ゲート
+  3: 'gate_drain',   // 排水ゲート
+  4: 'temperature',  // 温度センサ
+  5: 'humidity',     // 湿度センサ
+  6: 'soil_moisture',// 土壌水分センサ
+  7: 'water_temp',   // 水温センサ
+  8: 'water_level',  // 水位センサ
 }
 
 const STATUS_LABEL: Record<string, string> = { growing: '栽培中', finished: '終了' }
