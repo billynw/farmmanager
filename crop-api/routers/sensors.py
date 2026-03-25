@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import func, case
 from database import get_db
 from auth import get_current_user
 from config import settings
@@ -62,7 +63,7 @@ def list_sensor_feature_types(
 
 
 # ----------------------------------------------------------------
-# センサー管理（CRUD）
+# センサー管理(CRUD)
 # ----------------------------------------------------------------
 
 @router.get("/sensors", response_model=List[schemas.SensorOut])
@@ -74,7 +75,17 @@ def list_sensors(
     q = db.query(models.Sensor)
     if field_id:
         q = q.filter(models.Sensor.field_id == field_id)
-    return q.all()
+    
+    sensors = q.all()
+    
+    # センサーのfeaturesに含まれる最小ID順でソート
+    def min_feature_id(sensor):
+        if sensor.features and len(sensor.features) > 0:
+            return min(sensor.features)
+        return float('inf')
+    
+    sensors.sort(key=min_feature_id)
+    return sensors
 
 
 @router.post("/sensors", response_model=schemas.SensorOut)
@@ -256,7 +267,7 @@ def get_sensor_photos(
 
 
 # ----------------------------------------------------------------
-# 圃場ごとの最新センサー値サマリー（ホーム画面向け）
+# 圃場ごとの最新センサー値サマリー(ホーム画面向け)
 # show_on_home=True のセンサーを優先。なければ最小IDの有効センサー。
 # ----------------------------------------------------------------
 
@@ -334,7 +345,7 @@ def field_sensor_summary(
 
 
 # ----------------------------------------------------------------
-# ダミーデータ生成（開発用）
+# ダミーデータ生成(開発用)
 # ----------------------------------------------------------------
 
 @router.post("/dev/seed-sensor-dummy")
