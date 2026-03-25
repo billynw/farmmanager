@@ -189,6 +189,7 @@ class SensorFeatureType(Base):
     color = Column(String(7), nullable=True)
     value_max = Column(Float, nullable=True)
     value_min = Column(Float, nullable=True)
+    unit = Column(String(20), nullable=True)
 
 
 class Sensor(Base):
@@ -214,7 +215,6 @@ class SensorReading(Base):
     sensor_id   = Column(Integer, ForeignKey("sensors.id"), nullable=False)
     metric      = Column(String(50), nullable=False)
     value       = Column(Float, nullable=False)
-    unit        = Column(String(20), nullable=True)
     recorded_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     sensor = relationship("Sensor", back_populates="readings")
 

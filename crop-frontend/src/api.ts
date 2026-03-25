@@ -87,6 +87,7 @@ export interface SensorFeatureType {
   color?: string
   value_max?: number
   value_min?: number
+  unit?: string
 }
 
 export interface SensorLatestReading {
@@ -115,8 +116,8 @@ export interface SensorOut {
   name: string
   active: boolean
   token: string
-  features: number[]       // 有効な機能IDリスト
-  show_on_home: number[]   // ホームに表示する機能IDリスト
+  features: number[]
+  show_on_home: number[]
 }
 
 export interface SensorReadingOut {
@@ -124,7 +125,6 @@ export interface SensorReadingOut {
   sensor_id: number
   metric: string
   value: number
-  unit?: string
   recorded_at: string
 }
 

@@ -158,6 +158,7 @@ class SensorFeatureTypeOut(BaseModel):
     color: Optional[str] = None
     value_max: Optional[float] = None
     value_min: Optional[float] = None
+    unit: Optional[str] = None
     model_config = {"from_attributes": True}
 
 # --- Sensor ---
@@ -232,7 +233,6 @@ class SensorReadingCreate(BaseModel):
     token: str
     metric: str
     value: float
-    unit: Optional[str] = None
     recorded_at: Optional[datetime] = None
 
 class SensorReadingOut(BaseModel):
@@ -240,7 +240,6 @@ class SensorReadingOut(BaseModel):
     sensor_id: int
     metric: str
     value: float
-    unit: Optional[str]
     recorded_at: datetime
     model_config = {"from_attributes": True}
 
