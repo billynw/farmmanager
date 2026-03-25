@@ -180,7 +180,8 @@ function SensorReadingsGrid({ sensorId, targetMetrics, featureTypes }: { sensorI
           const vMin = featureType.value_min ?? 0
           const vMax = featureType.value_max ?? 100
           const pct = (data.value - vMin) / (vMax - vMin) * 100
-          return <SensorCard key={m} label={featureType.label} value={data.value} unit={data.unit ?? ''} color={featureType.color ?? '#888'} pct={pct} />
+          const unit = data.unit ?? featureType.unit ?? ''
+          return <SensorCard key={m} label={featureType.label} value={data.value} unit={unit} color={featureType.color ?? '#888'} pct={pct} />
         }
         return <SensorCardEmpty key={m} label={featureType.label} color={featureType.color ?? '#888'} />
       })}
