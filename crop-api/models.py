@@ -23,6 +23,7 @@ class DeviceCommandStatus(str, enum.Enum):
     pending = "pending"
     delivered = "delivered"
     expired = "expired"
+    cancelled = "cancelled"
 
 
 class UserField(Base):

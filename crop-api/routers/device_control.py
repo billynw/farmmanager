@@ -22,6 +22,11 @@ class DeviceCommandResponse(BaseModel):
     command: Optional[str] = None
 
 
+class DeviceCommandCancelRequest(BaseModel):
+    """命令キャンセルリクエスト"""
+    command_id: int
+
+
 @router.post("/device/command", response_model=DeviceCommandResponse)
 def get_device_command(
     request: DeviceStateRequest,
@@ -108,6 +113,36 @@ def send_device_command(
     db.refresh(command)
     
     return command
+
+
+@router.post("/device/command/cancel")
+def cancel_device_command(
+    body: DeviceCommandCancelRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    命令をキャンセルするエンドポイント
+    
+    受信JSON:
+    {
+        "command_id": 123
+    }
+    """
+    command = db.query(models.DeviceCommand).filter(
+        models.DeviceCommand.id == body.command_id
+    ).first()
+    
+    if not command:
+        raise HTTPException(status_code=404, detail="Command not found")
+    
+    if command.status != models.DeviceCommandStatus.pending:
+        raise HTTPException(status_code=400, detail="Only pending commands can be cancelled")
+    
+    command.status = models.DeviceCommandStatus.cancelled
+    db.commit()
+    
+    return {"ok": True}
 
 
 @router.get("/device/commands", response_model=List[schemas.DeviceCommandOut])
