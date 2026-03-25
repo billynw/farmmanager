@@ -417,7 +417,7 @@ function GateCommandModal({
             </button>
           )}
         </div>
-        <button style={cancelButtonStyle} onClick={onClose}>キャンセル</button>
+        <button style={cancelButtonStyle} onClick={onClose}>戻る</button>
       </div>
     </div>
   )
