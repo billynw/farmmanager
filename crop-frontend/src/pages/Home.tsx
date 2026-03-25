@@ -1,18 +1,18 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { fieldsApi, sensorsApi, itemsApi } from '../api'
-import type { Item, Field, SensorOut, SensorReadingOut } from '../api'
+import { fieldsApi, sensorsApi, itemsApi, sensorFeatureTypesApi } from '../api'
+import type { Item, Field, SensorOut, SensorReadingOut, SensorFeatureType } from '../api'
 import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
 
-const METRIC_CONFIG: Record<string, { label: string; unit: string; color: string; max: number; min: number }> = {
-  water_level:   { label: '水位',    unit: 'cm',  color: '#378ADD', max: 25,  min: 0  },
-  water_temp:    { label: '水温',    unit: '°C',  color: '#1D9E75', max: 35,  min: 10 },
-  air_temp:      { label: '気温',    unit: '°C',  color: '#BA7517', max: 40,  min: 0  },
-  soil_moisture: { label: '地中水分', unit: '%',   color: '#639922', max: 100, min: 0  },
-  ph:            { label: 'pH',      unit: '',    color: '#8e44ad', max: 14,  min: 0  },
-  gate_open:     { label: 'ゲート',  unit: '',    color: '#e67e22', max: 1,   min: 0  },
+const METRIC_CONFIG: Record<string, { color: string; max: number; min: number }> = {
+  water_level:   { color: '#378ADD', max: 25,  min: 0  },
+  water_temp:    { color: '#1D9E75', max: 35,  min: 10 },
+  air_temp:      { color: '#BA7517', max: 40,  min: 0  },
+  soil_moisture: { color: '#639922', max: 100, min: 0  },
+  ph:            { color: '#8e44ad', max: 14,  min: 0  },
+  gate_open:     { color: '#e67e22', max: 1,   min: 0  },
 }
 
 const FEATURE_TO_METRIC: Record<number, string | null> = {
@@ -129,6 +129,11 @@ function FieldSensorBlock({ fieldId }: { fieldId: number }) {
     queryFn: () => sensorsApi.list(fieldId).then(r => r.data),
   })
 
+  const { data: featureTypes = [] } = useQuery<SensorFeatureType[]>({
+    queryKey: ['sensor-feature-types'],
+    queryFn: () => sensorFeatureTypesApi.list().then(r => r.data),
+  })
+
   const activeSensor = sensors
     .filter(s => s.active && (s.show_on_home ?? []).length > 0)
     .sort((a, b) => a.id - b.id)[0] ?? null
@@ -142,9 +147,10 @@ function FieldSensorBlock({ fieldId }: { fieldId: number }) {
     : []
 
   if (!activeSensor || targetMetrics.length === 0) {
+    const defaultLabels = ['水位', '水温', '気温', '地中水分']
     return (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 16, opacity: 0.4 }}>
-        {['水位', '水温', '気温', '地中水分'].map(label => (
+        {defaultLabels.map(label => (
           <div key={label} style={{ background: '#fff', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px' }}>
             <div style={{ fontSize: 10, color: '#999', marginBottom: 3 }}>{label}</div>
             <div style={{ fontSize: 16, fontWeight: 500, color: '#bbb' }}>--</div>
@@ -154,10 +160,10 @@ function FieldSensorBlock({ fieldId }: { fieldId: number }) {
     )
   }
 
-  return <SensorReadingsGrid sensorId={activeSensor.id} targetMetrics={targetMetrics} />
+  return <SensorReadingsGrid sensorId={activeSensor.id} targetMetrics={targetMetrics} featureTypes={featureTypes} />
 }
 
-function SensorReadingsGrid({ sensorId, targetMetrics }: { sensorId: number; targetMetrics: string[] }) {
+function SensorReadingsGrid({ sensorId, targetMetrics, featureTypes }: { sensorId: number; targetMetrics: string[]; featureTypes: SensorFeatureType[] }) {
   const { data: readings = [] } = useQuery<SensorReadingOut[]>({
     queryKey: ['sensor-readings-home', sensorId],
     queryFn: () => sensorsApi.readings(sensorId, undefined, 200).then(r => r.data),
@@ -170,17 +176,20 @@ function SensorReadingsGrid({ sensorId, targetMetrics }: { sensorId: number; tar
     }
   }
 
+  const featureTypeByKey = Object.fromEntries(featureTypes.map(ft => [ft.key, ft]))
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 16 }}>
       {targetMetrics.map(m => {
         const cfg = METRIC_CONFIG[m]
-        if (!cfg) return null
+        const featureType = featureTypeByKey[m]
+        if (!cfg || !featureType) return null
         const data = latestByMetric[m]
         if (data) {
           const pct = (data.value - cfg.min) / (cfg.max - cfg.min) * 100
-          return <SensorCard key={m} label={cfg.label} value={data.value} unit={data.unit ?? cfg.unit} color={cfg.color} pct={pct} />
+          return <SensorCard key={m} label={featureType.label} value={data.value} unit={data.unit ?? ''} color={cfg.color} pct={pct} />
         }
-        return <SensorCardEmpty key={m} label={cfg.label} color={cfg.color} />
+        return <SensorCardEmpty key={m} label={featureType.label} color={cfg.color} />
       })}
     </div>
   )
