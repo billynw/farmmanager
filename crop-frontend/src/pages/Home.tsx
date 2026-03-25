@@ -123,6 +123,8 @@ export default function Home() {
 }
 
 function FieldSensorBlock({ fieldId }: { fieldId: number }) {
+  const [selectedSensorId, setSelectedSensorId] = useState<number | null>(null)
+
   const { data: sensors = [] } = useQuery<SensorOut[]>({
     queryKey: ['sensors-home', fieldId],
     queryFn: () => sensorsApi.list(fieldId).then(r => r.data),
@@ -133,38 +135,16 @@ function FieldSensorBlock({ fieldId }: { fieldId: number }) {
     queryFn: () => sensorFeatureTypesApi.list().then(r => r.data),
   })
 
-  // 全アクティブセンサーのshow_on_homeを統合
-  const activeSensors = sensors.filter(s => s.active && (s.show_on_home ?? []).length > 0)
-  
-  // メトリック→センサーIDのマッピングを作成
-  const metricToSensorId: Record<string, number> = {}
-  const allMetricsSet = new Set<string>()
-  
-  for (const sensor of activeSensors) {
-    for (const featureId of sensor.show_on_home ?? []) {
-      const metric = FEATURE_TO_METRIC[featureId]
-      if (metric) {
-        allMetricsSet.add(metric)
-        if (!metricToSensorId[metric]) {
-          metricToSensorId[metric] = sensor.id
-        }
-      }
-    }
-  }
-  
-  // sensor_feature_typesのID順にソート
-  const metricToFeatureId: Record<string, number> = {}
-  for (const [featureId, metric] of Object.entries(FEATURE_TO_METRIC)) {
-    if (metric) {
-      metricToFeatureId[metric] = parseInt(featureId)
-    }
-  }
-  
-  const targetMetrics = Array.from(allMetricsSet).sort((a, b) => {
-    return metricToFeatureId[a] - metricToFeatureId[b]
-  })
+  // アクティブでshow_on_homeがあるセンサー
+  const activeSensors = sensors
+    .filter(s => s.active && (s.show_on_home ?? []).length > 0)
+    .sort((a, b) => a.id - b.id)
 
-  if (targetMetrics.length === 0) {
+  // 選択されているセンサー（デフォルトは最初のセンサー）
+  const activeSensorId = selectedSensorId ?? activeSensors[0]?.id ?? null
+  const activeSensor = activeSensors.find(s => s.id === activeSensorId) ?? null
+
+  if (activeSensors.length === 0) {
     const defaultLabels = ['水位', '水温', '気温', '地中水分']
     return (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 16, opacity: 0.4 }}>
@@ -178,46 +158,56 @@ function FieldSensorBlock({ fieldId }: { fieldId: number }) {
     )
   }
 
-  return <SensorReadingsGrid sensors={activeSensors} targetMetrics={targetMetrics} metricToSensorId={metricToSensorId} featureTypes={featureTypes} />
+  return (
+    <>
+      {/* センサー切り替えボタン（複数ある場合のみ表示） */}
+      {activeSensors.length > 1 && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 10, overflowX: 'auto', paddingBottom: 2 }}>
+          {activeSensors.map(s => (
+            <div key={s.id} onClick={() => setSelectedSensorId(s.id)}
+              style={s.id === activeSensorId ? activePillStyle : pillStyle}>
+              {s.name}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {activeSensor && <SensorReadingsGrid sensor={activeSensor} featureTypes={featureTypes} />}
+    </>
+  )
 }
 
 function SensorReadingsGrid({ 
-  sensors, 
-  targetMetrics, 
-  metricToSensorId, 
+  sensor, 
   featureTypes 
 }: { 
-  sensors: SensorOut[]
-  targetMetrics: string[]
-  metricToSensorId: Record<string, number>
+  sensor: SensorOut
   featureTypes: SensorFeatureType[] 
 }) {
   const [commandModal, setCommandModal] = useState<{ sensorId: number; metric: string; label: string } | null>(null)
 
-  // 全センサーのreadingsを取得
-  const sensorIds = sensors.map(s => s.id)
-  const readingsQueries = useQuery<Record<number, SensorReadingOut[]>>({
-    queryKey: ['sensor-readings-home-all', sensorIds],
-    queryFn: async () => {
-      const results: Record<number, SensorReadingOut[]> = {}
-      for (const sensorId of sensorIds) {
-        const response = await sensorsApi.readings(sensorId, undefined, 200)
-        results[sensorId] = response.data
-      }
-      return results
-    },
-    enabled: sensorIds.length > 0,
+  // sensor_feature_typesのID順にソートされたメトリック
+  const metricToFeatureId: Record<string, number> = {}
+  for (const [featureId, metric] of Object.entries(FEATURE_TO_METRIC)) {
+    if (metric) {
+      metricToFeatureId[metric] = parseInt(featureId)
+    }
+  }
+
+  const targetMetrics = (sensor.show_on_home ?? [])
+    .map(id => FEATURE_TO_METRIC[id])
+    .filter((m): m is string => m !== null)
+    .sort((a, b) => metricToFeatureId[a] - metricToFeatureId[b])
+
+  const { data: readings = [] } = useQuery<SensorReadingOut[]>({
+    queryKey: ['sensor-readings-home', sensor.id],
+    queryFn: () => sensorsApi.readings(sensor.id, undefined, 200).then(r => r.data),
   })
 
-  const allReadings = readingsQueries.data ?? {}
-  
-  // メトリックごとの最新データを統合
-  const latestByMetric: Record<string, { value: number; unit?: string; sensorId: number }> = {}
-  for (const [sensorIdStr, readings] of Object.entries(allReadings)) {
-    for (const r of readings) {
-      if (!latestByMetric[r.metric]) {
-        latestByMetric[r.metric] = { value: r.value, unit: r.unit ?? undefined, sensorId: parseInt(sensorIdStr) }
-      }
+  const latestByMetric: Record<string, { value: number; unit?: string }> = {}
+  for (const r of readings) {
+    if (!latestByMetric[r.metric]) {
+      latestByMetric[r.metric] = { value: r.value, unit: r.unit ?? undefined }
     }
   }
 
@@ -230,7 +220,6 @@ function SensorReadingsGrid({
           const featureType = featureTypeByKey[m]
           if (!featureType) return null
           const data = latestByMetric[m]
-          const sensorId = metricToSensorId[m]
           const isGate = m === 'gate_supply' || m === 'gate_drain'
           
           if (data) {
@@ -241,20 +230,20 @@ function SensorReadingsGrid({
             return (
               <SensorCard
                 key={m}
-                sensorId={data.sensorId}
+                sensorId={sensor.id}
                 metric={m}
                 label={featureType.label}
                 value={data.value}
                 unit={unit}
                 color={featureType.color ?? '#888'}
                 pct={pct}
-                onCommandClick={(metric, label) => setCommandModal({ sensorId: data.sensorId, metric, label })}
+                onCommandClick={(metric, label) => setCommandModal({ sensorId: sensor.id, metric, label })}
               />
             )
           }
           
           // データがない場合
-          if (isGate && sensorId) {
+          if (isGate) {
             // ゲートはデータなしでもクリック可能
             return (
               <SensorCardEmpty 
@@ -262,7 +251,7 @@ function SensorReadingsGrid({
                 label={featureType.label} 
                 color={featureType.color ?? '#888'}
                 isGate={true}
-                onClick={() => setCommandModal({ sensorId, metric: m, label: featureType.label })}
+                onClick={() => setCommandModal({ sensorId: sensor.id, metric: m, label: featureType.label })}
               />
             )
           } else {
