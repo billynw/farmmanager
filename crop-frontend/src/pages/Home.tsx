@@ -138,24 +138,31 @@ function FieldSensorBlock({ fieldId }: { fieldId: number }) {
   
   // メトリック→センサーIDのマッピングを作成
   const metricToSensorId: Record<string, number> = {}
-  const allMetrics: Array<{ metric: string; sensorId: number }> = []
+  const allMetricsSet = new Set<string>()
   
   for (const sensor of activeSensors) {
     for (const featureId of sensor.show_on_home ?? []) {
       const metric = FEATURE_TO_METRIC[featureId]
       if (metric) {
+        allMetricsSet.add(metric)
         if (!metricToSensorId[metric]) {
           metricToSensorId[metric] = sensor.id
-          allMetrics.push({ metric, sensorId: sensor.id })
         }
       }
     }
   }
   
-  // センサーID順にソート
-  const targetMetrics = allMetrics
-    .sort((a, b) => a.sensorId - b.sensorId)
-    .map(m => m.metric)
+  // sensor_feature_typesのID順にソート
+  const metricToFeatureId: Record<string, number> = {}
+  for (const [featureId, metric] of Object.entries(FEATURE_TO_METRIC)) {
+    if (metric) {
+      metricToFeatureId[metric] = parseInt(featureId)
+    }
+  }
+  
+  const targetMetrics = Array.from(allMetricsSet).sort((a, b) => {
+    return metricToFeatureId[a] - metricToFeatureId[b]
+  })
 
   if (targetMetrics.length === 0) {
     const defaultLabels = ['水位', '水温', '気温', '地中水分']
