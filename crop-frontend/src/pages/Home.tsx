@@ -263,6 +263,7 @@ function SensorReadingsGrid({
       {commandModal && (
         <GateCommandModal
           sensorId={commandModal.sensorId}
+          metric={commandModal.metric}
           label={commandModal.label}
           onClose={() => setCommandModal(null)}
         />
@@ -360,14 +361,24 @@ function SensorCardEmpty({ label, color, isGate, onClick }: { label: string; col
 
 function GateCommandModal({
   sensorId,
+  metric,
   label,
   onClose
 }: {
   sensorId: number
+  metric: string
   label: string
   onClose: () => void
 }) {
   const queryClient = useQueryClient()
+
+  const { data: readings = [] } = useQuery<SensorReadingOut[]>({
+    queryKey: ['sensor-readings-home', sensorId],
+    queryFn: () => sensorsApi.readings(sensorId, metric, 1).then(r => r.data),
+  })
+
+  const currentValue = readings.length > 0 ? readings[0].value : null
+  const currentState = currentValue === null ? null : (currentValue === 0 ? 'CLOSE' : 'OPEN')
 
   const sendCommand = useMutation({
     mutationFn: (command: string) => deviceCommandsApi.send(sensorId, command),
@@ -381,21 +392,30 @@ function GateCommandModal({
     <div style={modalOverlayStyle} onClick={onClose}>
       <div style={modalContentStyle} onClick={e => e.stopPropagation()}>
         <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 16, color: '#1a1a1a' }}>{label}制御</div>
+        {currentState && (
+          <div style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>
+            現在の状態: <span style={{ fontWeight: 600, color: '#1a1a1a' }}>{currentState}</span>
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 10 }}>
-          <button
-            style={commandButtonStyle}
-            onClick={() => sendCommand.mutate('OPEN')}
-            disabled={sendCommand.isPending}
-          >
-            OPEN
-          </button>
-          <button
-            style={commandButtonStyle}
-            onClick={() => sendCommand.mutate('CLOSE')}
-            disabled={sendCommand.isPending}
-          >
-            CLOSE
-          </button>
+          {(!currentState || currentState === 'CLOSE') && (
+            <button
+              style={commandButtonStyle}
+              onClick={() => sendCommand.mutate('OPEN')}
+              disabled={sendCommand.isPending}
+            >
+              OPEN
+            </button>
+          )}
+          {(!currentState || currentState === 'OPEN') && (
+            <button
+              style={commandButtonStyle}
+              onClick={() => sendCommand.mutate('CLOSE')}
+              disabled={sendCommand.isPending}
+            >
+              CLOSE
+            </button>
+          )}
         </div>
         <button style={cancelButtonStyle} onClick={onClose}>キャンセル</button>
       </div>
