@@ -125,6 +125,7 @@ export interface SensorReadingOut {
   sensor_id: number
   metric: string
   value: number
+  unit?: string
   recorded_at: string
 }
 
