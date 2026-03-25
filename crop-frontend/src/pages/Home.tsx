@@ -451,16 +451,14 @@ function CancelCommandModal({
         <div style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>
           送信中の命令をキャンセルしますか？
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button
-            style={{ ...commandButtonStyle, background: '#dc3545' }}
-            onClick={() => cancelCommand.mutate()}
-            disabled={cancelCommand.isPending}
-          >
-            キャンセル実行
-          </button>
-          <button style={{ ...cancelButtonStyle, marginTop: 0, flex: 1 }} onClick={onClose}>戻る</button>
-        </div>
+        <button
+          style={{ ...commandButtonStyle, background: '#dc3545' }}
+          onClick={() => cancelCommand.mutate()}
+          disabled={cancelCommand.isPending}
+        >
+          キャンセル
+        </button>
+        <button style={cancelButtonStyle} onClick={onClose}>戻る</button>
       </div>
     </div>
   )
@@ -494,7 +492,7 @@ const modalContentStyle: React.CSSProperties = {
 }
 
 const commandButtonStyle: React.CSSProperties = {
-  flex: 1,
+  width: '100%',
   padding: '12px 20px',
   background: '#2d7a4f',
   color: '#fff',
