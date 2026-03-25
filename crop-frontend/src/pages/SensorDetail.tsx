@@ -1,22 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { fieldsApi, sensorsApi } from '../api'
-import type { Field, SensorOut, SensorReadingOut, SensorPhotoOut } from '../api'
+import { fieldsApi, sensorsApi, sensorFeatureTypesApi } from '../api'
+import type { Field, SensorOut, SensorReadingOut, SensorPhotoOut, SensorFeatureType } from '../api'
 import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
-
-const METRIC_CONFIG: Record<string, { label: string; unit: string; color: string; max: number; min: number }> = {
-  water_level:   { label: '水位',    unit: 'cm', color: '#378ADD', max: 25,  min: 0  },
-  water_temp:    { label: '水温',    unit: '°C', color: '#1D9E75', max: 35,  min: 10 },
-  air_temp:      { label: '気温',    unit: '°C', color: '#BA7517', max: 40,  min: 0  },
-  temperature:   { label: '温度',    unit: '°C', color: '#BA7517', max: 40,  min: 0  },
-  humidity:      { label: '湿度',    unit: '%',  color: '#639922', max: 100, min: 0  },
-  soil_moisture: { label: '地中水分', unit: '%',  color: '#639922', max: 100, min: 0  },
-  ph:            { label: 'pH',      unit: '',   color: '#8e44ad', max: 14,  min: 0  },
-  gate_open:     { label: 'ゲート',  unit: '',   color: '#e67e22', max: 1,   min: 0  },
-  gate_supply:   { label: '給水ゲート', unit: '', color: '#e67e22', max: 1,   min: 0  },
-  gate_drain:    { label: '排水ゲート', unit: '', color: '#e67e22', max: 1,   min: 0  },
-}
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr)
@@ -41,6 +28,13 @@ export default function SensorDetail() {
     queryKey: ['fields'],
     queryFn: () => fieldsApi.list().then(r => r.data),
   })
+  
+  const { data: featureTypes = [] } = useQuery<SensorFeatureType[]>({
+    queryKey: ['sensor-feature-types'],
+    queryFn: () => sensorFeatureTypesApi.list().then(r => r.data),
+  })
+  const featureTypeByKey = Object.fromEntries(featureTypes.map(ft => [ft.key, ft]))
+  
   const activeFieldId = selectedFieldId ?? fields[0]?.id ?? null
   useEffect(() => {
     if (!selectedFieldId && fields.length > 0) setSelectedFieldId(fields[0].id)
@@ -82,8 +76,8 @@ export default function SensorDetail() {
   const W = 320, H = 80, pad = 10
   let chartPath = '', chartArea = '', chartColor = '#378ADD'
   if (chartData.length >= 2) {
-    const cfg = METRIC_CONFIG[selectedMetric]
-    chartColor = cfg?.color ?? '#378ADD'
+    const ft = featureTypeByKey[selectedMetric]
+    chartColor = ft?.color ?? '#378ADD'
     const vals = chartData.map(r => r.value)
     const minV = Math.min(...vals) - 1
     const maxV = Math.max(...vals) + 1
@@ -98,7 +92,7 @@ export default function SensorDetail() {
   const chartLabels = chartRange === '24h'
     ? ['0:00', '6:00', '12:00', '18:00', '24:00']
     : ['7日前', '6日前', '5日前', '4日前', '3日前', '2日前', '昨日', '今日']
-  const cfg = METRIC_CONFIG[selectedMetric]
+  const selectedFeatureType = featureTypeByKey[selectedMetric]
 
   return (
     <div style={pageStyle}>
@@ -146,24 +140,27 @@ export default function SensorDetail() {
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 14 }}>
                   {latestReadings.map(r => {
-                    const mc = METRIC_CONFIG[r.metric]
-                    if (!mc) return null
-                    const pct = Math.min(100, Math.max(0, (r.value - mc.min) / (mc.max - mc.min) * 100))
+                    const ft = featureTypeByKey[r.metric]
+                    if (!ft) return null
+                    const vMin = ft.value_min ?? 0
+                    const vMax = ft.value_max ?? 100
+                    const pct = Math.min(100, Math.max(0, (r.value - vMin) / (vMax - vMin) * 100))
                     const isSelected = r.metric === selectedMetric
                     const isGate = r.metric === 'gate_supply' || r.metric === 'gate_drain' || r.metric === 'gate_open'
                     const displayValue = formatGateValue(r.metric, r.value)
+                    const unit = r.unit ?? ft.unit ?? ''
                     return (
                       <div key={r.metric} onClick={() => setSelectedMetric(r.metric)}
-                        style={{ background: '#fff', border: `1.5px solid ${isSelected ? mc.color : '#eee'}`, borderRadius: 8, padding: '8px 6px', cursor: 'pointer' }}>
+                        style={{ background: '#fff', border: `1.5px solid ${isSelected ? ft.color : '#eee'}`, borderRadius: 8, padding: '8px 6px', cursor: 'pointer' }}>
                         <div style={{ fontSize: 10, color: '#999', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 3 }}>
-                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: mc.color, flexShrink: 0 }} />
-                          {mc.label}
+                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: ft.color ?? '#888', flexShrink: 0 }} />
+                          {ft.label}
                         </div>
                         <div style={{ fontSize: 16, fontWeight: 500, color: '#1a1a1a', lineHeight: 1.2 }}>
-                          {displayValue}{!isGate && <span style={{ fontSize: 10, fontWeight: 400, color: '#999' }}>{r.unit ?? mc.unit}</span>}
+                          {displayValue}{!isGate && <span style={{ fontSize: 10, fontWeight: 400, color: '#999' }}>{unit}</span>}
                         </div>
                         <div style={{ height: 3, background: '#eee', borderRadius: 2, marginTop: 5, overflow: 'hidden' }}>
-                          <div style={{ height: '100%', borderRadius: 2, background: mc.color, width: `${pct}%` }} />
+                          <div style={{ height: '100%', borderRadius: 2, background: ft.color ?? '#888', width: `${pct}%` }} />
                         </div>
                       </div>
                     )
@@ -172,7 +169,7 @@ export default function SensorDetail() {
 
                 <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <div style={{ fontSize: 12, fontWeight: 500, color: '#444' }}>{cfg?.label ?? selectedMetric}の推移</div>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: '#444' }}>{selectedFeatureType?.label ?? selectedMetric}の推移</div>
                     <div style={{ display: 'flex', gap: 4 }}>
                       {(['24h', '7d'] as const).map(r => (
                         <div key={r} onClick={() => setChartRange(r)}
