@@ -19,6 +19,12 @@ class ItemStatus(str, enum.Enum):
     finished = "finished"
 
 
+class DeviceCommandStatus(str, enum.Enum):
+    pending = "pending"
+    delivered = "delivered"
+    expired = "expired"
+
+
 class UserField(Base):
     __tablename__ = "user_fields"
     user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
@@ -199,14 +205,13 @@ class Sensor(Base):
     name         = Column(String(100), nullable=False)
     active       = Column(Boolean, default=True)
     token        = Column(String(15), nullable=False)
-    # features: sensor_feature_types.id のリスト  例: [1, 4, 7]
     features     = Column(JSON, nullable=False, default=list)
-    # show_on_home: ホームに表示する feature_type id のリスト  例: [4, 7]
     show_on_home = Column(JSON, nullable=False, default=list)
     created_at   = Column(DateTime, default=datetime.utcnow)
     field    = relationship("Field", back_populates="sensors")
     readings = relationship("SensorReading", back_populates="sensor", cascade="all, delete-orphan")
     photos   = relationship("SensorPhoto",   back_populates="sensor", cascade="all, delete-orphan")
+    commands = relationship("DeviceCommand", back_populates="sensor", cascade="all, delete-orphan")
 
 
 class SensorReading(Base):
@@ -227,3 +232,15 @@ class SensorPhoto(Base):
     taken_at   = Column(DateTime, default=datetime.utcnow, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     sensor = relationship("Sensor", back_populates="photos")
+
+
+class DeviceCommand(Base):
+    __tablename__ = "device_commands"
+    id = Column(Integer, primary_key=True)
+    sensor_id = Column(Integer, ForeignKey("sensors.id"), nullable=False)
+    command = Column(String(10), nullable=False)
+    status = Column(Enum(DeviceCommandStatus), default=DeviceCommandStatus.pending, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    delivered_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=False)
+    sensor = relationship("Sensor", back_populates="commands")

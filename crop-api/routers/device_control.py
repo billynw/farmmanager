@@ -1,6 +1,12 @@
-from fastapi import APIRouter, HTTPException
+from datetime import datetime, timedelta
+from typing import Optional, List
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import Optional
+from sqlalchemy.orm import Session
+from database import get_db
+from auth import get_current_user
+import models
+import schemas
 
 router = APIRouter(prefix="/api/v1", tags=["device-control"])
 
@@ -13,31 +19,112 @@ class DeviceStateRequest(BaseModel):
 
 class DeviceCommandResponse(BaseModel):
     """デバイスへのコマンドレスポンス"""
-    command: str
+    command: Optional[str] = None
 
 
 @router.post("/device/command", response_model=DeviceCommandResponse)
-def get_device_command(request: DeviceStateRequest):
+def get_device_command(
+    request: DeviceStateRequest,
+    db: Session = Depends(get_db)
+):
     """
-    デバイスの状態に基づいてコマンドを返す
+    センサーデバイスが命令を取得するエンドポイント
     
     受信JSON:
     {
         "state": "CLOSED",
-        "token": "your-token"  # オプション
+        "token": "sensor-token"
     }
     
     返すJSON:
     {
+        "command": "OPEN"  # or null
+    }
+    """
+    if not request.token:
+        raise HTTPException(status_code=400, detail="Token is required")
+    
+    # トークンでセンサーを特定
+    sensor = db.query(models.Sensor).filter(models.Sensor.token == request.token).first()
+    if not sensor:
+        raise HTTPException(status_code=404, detail="Sensor not found")
+    
+    # pending状態で有効期限内の命令を取得（最新1件）
+    now = datetime.utcnow()
+    command = (
+        db.query(models.DeviceCommand)
+        .filter(
+            models.DeviceCommand.sensor_id == sensor.id,
+            models.DeviceCommand.status == models.DeviceCommandStatus.pending,
+            models.DeviceCommand.expires_at > now
+        )
+        .order_by(models.DeviceCommand.created_at.desc())
+        .first()
+    )
+    
+    if command:
+        # 配信済みにマーク
+        command.status = models.DeviceCommandStatus.delivered
+        command.delivered_at = now
+        db.commit()
+        return DeviceCommandResponse(command=command.command)
+    
+    return DeviceCommandResponse(command=None)
+
+
+@router.post("/device/command/send", response_model=schemas.DeviceCommandOut)
+def send_device_command(
+    body: schemas.DeviceCommandCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    フロントエンドから命令を送信するエンドポイント
+    
+    受信JSON:
+    {
+        "sensor_id": 5,
         "command": "OPEN"
     }
     """
-    if request.state == "CLOSED":
-        return DeviceCommandResponse(command="OPEN")
-    elif request.state == "OPEN":
-        return DeviceCommandResponse(command="CLOSE")
-    else:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid state: {request.state}. Expected 'OPEN' or 'CLOSED'"
-        )
+    # センサーの存在確認
+    sensor = db.query(models.Sensor).filter(models.Sensor.id == body.sensor_id).first()
+    if not sensor:
+        raise HTTPException(status_code=404, detail="Sensor not found")
+    
+    # コマンド検証
+    if body.command not in ["OPEN", "CLOSE"]:
+        raise HTTPException(status_code=400, detail="Command must be OPEN or CLOSE")
+    
+    # 命令作成（有効期限24時間）
+    command = models.DeviceCommand(
+        sensor_id=body.sensor_id,
+        command=body.command,
+        status=models.DeviceCommandStatus.pending,
+        expires_at=datetime.utcnow() + timedelta(hours=24)
+    )
+    db.add(command)
+    db.commit()
+    db.refresh(command)
+    
+    return command
+
+
+@router.get("/device/commands", response_model=List[schemas.DeviceCommandOut])
+def get_device_commands(
+    sensor_id: int,
+    limit: int = 10,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    命令履歴を取得するエンドポイント
+    """
+    commands = (
+        db.query(models.DeviceCommand)
+        .filter(models.DeviceCommand.sensor_id == sensor_id)
+        .order_by(models.DeviceCommand.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return commands
