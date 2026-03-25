@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { fieldsApi, sensorsApi, itemsApi, sensorFeatureTypesApi } from '../api'
-import type { Item, Field, SensorOut, SensorReadingOut, SensorFeatureType } from '../api'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { fieldsApi, sensorsApi, itemsApi, sensorFeatureTypesApi, deviceCommandsApi } from '../api'
+import type { Item, Field, SensorOut, SensorReadingOut, SensorFeatureType, DeviceCommandOut } from '../api'
 import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
 
@@ -159,78 +159,4 @@ function FieldSensorBlock({ fieldId }: { fieldId: number }) {
     )
   }
 
-  return <SensorReadingsGrid sensorId={activeSensor.id} targetMetrics={targetMetrics} featureTypes={featureTypes} />
-}
-
-function SensorReadingsGrid({ sensorId, targetMetrics, featureTypes }: { sensorId: number; targetMetrics: string[]; featureTypes: SensorFeatureType[] }) {
-  const { data: readings = [] } = useQuery<SensorReadingOut[]>({
-    queryKey: ['sensor-readings-home', sensorId],
-    queryFn: () => sensorsApi.readings(sensorId, undefined, 200).then(r => r.data),
-  })
-
-  const latestByMetric: Record<string, { value: number; unit?: string }> = {}
-  for (const r of readings) {
-    if (!latestByMetric[r.metric]) {
-      latestByMetric[r.metric] = { value: r.value, unit: r.unit ?? undefined }
-    }
-  }
-
-  const featureTypeByKey = Object.fromEntries(featureTypes.map(ft => [ft.key, ft]))
-
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 16 }}>
-      {targetMetrics.map(m => {
-        const featureType = featureTypeByKey[m]
-        if (!featureType) return null
-        const data = latestByMetric[m]
-        if (data) {
-          const vMin = featureType.value_min ?? 0
-          const vMax = featureType.value_max ?? 100
-          const pct = (data.value - vMin) / (vMax - vMin) * 100
-          const unit = data.unit ?? featureType.unit ?? ''
-          return <SensorCard key={m} metric={m} label={featureType.label} value={data.value} unit={unit} color={featureType.color ?? '#888'} pct={pct} />
-        }
-        return <SensorCardEmpty key={m} label={featureType.label} color={featureType.color ?? '#888'} />
-      })}
-    </div>
-  )
-}
-
-function SensorCard({ metric, label, value, unit, color, pct }: { metric: string; label: string; value: number; unit: string; color: string; pct: number }) {
-  const displayValue = formatGateValue(metric, value)
-  const isGate = metric === 'gate_supply' || metric === 'gate_drain'
-  
-  return (
-    <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px' }}>
-      <div style={{ fontSize: 10, color: '#999', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 3 }}>
-        <div style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
-        {label}
-      </div>
-      <div style={{ fontSize: 16, fontWeight: 500, color: '#1a1a1a', lineHeight: 1.2 }}>
-        {displayValue}{!isGate && <span style={{ fontSize: 10, fontWeight: 400, color: '#999' }}>{unit}</span>}
-      </div>
-      <div style={{ height: 3, background: '#eee', borderRadius: 2, marginTop: 5, overflow: 'hidden' }}>
-        <div style={{ height: '100%', borderRadius: 2, background: color, width: `${Math.min(100, Math.max(0, pct))}%` }} />
-      </div>
-    </div>
-  )
-}
-
-function SensorCardEmpty({ label, color }: { label: string; color: string }) {
-  return (
-    <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px', opacity: 0.4 }}>
-      <div style={{ fontSize: 10, color: '#999', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 3 }}>
-        <div style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
-        {label}
-      </div>
-      <div style={{ fontSize: 16, fontWeight: 500, color: '#bbb', lineHeight: 1.2 }}>--</div>
-      <div style={{ height: 3, background: '#eee', borderRadius: 2, marginTop: 5 }} />
-    </div>
-  )
-}
-
-const pageStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', height: '100dvh', background: '#f5f5f0' }
-const sectionLabelStyle: React.CSSProperties = { fontSize: 12, color: '#999', marginBottom: 8, marginTop: 4 }
-const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 10, padding: '14px 16px', marginBottom: 8, cursor: 'pointer', border: '1px solid #eee' }
-const pillStyle: React.CSSProperties = { padding: '5px 12px', borderRadius: 20, border: '1px solid #ddd', background: '#fff', fontSize: 12, color: '#666', whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0 }
-const activePillStyle: React.CSSProperties = { ...pillStyle, background: '#2d7a4f', borderColor: '#2d7a4f', color: '#fff' }
+  return <SensorReadingsGrid s
