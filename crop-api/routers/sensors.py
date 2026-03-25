@@ -43,6 +43,12 @@ def validate_feature_ids(feature_ids: List[int], db: Session) -> None:
         )
 
 
+def get_feature_type_by_key(db: Session) -> dict:
+    """sensor_feature_typesをkeyでマッピングした辞書を返す"""
+    types = db.query(models.SensorFeatureType).all()
+    return {t.key: t for t in types}
+
+
 # ----------------------------------------------------------------
 # センサー機能マスタ取得
 # ----------------------------------------------------------------
@@ -145,13 +151,25 @@ def post_reading(
         sensor_id=sensor_id,
         metric=body.metric,
         value=body.value,
-        unit=body.unit,
         recorded_at=body.recorded_at or datetime.utcnow(),
     )
     db.add(reading)
     db.commit()
     db.refresh(reading)
-    return reading
+    
+    # レスポンス用にunitを付加
+    feature_types = get_feature_type_by_key(db)
+    ft = feature_types.get(body.metric)
+    unit = ft.unit if ft else None
+    
+    return schemas.SensorReadingOut(
+        id=reading.id,
+        sensor_id=reading.sensor_id,
+        metric=reading.metric,
+        value=reading.value,
+        unit=unit,
+        recorded_at=reading.recorded_at,
+    )
 
 
 @router.get("/sensors/{sensor_id}/readings", response_model=List[schemas.SensorReadingOut])
@@ -165,7 +183,23 @@ def get_readings(
     q = db.query(models.SensorReading).filter(models.SensorReading.sensor_id == sensor_id)
     if metric:
         q = q.filter(models.SensorReading.metric == metric)
-    return q.order_by(models.SensorReading.recorded_at.desc()).limit(limit).all()
+    readings = q.order_by(models.SensorReading.recorded_at.desc()).limit(limit).all()
+    
+    # sensor_feature_typesからunitを取得
+    feature_types = get_feature_type_by_key(db)
+    result = []
+    for r in readings:
+        ft = feature_types.get(r.metric)
+        unit = ft.unit if ft else None
+        result.append(schemas.SensorReadingOut(
+            id=r.id,
+            sensor_id=r.sensor_id,
+            metric=r.metric,
+            value=r.value,
+            unit=unit,
+            recorded_at=r.recorded_at,
+        ))
+    return result
 
 
 # ----------------------------------------------------------------
@@ -271,15 +305,19 @@ def field_sensor_summary(
         )
         .all()
     )
+    
+    feature_types = get_feature_type_by_key(db)
     seen = set()
     latest = []
     for r in latest_per_metric:
         if r.metric not in seen:
             seen.add(r.metric)
+            ft = feature_types.get(r.metric)
+            unit = ft.unit if ft else None
             latest.append(schemas.SensorLatestReading(
                 metric=r.metric,
                 value=r.value,
-                unit=r.unit,
+                unit=unit,
                 recorded_at=r.recorded_at,
             ))
 
@@ -330,20 +368,19 @@ def seed_sensor_dummy(
         created_sensors += 1
 
         metrics = [
-            ("water_level",   "cm",  15.0, 3.0),
-            ("water_temp",    "\u00b0C",  22.0, 2.0),
-            ("air_temp",      "\u00b0C",  20.0, 4.0),
-            ("soil_moisture", "%",   65.0, 10.0),
+            ("water_level",   15.0, 3.0),
+            ("water_temp",    22.0, 2.0),
+            ("temperature",   20.0, 4.0),
+            ("soil_moisture", 65.0, 10.0),
         ]
         for hours_ago in range(24, -1, -1):
             recorded_at = now - timedelta(hours=hours_ago)
-            for metric, unit, base, spread in metrics:
+            for metric, base, spread in metrics:
                 value = round(base + random.uniform(-spread, spread), 1)
                 db.add(models.SensorReading(
                     sensor_id=sensor.id,
                     metric=metric,
                     value=value,
-                    unit=unit,
                     recorded_at=recorded_at,
                 ))
                 created_readings += 1
