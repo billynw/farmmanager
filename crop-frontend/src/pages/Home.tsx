@@ -185,6 +185,7 @@ function SensorReadingsGrid({
   featureTypes: SensorFeatureType[] 
 }) {
   const [commandModal, setCommandModal] = useState<{ sensorId: number; label: string; currentValue: number } | null>(null)
+  const [cancelModal, setCancelModal] = useState<{ sensorId: number; commandId: number; label: string } | null>(null)
 
   // sensor_feature_typesのID順にソートされたメトリック
   const metricToFeatureId: Record<string, number> = {}
@@ -217,6 +218,10 @@ function SensorReadingsGrid({
     setCommandModal({ sensorId: sensor.id, label, currentValue: value })
   }
 
+  const handleCancelClick = (label: string, commandId: number) => {
+    setCancelModal({ sensorId: sensor.id, commandId, label })
+  }
+
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 16 }}>
@@ -241,6 +246,7 @@ function SensorReadingsGrid({
                 color={featureType.color ?? '#888'}
                 pct={pct}
                 onCommandClick={handleGateClick}
+                onCancelClick={handleCancelClick}
               />
             )
           }
@@ -257,6 +263,14 @@ function SensorReadingsGrid({
           onClose={() => setCommandModal(null)}
         />
       )}
+      {cancelModal && (
+        <CancelCommandModal
+          sensorId={cancelModal.sensorId}
+          commandId={cancelModal.commandId}
+          label={cancelModal.label}
+          onClose={() => setCancelModal(null)}
+        />
+      )}
     </>
   )
 }
@@ -269,7 +283,8 @@ function SensorCard({
   unit,
   color,
   pct,
-  onCommandClick
+  onCommandClick,
+  onCancelClick
 }: {
   sensorId: number
   metric: string
@@ -279,6 +294,7 @@ function SensorCard({
   color: string
   pct: number
   onCommandClick: (label: string, value: number) => void
+  onCancelClick: (label: string, commandId: number) => void
 }) {
   const displayValue = formatGateValue(metric, value)
   const isGate = metric === 'gate_supply' || metric === 'gate_drain'
@@ -289,7 +305,8 @@ function SensorCard({
     enabled: isGate,
   })
 
-  const hasPendingCommand = isGate && commands.some(c => c.status === 'pending')
+  const pendingCommand = isGate ? commands.find(c => c.status === 'pending') : null
+  const hasPendingCommand = !!pendingCommand
 
   const cardStyle: React.CSSProperties = {
     background: hasPendingCommand ? '#fff3cd' : '#fff',
@@ -300,7 +317,11 @@ function SensorCard({
   }
 
   const handleClick = () => {
-    if (isGate) {
+    if (!isGate) return
+    
+    if (hasPendingCommand && pendingCommand) {
+      onCancelClick(label, pendingCommand.id)
+    } else {
       onCommandClick(label, value)
     }
   }
@@ -397,6 +418,49 @@ function GateCommandModal({
           )}
         </div>
         <button style={cancelButtonStyle} onClick={onClose}>キャンセル</button>
+      </div>
+    </div>
+  )
+}
+
+function CancelCommandModal({
+  sensorId,
+  commandId,
+  label,
+  onClose
+}: {
+  sensorId: number
+  commandId: number
+  label: string
+  onClose: () => void
+}) {
+  const queryClient = useQueryClient()
+
+  const cancelCommand = useMutation({
+    mutationFn: () => deviceCommandsApi.cancel(commandId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['device-commands', sensorId] })
+      onClose()
+    },
+  })
+
+  return (
+    <div style={modalOverlayStyle} onClick={onClose}>
+      <div style={modalContentStyle} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 16, color: '#1a1a1a' }}>{label}命令キャンセル</div>
+        <div style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>
+          送信中の命令をキャンセルしますか？
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            style={{ ...commandButtonStyle, background: '#dc3545' }}
+            onClick={() => cancelCommand.mutate()}
+            disabled={cancelCommand.isPending}
+          >
+            キャンセル実行
+          </button>
+          <button style={{ ...cancelButtonStyle, marginTop: 0, flex: 1 }} onClick={onClose}>戻る</button>
+        </div>
       </div>
     </div>
   )

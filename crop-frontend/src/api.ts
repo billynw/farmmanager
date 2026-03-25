@@ -22,7 +22,7 @@ api.interceptors.response.use(
 // --- Types ---
 export type UserFieldRole = 'owner' | 'manager' | 'member'
 export type ItemStatus = 'growing' | 'finished'
-export type DeviceCommandStatus = 'pending' | 'delivered' | 'expired'
+export type DeviceCommandStatus = 'pending' | 'delivered' | 'expired' | 'cancelled'
 
 export interface User {
   id: number
@@ -231,6 +231,8 @@ export const deviceCommandsApi = {
     api.post<DeviceCommandOut>('/device/command/send', { sensor_id, command }),
   list: (sensor_id: number, limit = 10) =>
     api.get<DeviceCommandOut[]>('/device/commands', { params: { sensor_id, limit } }),
+  cancel: (command_id: number) =>
+    api.post('/device/command/cancel', { command_id }),
 }
 
 export const workLogsApi = {
