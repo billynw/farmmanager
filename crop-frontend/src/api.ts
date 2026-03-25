@@ -22,6 +22,7 @@ api.interceptors.response.use(
 // --- Types ---
 export type UserFieldRole = 'owner' | 'manager' | 'member'
 export type ItemStatus = 'growing' | 'finished'
+export type DeviceCommandStatus = 'pending' | 'delivered' | 'expired'
 
 export interface User {
   id: number
@@ -136,6 +137,16 @@ export interface SensorPhotoOut {
   taken_at: string
 }
 
+export interface DeviceCommandOut {
+  id: number
+  sensor_id: number
+  command: string
+  status: DeviceCommandStatus
+  created_at: string
+  delivered_at?: string
+  expires_at: string
+}
+
 // --- API calls ---
 export const authApi = {
   login: (email: string, password: string) =>
@@ -213,6 +224,13 @@ export const sensorsApi = {
     api.get<SensorReadingOut[]>(`/sensors/${sensor_id}/readings`, { params: { metric, limit } }),
   photos: (sensor_id: number, limit = 24) =>
     api.get<SensorPhotoOut[]>(`/sensors/${sensor_id}/photos`, { params: { limit } }),
+}
+
+export const deviceCommandsApi = {
+  send: (sensor_id: number, command: string) =>
+    api.post<DeviceCommandOut>('/device/command/send', { sensor_id, command }),
+  list: (sensor_id: number, limit = 10) =>
+    api.get<DeviceCommandOut[]>('/device/commands', { params: { sensor_id, limit } }),
 }
 
 export const workLogsApi = {
