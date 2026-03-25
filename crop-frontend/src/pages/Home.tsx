@@ -184,7 +184,7 @@ function SensorReadingsGrid({
   sensor: SensorOut
   featureTypes: SensorFeatureType[] 
 }) {
-  const [commandModal, setCommandModal] = useState<{ sensorId: number; metric: string; label: string } | null>(null)
+  const [commandModal, setCommandModal] = useState<{ sensorId: number; label: string; currentValue: number } | null>(null)
 
   // sensor_feature_typesのID順にソートされたメトリック
   const metricToFeatureId: Record<string, number> = {}
@@ -213,6 +213,10 @@ function SensorReadingsGrid({
 
   const featureTypeByKey = Object.fromEntries(featureTypes.map(ft => [ft.key, ft]))
 
+  const handleGateClick = (label: string, value: number) => {
+    setCommandModal({ sensorId: sensor.id, label, currentValue: value })
+  }
+
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 16 }}>
@@ -237,34 +241,20 @@ function SensorReadingsGrid({
                 unit={unit}
                 color={featureType.color ?? '#888'}
                 pct={pct}
-                onCommandClick={(metric, label) => setCommandModal({ sensorId: sensor.id, metric, label })}
+                onCommandClick={handleGateClick}
               />
             )
           }
           
-          // データがない場合
-          if (isGate) {
-            // ゲートはデータなしでもクリック可能
-            return (
-              <SensorCardEmpty 
-                key={m} 
-                label={featureType.label} 
-                color={featureType.color ?? '#888'}
-                isGate={true}
-                onClick={() => setCommandModal({ sensorId: sensor.id, metric: m, label: featureType.label })}
-              />
-            )
-          } else {
-            // 通常センサーはグレーアウトのみ
-            return <SensorCardEmpty key={m} label={featureType.label} color={featureType.color ?? '#888'} />
-          }
+          // データがない場合 - ゲートも含めて非クリック可能
+          return <SensorCardEmpty key={m} label={featureType.label} color={featureType.color ?? '#888'} />
         })}
       </div>
       {commandModal && (
         <GateCommandModal
           sensorId={commandModal.sensorId}
-          metric={commandModal.metric}
           label={commandModal.label}
+          currentValue={commandModal.currentValue}
           onClose={() => setCommandModal(null)}
         />
       )}
@@ -289,7 +279,7 @@ function SensorCard({
   unit: string
   color: string
   pct: number
-  onCommandClick: (metric: string, label: string) => void
+  onCommandClick: (label: string, value: number) => void
 }) {
   const displayValue = formatGateValue(metric, value)
   const isGate = metric === 'gate_supply' || metric === 'gate_drain'
@@ -312,7 +302,7 @@ function SensorCard({
 
   const handleClick = () => {
     if (isGate) {
-      onCommandClick(metric, label)
+      onCommandClick(label, value)
     }
   }
 
@@ -337,18 +327,17 @@ function SensorCard({
   )
 }
 
-function SensorCardEmpty({ label, color, isGate, onClick }: { label: string; color: string; isGate?: boolean; onClick?: () => void }) {
+function SensorCardEmpty({ label, color }: { label: string; color: string }) {
   const cardStyle: React.CSSProperties = {
     background: '#fff',
     border: '1px solid #eee',
     borderRadius: 8,
     padding: '8px 6px',
     opacity: 0.4,
-    cursor: isGate ? 'pointer' : 'default',
   }
 
   return (
-    <div style={cardStyle} onClick={onClick}>
+    <div style={cardStyle}>
       <div style={{ fontSize: 10, color: '#999', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 3 }}>
         <div style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
         {label}
@@ -361,24 +350,17 @@ function SensorCardEmpty({ label, color, isGate, onClick }: { label: string; col
 
 function GateCommandModal({
   sensorId,
-  metric,
   label,
+  currentValue,
   onClose
 }: {
   sensorId: number
-  metric: string
   label: string
+  currentValue: number
   onClose: () => void
 }) {
   const queryClient = useQueryClient()
-
-  const { data: readings = [] } = useQuery<SensorReadingOut[]>({
-    queryKey: ['sensor-readings-home', sensorId],
-    queryFn: () => sensorsApi.readings(sensorId, metric, 1).then(r => r.data),
-  })
-
-  const currentValue = readings.length > 0 ? readings[0].value : null
-  const currentState = currentValue === null ? null : (currentValue === 0 ? 'CLOSE' : 'OPEN')
+  const currentState = currentValue === 0 ? 'CLOSE' : 'OPEN'
 
   const sendCommand = useMutation({
     mutationFn: (command: string) => deviceCommandsApi.send(sensorId, command),
@@ -392,13 +374,11 @@ function GateCommandModal({
     <div style={modalOverlayStyle} onClick={onClose}>
       <div style={modalContentStyle} onClick={e => e.stopPropagation()}>
         <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 16, color: '#1a1a1a' }}>{label}制御</div>
-        {currentState && (
-          <div style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>
-            現在の状態: <span style={{ fontWeight: 600, color: '#1a1a1a' }}>{currentState}</span>
-          </div>
-        )}
+        <div style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>
+          現在の状態: <span style={{ fontWeight: 600, color: '#1a1a1a' }}>{currentState}</span>
+        </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          {(!currentState || currentState === 'CLOSE') && (
+          {currentState === 'CLOSE' && (
             <button
               style={commandButtonStyle}
               onClick={() => sendCommand.mutate('OPEN')}
@@ -407,7 +387,7 @@ function GateCommandModal({
               OPEN
             </button>
           )}
-          {(!currentState || currentState === 'OPEN') && (
+          {currentState === 'OPEN' && (
             <button
               style={commandButtonStyle}
               onClick={() => sendCommand.mutate('CLOSE')}
