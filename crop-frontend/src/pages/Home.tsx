@@ -211,7 +211,6 @@ function SensorReadingsGrid({ sensorId, targetMetrics, featureTypes }: { sensorI
       {commandModal && (
         <GateCommandModal
           sensorId={commandModal.sensorId}
-          metric={commandModal.metric}
           label={commandModal.label}
           onClose={() => setCommandModal(null)}
         />
@@ -300,12 +299,10 @@ function SensorCardEmpty({ label, color }: { label: string; color: string }) {
 
 function GateCommandModal({
   sensorId,
-  metric,
   label,
   onClose
 }: {
   sensorId: number
-  metric: string
   label: string
   onClose: () => void
 }) {
