@@ -186,6 +186,8 @@ function SensorReadingsGrid({ sensorId, targetMetrics, featureTypes }: { sensorI
           const featureType = featureTypeByKey[m]
           if (!featureType) return null
           const data = latestByMetric[m]
+          const isGate = m === 'gate_supply' || m === 'gate_drain'
+          
           if (data) {
             const vMin = featureType.value_min ?? 0
             const vMax = featureType.value_max ?? 100
@@ -205,7 +207,23 @@ function SensorReadingsGrid({ sensorId, targetMetrics, featureTypes }: { sensorI
               />
             )
           }
-          return <SensorCardEmpty key={m} label={featureType.label} color={featureType.color ?? '#888'} />
+          
+          // データがない場合
+          if (isGate) {
+            // ゲートはデータなしでもクリック可能
+            return (
+              <SensorCardEmpty 
+                key={m} 
+                label={featureType.label} 
+                color={featureType.color ?? '#888'}
+                isGate={true}
+                onClick={() => setCommandModal({ sensorId, metric: m, label: featureType.label })}
+              />
+            )
+          } else {
+            // 通常センサーはグレーアウトのみ
+            return <SensorCardEmpty key={m} label={featureType.label} color={featureType.color ?? '#888'} />
+          }
         })}
       </div>
       {commandModal && (
@@ -284,9 +302,18 @@ function SensorCard({
   )
 }
 
-function SensorCardEmpty({ label, color }: { label: string; color: string }) {
+function SensorCardEmpty({ label, color, isGate, onClick }: { label: string; color: string; isGate?: boolean; onClick?: () => void }) {
+  const cardStyle: React.CSSProperties = {
+    background: '#fff',
+    border: '1px solid #eee',
+    borderRadius: 8,
+    padding: '8px 6px',
+    opacity: 0.4,
+    cursor: isGate ? 'pointer' : 'default',
+  }
+
   return (
-    <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px', opacity: 0.4 }}>
+    <div style={cardStyle} onClick={onClick}>
       <div style={{ fontSize: 10, color: '#999', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 3 }}>
         <div style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
         {label}
