@@ -22,6 +22,7 @@ class ItemStatus(str, enum.Enum):
 class DeviceCommandStatus(str, enum.Enum):
     pending = "pending"
     delivered = "delivered"
+    completed = "completed"
     expired = "expired"
     cancelled = "cancelled"
 
@@ -208,6 +209,7 @@ class Sensor(Base):
     token        = Column(String(15), nullable=False)
     features     = Column(JSON, nullable=False, default=list)
     show_on_home = Column(JSON, nullable=False, default=list)
+    current_state = Column(String(10), nullable=True)
     created_at   = Column(DateTime, default=datetime.utcnow)
     field    = relationship("Field", back_populates="sensors")
     readings = relationship("SensorReading", back_populates="sensor", cascade="all, delete-orphan")
@@ -243,5 +245,6 @@ class DeviceCommand(Base):
     status = Column(Enum(DeviceCommandStatus), default=DeviceCommandStatus.pending, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     delivered_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
     expires_at = Column(DateTime, nullable=False)
     sensor = relationship("Sensor", back_populates="commands")
