@@ -239,7 +239,7 @@ def get_device_commands(
     """
     commands = (
         db.query(models.DeviceCommand)
-        .filter(models.DeviceCommand.sensor_id == sensor.id)
+        .filter(models.DeviceCommand.sensor_id == sensor_id)
         .order_by(models.DeviceCommand.created_at.desc())
         .limit(limit)
         .all()
