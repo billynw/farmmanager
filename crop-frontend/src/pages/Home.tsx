@@ -203,6 +203,7 @@ function SensorReadingsGrid({
   const { data: readings = [] } = useQuery<SensorReadingOut[]>({
     queryKey: ['sensor-readings-home', sensor.id],
     queryFn: () => sensorsApi.readings(sensor.id, undefined, 200).then(r => r.data),
+    refetchInterval: 60000, // 1分ごとに自動更新
   })
 
   const latestByMetric: Record<string, { value: number; unit?: string }> = {}
@@ -303,6 +304,7 @@ function SensorCard({
     queryKey: ['device-commands', sensorId],
     queryFn: () => deviceCommandsApi.list(sensorId, 1).then(r => r.data),
     enabled: isGate,
+    refetchInterval: 60000, // 1分ごとに自動更新
   })
 
   const pendingCommand = isGate ? commands.find(c => c.status === 'pending') : null
@@ -386,6 +388,7 @@ function GateCommandModal({
     mutationFn: (command: string) => deviceCommandsApi.send(sensorId, command),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['device-commands', sensorId] })
+      queryClient.invalidateQueries({ queryKey: ['sensor-readings-home', sensorId] })
       onClose()
     },
   })
@@ -440,6 +443,7 @@ function CancelCommandModal({
     mutationFn: () => deviceCommandsApi.cancel(commandId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['device-commands', sensorId] })
+      queryClient.invalidateQueries({ queryKey: ['sensor-readings-home', sensorId] })
       onClose()
     },
   })
