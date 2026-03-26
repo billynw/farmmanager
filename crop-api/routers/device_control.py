@@ -54,17 +54,6 @@ def get_device_command(
     if not sensor:
         raise HTTPException(status_code=404, detail="Sensor not found")
     
-    # ゲート状態をsensor_readingsに記録
-    # OPEN -> 1, CLOSE -> 0
-    state_value = 1.0 if request.state == "OPEN" else 0.0
-    reading = models.SensorReading(
-        sensor_id=sensor.id,
-        metric="gate_state",
-        value=state_value,
-        recorded_at=datetime.utcnow()
-    )
-    db.add(reading)
-    
     # pending状態で有効期限内の命令を取得（最新1件）
     now = datetime.utcnow()
     command = (
@@ -94,7 +83,6 @@ def get_device_command(
         db.commit()
         return DeviceCommandResponse(command=command.command)
     
-    db.commit()
     return DeviceCommandResponse(command=None)
 
 
@@ -120,7 +108,8 @@ def complete_device_command(
     if not sensor:
         raise HTTPException(status_code=404, detail="Sensor not found")
     
-    # ゲート状態をsensor_readingsに記録
+    # ゲート状態をsensor_readingsに記録（実行後の状態のみ記録）
+    # OPEN -> 1, CLOSE -> 0
     state_value = 1.0 if request.state == "OPEN" else 0.0
     reading = models.SensorReading(
         sensor_id=sensor.id,
