@@ -108,12 +108,32 @@ def complete_device_command(
     if not sensor:
         raise HTTPException(status_code=404, detail="Sensor not found")
     
-    # ゲート状態をsensor_readingsに記録（実行後の状態のみ記録）
+    # センサーのfeaturesからゲート制御機能のfeature_idを取得
+    # feature_id 2: 給水ゲート (gate_supply), 3: 排水ゲート (gate_drain)
+    gate_feature_ids = [2, 3]  # 給水ゲート、排水ゲート
+    gate_feature_id = None
+    for fid in sensor.features:
+        if fid in gate_feature_ids:
+            gate_feature_id = fid
+            break
+    
+    if not gate_feature_id:
+        raise HTTPException(status_code=400, detail="Sensor does not have gate control feature")
+    
+    # feature_idからmetric keyを取得
+    feature_type = db.query(models.SensorFeatureType).filter(
+        models.SensorFeatureType.id == gate_feature_id
+    ).first()
+    
+    if not feature_type:
+        raise HTTPException(status_code=500, detail="Feature type not found")
+    
+    # ゲート状態をsensor_readingsに記録
     # OPEN -> 1, CLOSE -> 0
     state_value = 1.0 if request.state == "OPEN" else 0.0
     reading = models.SensorReading(
         sensor_id=sensor.id,
-        metric="gate_state",
+        metric=feature_type.key,  # gate_supply または gate_drain
         value=state_value,
         recorded_at=datetime.utcnow()
     )
@@ -219,7 +239,7 @@ def get_device_commands(
     """
     commands = (
         db.query(models.DeviceCommand)
-        .filter(models.DeviceCommand.sensor_id == sensor_id)
+        .filter(models.DeviceCommand.sensor_id == sensor.id)
         .order_by(models.DeviceCommand.created_at.desc())
         .limit(limit)
         .all()
