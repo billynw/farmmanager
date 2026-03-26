@@ -286,7 +286,7 @@ void goToDeepSleep() {
 
 void setup() {
   Serial.begin(115200);
-  while (!Serial) { delay(10); }
+  delay(1000);  // シリアル初期化待ち（シリアル無しでも動作）
 
   // USER_LED
   pinMode(USER_LED_PIN, OUTPUT);
