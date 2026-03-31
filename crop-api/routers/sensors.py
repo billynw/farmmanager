@@ -239,7 +239,8 @@ async def upload_sensor_photo(
 
     photo_dir = get_sensor_photo_dir(sensor_id)
     ext = os.path.splitext(file.filename or "")[1].lower() or ".jpg"
-    filename = f"{uuid.uuid4().hex}{ext}"
+    timestamp = (taken_at or datetime.utcnow()).strftime("%Y%m%d%H%M%S")
+    filename = f"{timestamp}{ext}"
     file_path = os.path.join(photo_dir, filename)
 
     with open(file_path, "wb") as f:
