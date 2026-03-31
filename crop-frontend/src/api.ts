@@ -220,8 +220,8 @@ export const sensorsApi = {
   update: (id: number, data: { name?: string; active?: boolean; field_id?: number; features?: number[]; show_on_home?: number[] }) =>
     api.put<SensorOut>(`/sensors/${id}`, data),
   delete: (id: number) => api.delete(`/sensors/${id}`),
-  readings: (sensor_id: number, metric?: string, limit = 24) =>
-    api.get<SensorReadingOut[]>(`/sensors/${sensor_id}/readings`, { params: { metric, limit } }),
+  readings: (sensor_id: number, metric?: string, hours?: number) =>
+    api.get<SensorReadingOut[]>(`/sensors/${sensor_id}/readings`, { params: { metric, hours } }),
   photos: (sensor_id: number, limit = 24) =>
     api.get<SensorPhotoOut[]>(`/sensors/${sensor_id}/photos`, { params: { limit } }),
 }
