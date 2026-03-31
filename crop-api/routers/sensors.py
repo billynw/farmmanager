@@ -187,13 +187,20 @@ def post_reading(
 def get_readings(
     sensor_id: int,
     metric: Optional[str] = None,
-    limit: int = 100,
+    hours: Optional[int] = None,
+    limit: int = 200,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
     q = db.query(models.SensorReading).filter(models.SensorReading.sensor_id == sensor_id)
     if metric:
         q = q.filter(models.SensorReading.metric == metric)
+    
+    # hours が指定されている場合は時間範囲でフィルタ
+    if hours:
+        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        q = q.filter(models.SensorReading.recorded_at >= cutoff)
+    
     readings = q.order_by(models.SensorReading.recorded_at.desc()).limit(limit).all()
     
     # sensor_feature_typesからunitを取得
