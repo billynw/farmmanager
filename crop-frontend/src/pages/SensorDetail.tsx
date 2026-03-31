@@ -5,6 +5,17 @@ import type { Field, SensorOut, SensorReadingOut, SensorPhotoOut, SensorFeatureT
 import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
 
+const FEATURE_TO_METRIC: Record<number, string | null> = {
+  1: null,           // camera
+  2: 'gate_supply',  // 給水ゲート
+  3: 'gate_drain',   // 排水ゲート
+  4: 'temperature',  // 温度センサ
+  5: 'humidity',     // 湿度センサ
+  6: 'soil_moisture',// 土壌水分センサ
+  7: 'water_temp',   // 水温センサ
+  8: 'water_level',  // 水位センサ
+}
+
 function formatDate(dateStr: string) {
   const d = new Date(dateStr)
   return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
@@ -46,6 +57,8 @@ export default function SensorDetail() {
     enabled: !!activeFieldId,
   })
   const activeSensorId = selectedSensorId ?? sensors[0]?.id ?? null
+  const activeSensor = sensors.find(s => s.id === activeSensorId) ?? null
+  
   useEffect(() => {
     if (sensors.length > 0) setSelectedSensorId(sensors[0].id)
   }, [sensors])
@@ -54,18 +67,18 @@ export default function SensorDetail() {
     queryKey: ['readings', activeSensorId, selectedMetric, chartRange],
     queryFn: () => sensorsApi.readings(activeSensorId!, selectedMetric ?? undefined, chartRange === '24h' ? 24 : 168).then(r => r.data),
     enabled: !!activeSensorId && !!selectedMetric,
-    refetchInterval: 60000, // 1分ごとに自動更新
+    refetchInterval: 60000,
   })
+  
   const { data: allReadings = [] } = useQuery<SensorReadingOut[]>({
     queryKey: ['readings-all', activeSensorId],
     queryFn: () => sensorsApi.readings(activeSensorId!, undefined, 200).then(r => r.data),
     enabled: !!activeSensorId,
-    refetchInterval: 60000, // 1分ごとに自動更新
+    refetchInterval: 60000,
   })
+  
   const latestByMetric = new Map<string, SensorReadingOut>()
   for (const r of [...allReadings].reverse()) latestByMetric.set(r.metric, r)
-  const latestReadings = Array.from(latestByMetric.values())
-  const hasData = latestReadings.length > 0
 
   // 各センサーのデータ有無をチェック
   const sensorDataMap = new Map<number, boolean>()
@@ -83,18 +96,36 @@ export default function SensorDetail() {
     if (sensors.length > 0) checkAllSensors()
   }, [sensors])
 
-  // センサーが切り替わったら、最初のメトリックを自動選択
-  useEffect(() => {
-    if (latestReadings.length > 0) {
-      setSelectedMetric(latestReadings[0].metric)
+  // センサーのfeaturesからメトリックリストを生成（sensor_feature_typesのID順）
+  const metricToFeatureId: Record<string, number> = {}
+  for (const [featureId, metric] of Object.entries(FEATURE_TO_METRIC)) {
+    if (metric) {
+      metricToFeatureId[metric] = parseInt(featureId)
     }
-  }, [activeSensorId, latestReadings.length])
+  }
+
+  const allMetrics = activeSensor
+    ? (activeSensor.features ?? [])
+        .map(id => FEATURE_TO_METRIC[id])
+        .filter((m): m is string => m !== null)
+        .sort((a, b) => metricToFeatureId[a] - metricToFeatureId[b])
+    : []
+
+  const hasData = allMetrics.length > 0
+
+  // センサーが切り替わったら、最初に**データがある**メトリックを自動選択
+  useEffect(() => {
+    if (allMetrics.length > 0) {
+      const firstMetricWithData = allMetrics.find(m => latestByMetric.has(m))
+      setSelectedMetric(firstMetricWithData ?? allMetrics[0])
+    }
+  }, [activeSensorId, allMetrics.length])
 
   const { data: photos = [] } = useQuery<SensorPhotoOut[]>({
     queryKey: ['sensor-photos', activeSensorId],
     queryFn: () => sensorsApi.photos(activeSensorId!).then(r => r.data),
     enabled: !!activeSensorId,
-    refetchInterval: 60000, // 1分ごとに自動更新
+    refetchInterval: 60000,
   })
   const activePhoto = photos.find(p => p.id === selectedPhotoId) ?? photos[0] ?? null
 
@@ -116,21 +147,18 @@ export default function SensorDetail() {
     chartArea = chartPath + ` L${(W - pad).toFixed(1)},${(H - pad).toFixed(1)} L${pad},${(H - pad).toFixed(1)} Z`
   }
 
-  // 時間軸ラベルを実際のデータから生成
   let chartLabels: string[] = []
   if (chartData.length >= 2) {
     const firstTime = new Date(chartData[0].recorded_at)
     const lastTime = new Date(chartData[chartData.length - 1].recorded_at)
     
     if (chartRange === '24h') {
-      // 24h: 開始〜終了を5等分
       const labelCount = 5
       chartLabels = Array.from({ length: labelCount }, (_, i) => {
         const t = new Date(firstTime.getTime() + (lastTime.getTime() - firstTime.getTime()) * i / (labelCount - 1))
         return `${t.getHours()}:00`
       })
     } else {
-      // 7d: 開始〜終了を8等分
       const labelCount = 8
       chartLabels = Array.from({ length: labelCount }, (_, i) => {
         const t = new Date(firstTime.getTime() + (lastTime.getTime() - firstTime.getTime()) * i / (labelCount - 1))
@@ -138,13 +166,13 @@ export default function SensorDetail() {
       })
     }
   } else {
-    // データが少ない場合はデフォルト
     chartLabels = chartRange === '24h'
       ? ['0:00', '6:00', '12:00', '18:00', '24:00']
       : ['7日前', '6日前', '5日前', '4日前', '3日前', '2日前', '昨日', '今日']
   }
 
   const selectedFeatureType = selectedMetric ? featureTypeByKey[selectedMetric] : null
+  const latestReading = latestByMetric.get(allMetrics[0]) ?? null
 
   return (
     <div style={pageStyle}>
@@ -159,7 +187,6 @@ export default function SensorDetail() {
           ))}
         </div>
 
-        {/* センサーがない場合 */}
         {sensors.length === 0 ? (
           <div style={{ background: '#fff', borderRadius: 10, padding: '40px 16px', textAlign: 'center', color: '#bbb', fontSize: 14 }}>
             センサーがありません
@@ -184,7 +211,6 @@ export default function SensorDetail() {
               </>
             )}
 
-            {/* データがない場合 */}
             {!hasData ? (
               <div style={{ background: '#fff', borderRadius: 10, padding: '40px 16px', textAlign: 'center', color: '#bbb', fontSize: 14 }}>
                 センサーデータがありません
@@ -193,33 +219,50 @@ export default function SensorDetail() {
               <>
                 <div style={sectionLabelStyle}>
                   最新センサー値
-                  <span style={{ fontSize: 10, color: '#bbb', marginLeft: 6 }}>{formatDate(latestReadings[0].recorded_at)} 更新</span>
+                  {latestReading && <span style={{ fontSize: 10, color: '#bbb', marginLeft: 6 }}>{formatDate(latestReading.recorded_at)} 更新</span>}
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 14 }}>
-                  {latestReadings.map(r => {
-                    const ft = featureTypeByKey[r.metric]
+                  {allMetrics.map(m => {
+                    const ft = featureTypeByKey[m]
                     if (!ft) return null
-                    const vMin = ft.value_min ?? 0
-                    const vMax = ft.value_max ?? 100
-                    const pct = Math.min(100, Math.max(0, (r.value - vMin) / (vMax - vMin) * 100))
-                    const isSelected = r.metric === selectedMetric
-                    const isGate = r.metric === 'gate_supply' || r.metric === 'gate_drain' || r.metric === 'gate_open'
-                    const displayValue = formatGateValue(r.metric, r.value)
-                    const unit = r.unit ?? ft.unit ?? ''
+                    const data = latestByMetric.get(m)
+                    
+                    if (data) {
+                      const vMin = ft.value_min ?? 0
+                      const vMax = ft.value_max ?? 100
+                      const pct = Math.min(100, Math.max(0, (data.value - vMin) / (vMax - vMin) * 100))
+                      const isSelected = m === selectedMetric
+                      const isGate = m === 'gate_supply' || m === 'gate_drain' || m === 'gate_open'
+                      const displayValue = formatGateValue(m, data.value)
+                      const unit = data.unit ?? ft.unit ?? ''
+                      
+                      return (
+                        <div key={m} onClick={() => setSelectedMetric(m)}
+                          style={{ background: '#fff', border: `1.5px solid ${isSelected ? ft.color : '#eee'}`, borderRadius: 8, padding: '8px 6px', cursor: 'pointer' }}>
+                          <div style={{ fontSize: 10, color: '#999', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <div style={{ width: 6, height: 6, borderRadius: '50%', background: ft.color ?? '#888', flexShrink: 0 }} />
+                            {ft.label}
+                          </div>
+                          <div style={{ fontSize: 16, fontWeight: 500, color: '#1a1a1a', lineHeight: 1.2 }}>
+                            {displayValue}{!isGate && <span style={{ fontSize: 10, fontWeight: 400, color: '#999' }}>{unit}</span>}
+                          </div>
+                          <div style={{ height: 3, background: '#eee', borderRadius: 2, marginTop: 5, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', borderRadius: 2, background: ft.color ?? '#888', width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      )
+                    }
+                    
+                    // データがない場合 - グレーアウト
                     return (
-                      <div key={r.metric} onClick={() => setSelectedMetric(r.metric)}
-                        style={{ background: '#fff', border: `1.5px solid ${isSelected ? ft.color : '#eee'}`, borderRadius: 8, padding: '8px 6px', cursor: 'pointer' }}>
+                      <div key={m} style={{ background: '#fff', border: '1px solid #eee', borderRadius: 8, padding: '8px 6px', opacity: 0.4 }}>
                         <div style={{ fontSize: 10, color: '#999', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 3 }}>
                           <div style={{ width: 6, height: 6, borderRadius: '50%', background: ft.color ?? '#888', flexShrink: 0 }} />
                           {ft.label}
                         </div>
-                        <div style={{ fontSize: 16, fontWeight: 500, color: '#1a1a1a', lineHeight: 1.2 }}>
-                          {displayValue}{!isGate && <span style={{ fontSize: 10, fontWeight: 400, color: '#999' }}>{unit}</span>}
-                        </div>
-                        <div style={{ height: 3, background: '#eee', borderRadius: 2, marginTop: 5, overflow: 'hidden' }}>
-                          <div style={{ height: '100%', borderRadius: 2, background: ft.color ?? '#888', width: `${pct}%` }} />
-                        </div>
+                        <div style={{ fontSize: 16, fontWeight: 500, color: '#bbb', lineHeight: 1.2 }}>--</div>
+                        <div style={{ height: 3, background: '#eee', borderRadius: 2, marginTop: 5 }} />
                       </div>
                     )
                   })}
