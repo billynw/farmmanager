@@ -363,14 +363,14 @@ String getCommandFromServer(GateState state, String token, bool* takePhoto, int*
       }
       
       // take_photoフラグ取得
-      if (responseDoc.containsKey("take_photo")) {
+      if (!responseDoc["take_photo"].isNull()) {
         *takePhoto = responseDoc["take_photo"].as<bool>();
         Serial.print("写真撮影: ");
         Serial.println(*takePhoto ? "YES" : "NO");
       }
       
       // sensor_id取得
-      if (responseDoc.containsKey("sensor_id")) {
+      if (!responseDoc["sensor_id"].isNull()) {
         *sensorId = responseDoc["sensor_id"].as<int>();
         Serial.print("SensorID: ");
         Serial.println(*sensorId);
