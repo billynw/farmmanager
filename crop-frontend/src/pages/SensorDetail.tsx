@@ -20,7 +20,7 @@ function formatGateValue(metric: string, value: number): string {
 export default function SensorDetail() {
   const [selectedFieldId, setSelectedFieldId] = useState<number | null>(null)
   const [selectedSensorId, setSelectedSensorId] = useState<number | null>(null)
-  const [selectedMetric, setSelectedMetric] = useState<string>('water_level')
+  const [selectedMetric, setSelectedMetric] = useState<string | null>(null)
   const [selectedPhotoId, setSelectedPhotoId] = useState<number | null>(null)
   const [chartRange, setChartRange] = useState<'24h' | '7d'>('24h')
 
@@ -52,8 +52,8 @@ export default function SensorDetail() {
 
   const { data: readings = [] } = useQuery<SensorReadingOut[]>({
     queryKey: ['readings', activeSensorId, selectedMetric, chartRange],
-    queryFn: () => sensorsApi.readings(activeSensorId!, selectedMetric, chartRange === '24h' ? 24 : 168).then(r => r.data),
-    enabled: !!activeSensorId,
+    queryFn: () => sensorsApi.readings(activeSensorId!, selectedMetric ?? undefined, chartRange === '24h' ? 24 : 168).then(r => r.data),
+    enabled: !!activeSensorId && !!selectedMetric,
     refetchInterval: 60000, // 1分ごとに自動更新
   })
   const { data: allReadings = [] } = useQuery<SensorReadingOut[]>({
@@ -67,6 +67,13 @@ export default function SensorDetail() {
   const latestReadings = Array.from(latestByMetric.values())
   const hasData = latestReadings.length > 0
 
+  // センサーが切り替わったら、最初のメトリックを自動選択
+  useEffect(() => {
+    if (latestReadings.length > 0) {
+      setSelectedMetric(latestReadings[0].metric)
+    }
+  }, [activeSensorId, latestReadings.length])
+
   const { data: photos = [] } = useQuery<SensorPhotoOut[]>({
     queryKey: ['sensor-photos', activeSensorId],
     queryFn: () => sensorsApi.photos(activeSensorId!).then(r => r.data),
@@ -79,7 +86,7 @@ export default function SensorDetail() {
   const W = 320, H = 80, pad = 10
   let chartPath = '', chartArea = '', chartColor = '#378ADD'
   if (chartData.length >= 2) {
-    const ft = featureTypeByKey[selectedMetric]
+    const ft = selectedMetric ? featureTypeByKey[selectedMetric] : null
     chartColor = ft?.color ?? '#378ADD'
     const vals = chartData.map(r => r.value)
     const minV = Math.min(...vals) - 1
@@ -121,7 +128,7 @@ export default function SensorDetail() {
       : ['7日前', '6日前', '5日前', '4日前', '3日前', '2日前', '昨日', '今日']
   }
 
-  const selectedFeatureType = featureTypeByKey[selectedMetric]
+  const selectedFeatureType = selectedMetric ? featureTypeByKey[selectedMetric] : null
 
   return (
     <div style={pageStyle}>
