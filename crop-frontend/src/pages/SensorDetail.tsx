@@ -67,6 +67,22 @@ export default function SensorDetail() {
   const latestReadings = Array.from(latestByMetric.values())
   const hasData = latestReadings.length > 0
 
+  // 各センサーのデータ有無をチェック
+  const sensorDataMap = new Map<number, boolean>()
+  useEffect(() => {
+    const checkAllSensors = async () => {
+      for (const sensor of sensors) {
+        try {
+          const res = await sensorsApi.readings(sensor.id, undefined, 1)
+          sensorDataMap.set(sensor.id, res.data.length > 0)
+        } catch {
+          sensorDataMap.set(sensor.id, false)
+        }
+      }
+    }
+    if (sensors.length > 0) checkAllSensors()
+  }, [sensors])
+
   // センサーが切り替わったら、最初のメトリックを自動選択
   useEffect(() => {
     if (latestReadings.length > 0) {
@@ -154,10 +170,16 @@ export default function SensorDetail() {
               <>
                 <div style={sectionLabelStyle}>センサー</div>
                 <div style={pillRowStyle}>
-                  {sensors.map(s => (
-                    <div key={s.id} onClick={() => setSelectedSensorId(s.id)}
-                      style={s.id === activeSensorId ? activeSensorPillStyle : sensorPillStyle}>{s.name}</div>
-                  ))}
+                  {sensors.map(s => {
+                    const hasDataForSensor = sensorDataMap.get(s.id) ?? true
+                    return (
+                      <div key={s.id} onClick={() => setSelectedSensorId(s.id)}
+                        style={{
+                          ...(s.id === activeSensorId ? activeSensorPillStyle : sensorPillStyle),
+                          opacity: hasDataForSensor ? 1 : 0.4
+                        }}>{s.name}</div>
+                    )
+                  })}
                 </div>
               </>
             )}
