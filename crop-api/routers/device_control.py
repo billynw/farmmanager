@@ -7,6 +7,7 @@ from database import get_db
 from auth import get_current_user
 import models
 import schemas
+import math
 
 router = APIRouter(prefix="/api/v1", tags=["device-control"])
 
@@ -20,11 +21,26 @@ class DeviceStateRequest(BaseModel):
 class DeviceCommandResponse(BaseModel):
     """デバイスへのコマンドレスポンス"""
     command: Optional[str] = None
+    take_photo: bool = False
 
 
 class DeviceCommandCancelRequest(BaseModel):
     """命令キャンセルリクエスト"""
     command_id: int
+
+
+def is_daytime(dt: datetime, latitude: float = 35.1815, longitude: float = 136.9066) -> bool:
+    """
+    指定された日時が日中かどうかを判定（名古屋の緯度経度をデフォルト）
+    
+    簡易計算: 日の出を6:00、日没を18:00とする
+    より正確な計算が必要な場合はastralライブラリなどを使用
+    """
+    # JST (UTC+9)
+    jst_hour = (dt.hour + 9) % 24
+    
+    # 6:00〜18:00を日中とする
+    return 6 <= jst_hour < 18
 
 
 @router.post("/device/command", response_model=DeviceCommandResponse)
@@ -43,7 +59,8 @@ def get_device_command(
     
     返すJSON:
     {
-        "command": "OPEN"  # or "CLOSE", or null
+        "command": "OPEN",  # or "CLOSE", or null
+        "take_photo": true  # 毎時0〜5分かつ日中の場合true
     }
     """
     if not request.token:
@@ -67,6 +84,11 @@ def get_device_command(
         .first()
     )
     
+    # 写真撮影判定: 毎時0〜5分かつ日中
+    take_photo = False
+    if 0 <= now.minute < 5 and is_daytime(now):
+        take_photo = True
+    
     if command:
         # 現在の状態と同じコマンドなら不要
         if request.state == command.command:
@@ -75,15 +97,15 @@ def get_device_command(
             command.delivered_at = now
             command.completed_at = now
             db.commit()
-            return DeviceCommandResponse(command=None)
+            return DeviceCommandResponse(command=None, take_photo=take_photo)
         
         # 配信済みにマーク
         command.status = models.DeviceCommandStatus.delivered
         command.delivered_at = now
         db.commit()
-        return DeviceCommandResponse(command=command.command)
+        return DeviceCommandResponse(command=command.command, take_photo=take_photo)
     
-    return DeviceCommandResponse(command=None)
+    return DeviceCommandResponse(command=None, take_photo=take_photo)
 
 
 @router.post("/device/command/complete")
