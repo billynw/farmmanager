@@ -22,6 +22,7 @@ class DeviceCommandResponse(BaseModel):
     """デバイスへのコマンドレスポンス"""
     command: Optional[str] = None
     take_photo: bool = False
+    sensor_id: int = 0
 
 
 class DeviceCommandCancelRequest(BaseModel):
@@ -60,7 +61,8 @@ def get_device_command(
     返すJSON:
     {
         "command": "OPEN",  # or "CLOSE", or null
-        "take_photo": true  # 毎時0〜5分かつ日中の場合true
+        "take_photo": true,  # 毎時0〜5分かつ日中の場合true
+        "sensor_id": 5  # センサーID
     }
     """
     if not request.token:
@@ -97,15 +99,15 @@ def get_device_command(
             command.delivered_at = now
             command.completed_at = now
             db.commit()
-            return DeviceCommandResponse(command=None, take_photo=take_photo)
+            return DeviceCommandResponse(command=None, take_photo=take_photo, sensor_id=sensor.id)
         
         # 配信済みにマーク
         command.status = models.DeviceCommandStatus.delivered
         command.delivered_at = now
         db.commit()
-        return DeviceCommandResponse(command=command.command, take_photo=take_photo)
+        return DeviceCommandResponse(command=command.command, take_photo=take_photo, sensor_id=sensor.id)
     
-    return DeviceCommandResponse(command=None, take_photo=take_photo)
+    return DeviceCommandResponse(command=None, take_photo=take_photo, sensor_id=sensor.id)
 
 
 @router.post("/device/command/complete")
