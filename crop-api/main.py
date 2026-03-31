@@ -42,11 +42,19 @@ async def add_utc_suffix_middleware(request: Request, call_next):
                 r'"\1Z"',
                 content
             )
+            
+            # 新しいボディをバイトに変換
+            new_body = content.encode("utf-8")
+            
+            # ヘッダーを更新（Content-Lengthを新しいボディサイズに合わせる）
+            headers = dict(response.headers)
+            headers["content-length"] = str(len(new_body))
+            
             # 新しいレスポンスを作成
             return Response(
-                content=content,
+                content=new_body,
                 status_code=response.status_code,
-                headers=dict(response.headers),
+                headers=headers,
                 media_type=response.media_type
             )
         except:
