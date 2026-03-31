@@ -1,14 +1,22 @@
 from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.encoders import jsonable_encoder
 from routers import auth, users, items, work_logs, harvests, sensors, export, device_control
 from database import engine
 import models
 
 models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Farm Manager API")
+# カスタムJSON encoder: datetimeにZサフィックスを付けてUTCとして明示
+def custom_json_encoder(obj):
+    if isinstance(obj, datetime):
+        return obj.isoformat() + 'Z'
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+app = FastAPI(
+    title="Farm Manager API",
+    json_encoders={datetime: custom_json_encoder}
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -17,27 +25,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# カスタムJSON encoder: datetimeにZサフィックスを付けてUTCとして明示
-from fastapi.responses import JSONResponse
-from typing import Any
-
-class UTCJSONResponse(JSONResponse):
-    def render(self, content: Any) -> bytes:
-        def convert_datetime(obj):
-            if isinstance(obj, dict):
-                return {k: convert_datetime(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [convert_datetime(item) for item in obj]
-            elif isinstance(obj, datetime):
-                # datetime.utcnowで保存されているのでZサフィックスを付けてUTCを明示
-                return obj.isoformat() + 'Z'
-            return obj
-        
-        content = convert_datetime(content)
-        return super().render(content)
-
-app.router.default_response_class = UTCJSONResponse
 
 app.include_router(auth.router)
 app.include_router(users.router)
