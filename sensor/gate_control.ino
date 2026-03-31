@@ -693,11 +693,6 @@ void setup() {
     // WiFi接続
     connectWiFi(ssid, pass);
 
-    // NTP時刻同期
-    if (WiFi.status() == WL_CONNECTED) {
-      syncNTP();
-    }
-
     // サーバーからコマンド取得
     bool takePhoto = false;
     int sensorId = 0;
@@ -715,7 +710,7 @@ void setup() {
       takeAndUploadPhoto(sensorId, CamToken);
     }
 
-    // Deep Sleep前にNTP再取得（写真撮影後に時刻がずれている可能性）
+    // Deep Sleep前にNTP取得（写真撮影後に時刻がずれている可能性）
     if (WiFi.status() == WL_CONNECTED) {
       syncNTP();
     }
