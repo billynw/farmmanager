@@ -87,8 +87,8 @@ def get_device_command(
     )
     
     # 写真撮影判定: テスト用に常にTrue
-    take_photo = True  # 一時的に常に撮影
-    # 本番用: take_photo = (0 <= now.minute < 5 and is_daytime(now))
+    #take_photo = True  # 一時的に常に撮影
+    take_photo = (0 <= now.minute < 5 and is_daytime(now))
     
     if command:
         # 現在の状態と同じコマンドなら不要

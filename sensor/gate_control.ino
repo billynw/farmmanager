@@ -227,6 +227,7 @@ bool initCamera() {
   return true;
 }
 
+
 void takeAndUploadPhoto(int sensorId, String token) {
   Serial.println("写真撮影開始");
   
@@ -235,7 +236,6 @@ void takeAndUploadPhoto(int sensorId, String token) {
     return;
   }
 
-  // 撮影
   camera_fb_t* fb = esp_camera_fb_get();
   if (!fb) {
     Serial.println("撮影失敗");
@@ -245,7 +245,6 @@ void takeAndUploadPhoto(int sensorId, String token) {
 
   Serial.printf("撮影成功: %d bytes\n", fb->len);
 
-  // アップロード
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("WiFi未接続 - アップロードスキップ");
     esp_camera_fb_return(fb);
@@ -253,77 +252,76 @@ void takeAndUploadPhoto(int sensorId, String token) {
     return;
   }
 
+  // URLにtokenをクエリパラメータとして追加
+  char url[256];
+  snprintf(url, sizeof(url), "https://norawork.jp/api/v1/sensors/%d/photos?token=%s", sensorId, token.c_str());
+  
+  Serial.print("アップロードURL: ");
+  Serial.println(url);
+
   WiFiClientSecure client;
   client.setInsecure();
-
-  char url[128];
-  snprintf(url, sizeof(url), PHOTO_UPLOAD_URL, sensorId);
   
   HTTPClient http;
-  http.begin(client, url);
-  http.setTimeout(30000);  // 30秒タイムアウト
+  if (!http.begin(client, url)) {
+    Serial.println("HTTP begin失敗");
+    esp_camera_fb_return(fb);
+    esp_camera_deinit();
+    return;
+  }
+  
+  http.setTimeout(30000);
 
-  // multipart/form-data boundary
+  // multipart/form-data作成
   String boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
+  
+  String bodyStart = "--" + boundary + "\r\n";
+  bodyStart += "Content-Disposition: form-data; name=\"file\"; filename=\"photo.jpg\"\r\n";
+  bodyStart += "Content-Type: image/jpeg\r\n\r\n";
+
+  String bodyEnd = "\r\n--" + boundary + "--\r\n";
+
+  // 全体のバッファを作成（メモリに余裕がある場合）
+  uint32_t totalLen = bodyStart.length() + fb->len + bodyEnd.length();
+  
+  uint8_t* fullBody = (uint8_t*)malloc(totalLen);
+  if (!fullBody) {
+    Serial.println("メモリ不足");
+    http.end();
+    esp_camera_fb_return(fb);
+    esp_camera_deinit();
+    return;
+  }
+
+  memcpy(fullBody, bodyStart.c_str(), bodyStart.length());
+  memcpy(fullBody + bodyStart.length(), fb->buf, fb->len);
+  memcpy(fullBody + bodyStart.length() + fb->len, bodyEnd.c_str(), bodyEnd.length());
+
+  // POSTリクエスト
   http.addHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
-
-  // multipart body作成
-  String head = "--" + boundary + "\r\n";
-  head += "Content-Disposition: form-data; name=\"token\"\r\n\r\n";
-  head += token + "\r\n";
-  head += "--" + boundary + "\r\n";
-  head += "Content-Disposition: form-data; name=\"file\"; filename=\"photo.jpg\"\r\n";
-  head += "Content-Type: image/jpeg\r\n\r\n";
-
-  String tail = "\r\n--" + boundary + "--\r\n";
-
-  uint32_t totalLen = head.length() + fb->len + tail.length();
-
-  // ストリーム送信
-  client.print(String("POST ") + url + " HTTP/1.1\r\n");
-  client.print(String("Host: norawork.jp\r\n"));
-  client.print("Content-Type: multipart/form-data; boundary=" + boundary + "\r\n");
-  client.print("Content-Length: " + String(totalLen) + "\r\n");
-  client.print("\r\n");
-  client.print(head);
   
-  // 画像データ送信
-  uint8_t* buf = fb->buf;
-  size_t len = fb->len;
-  size_t sent = 0;
-  while (sent < len) {
-    size_t chunk = (len - sent > 4096) ? 4096 : (len - sent);
-    size_t written = client.write(buf + sent, chunk);
-    sent += written;
-    if (written == 0) break;
-  }
-  
-  client.print(tail);
+  int httpCode = http.POST(fullBody, totalLen);
 
-  // レスポンス待ち
-  unsigned long timeout = millis();
-  while (client.available() == 0) {
-    if (millis() - timeout > 10000) {
-      Serial.println("アップロードタイムアウト");
-      esp_camera_fb_return(fb);
-      esp_camera_deinit();
-      client.stop();
-      return;
+  free(fullBody);
+
+  Serial.print("HTTPレスポンスコード: ");
+  Serial.println(httpCode);
+
+  if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_CREATED || httpCode == 200) {
+    Serial.println("写真アップロード成功");
+    String response = http.getString();
+    Serial.print("レスポンス: ");
+    Serial.println(response);
+  } else {
+    Serial.print("アップロード失敗: ");
+    Serial.println(httpCode);
+    if (httpCode > 0) {
+      String response = http.getString();
+      Serial.println(response);
     }
   }
 
-  // レスポンス読み取り
-  while (client.available()) {
-    String line = client.readStringUntil('\n');
-    if (line.startsWith("HTTP/1.1")) {
-      Serial.println(line);
-      if (line.indexOf("200") > 0) {
-        Serial.println("写真アップロード成功");
-      }
-    }
-  }
-
-  client.stop();
+  http.end();
   esp_camera_fb_return(fb);
   esp_camera_deinit();
   Serial.println("写真撮影完了");
@@ -727,3 +725,4 @@ void setup() {
 void loop() {
   // Deep Sleepに入るのでloopは実行されない
 }
+
