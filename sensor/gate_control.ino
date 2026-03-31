@@ -7,10 +7,12 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <time.h>
+#include "esp_camera.h"
 
 // ----- API設定 -----
 const char* API_URL = "https://norawork.jp/api/v1/device/command";
 const char* COMPLETE_URL = "https://norawork.jp/api/v1/device/command/complete";
+const char* PHOTO_UPLOAD_URL = "https://norawork.jp/api/v1/sensors/%d/photos";
 const unsigned long WAKE_INTERVAL_MINUTES = 5;  // 起動間隔(分) ※cronでいう*/5の5
 
 // NTP設定
@@ -27,6 +29,24 @@ const int DAYLIGHT_OFFSET_SEC = 0;
 #define PDM_DATA_PIN 41
 #define CONFIG_PIN 7     // D8
 #define USER_LED_PIN 21  // XIAO ESP32S3 USER_LED
+
+// ----- カメラピン設定 (XIAO ESP32S3 Sense) -----
+#define PWDN_GPIO_NUM     -1
+#define RESET_GPIO_NUM    -1
+#define XCLK_GPIO_NUM     10
+#define SIOD_GPIO_NUM     40
+#define SIOC_GPIO_NUM     39
+#define Y9_GPIO_NUM       48
+#define Y8_GPIO_NUM       11
+#define Y7_GPIO_NUM       12
+#define Y6_GPIO_NUM       14
+#define Y5_GPIO_NUM       16
+#define Y4_GPIO_NUM       18
+#define Y3_GPIO_NUM       17
+#define Y2_GPIO_NUM       15
+#define VSYNC_GPIO_NUM    38
+#define HREF_GPIO_NUM     47
+#define PCLK_GPIO_NUM     13
 
 // ----- オーディオ設定 -----
 static const uint32_t SAMPLE_RATE = 48000;
@@ -155,7 +175,145 @@ void syncNTP() {
   }
 }
 
-String getCommandFromServer(GateState state, String token) {
+bool initCamera() {
+  camera_config_t config;
+  config.ledc_channel = LEDC_CHANNEL_0;
+  config.ledc_timer   = LEDC_TIMER_0;
+  config.pin_d0       = Y2_GPIO_NUM;
+  config.pin_d1       = Y3_GPIO_NUM;
+  config.pin_d2       = Y4_GPIO_NUM;
+  config.pin_d3       = Y5_GPIO_NUM;
+  config.pin_d4       = Y6_GPIO_NUM;
+  config.pin_d5       = Y7_GPIO_NUM;
+  config.pin_d6       = Y8_GPIO_NUM;
+  config.pin_d7       = Y9_GPIO_NUM;
+  config.pin_xclk     = XCLK_GPIO_NUM;
+  config.pin_pclk     = PCLK_GPIO_NUM;
+  config.pin_vsync    = VSYNC_GPIO_NUM;
+  config.pin_href     = HREF_GPIO_NUM;
+  config.pin_sccb_sda = SIOD_GPIO_NUM;
+  config.pin_sccb_scl = SIOC_GPIO_NUM;
+  config.pin_pwdn     = PWDN_GPIO_NUM;
+  config.pin_reset    = RESET_GPIO_NUM;
+  config.xclk_freq_hz = 20000000;
+  config.pixel_format = PIXFORMAT_JPEG;
+  config.frame_size   = FRAMESIZE_SVGA;  // 800x600
+  config.jpeg_quality = 12;
+  config.fb_count     = 1;
+
+  esp_err_t err = esp_camera_init(&config);
+  if (err != ESP_OK) {
+    Serial.printf("カメラ初期化失敗: 0x%x\n", err);
+    return false;
+  }
+  
+  Serial.println("カメラ初期化成功");
+  return true;
+}
+
+void takeAndUploadPhoto(int sensorId, String token) {
+  Serial.println("写真撮影開始");
+  
+  if (!initCamera()) {
+    Serial.println("カメラ初期化失敗 - 撮影スキップ");
+    return;
+  }
+
+  // 撮影
+  camera_fb_t* fb = esp_camera_fb_get();
+  if (!fb) {
+    Serial.println("撮影失敗");
+    esp_camera_deinit();
+    return;
+  }
+
+  Serial.printf("撮影成功: %d bytes\n", fb->len);
+
+  // アップロード
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi未接続 - アップロードスキップ");
+    esp_camera_fb_return(fb);
+    esp_camera_deinit();
+    return;
+  }
+
+  WiFiClientSecure client;
+  client.setInsecure();
+
+  char url[128];
+  snprintf(url, sizeof(url), PHOTO_UPLOAD_URL, sensorId);
+  
+  HTTPClient http;
+  http.begin(client, url);
+  http.setTimeout(30000);  // 30秒タイムアウト
+
+  // multipart/form-data boundary
+  String boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
+  http.addHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
+
+  // multipart body作成
+  String head = "--" + boundary + "\r\n";
+  head += "Content-Disposition: form-data; name=\"token\"\r\n\r\n";
+  head += token + "\r\n";
+  head += "--" + boundary + "\r\n";
+  head += "Content-Disposition: form-data; name=\"file\"; filename=\"photo.jpg\"\r\n";
+  head += "Content-Type: image/jpeg\r\n\r\n";
+
+  String tail = "\r\n--" + boundary + "--\r\n";
+
+  uint32_t totalLen = head.length() + fb->len + tail.length();
+
+  // ストリーム送信
+  client.print(String("POST ") + url + " HTTP/1.1\r\n");
+  client.print(String("Host: norawork.jp\r\n"));
+  client.print("Content-Type: multipart/form-data; boundary=" + boundary + "\r\n");
+  client.print("Content-Length: " + String(totalLen) + "\r\n");
+  client.print("\r\n");
+  client.print(head);
+  
+  // 画像データ送信
+  uint8_t* buf = fb->buf;
+  size_t len = fb->len;
+  size_t sent = 0;
+  while (sent < len) {
+    size_t chunk = (len - sent > 4096) ? 4096 : (len - sent);
+    size_t written = client.write(buf + sent, chunk);
+    sent += written;
+    if (written == 0) break;
+  }
+  
+  client.print(tail);
+
+  // レスポンス待ち
+  unsigned long timeout = millis();
+  while (client.available() == 0) {
+    if (millis() - timeout > 10000) {
+      Serial.println("アップロードタイムアウト");
+      esp_camera_fb_return(fb);
+      esp_camera_deinit();
+      client.stop();
+      return;
+    }
+  }
+
+  // レスポンス読み取り
+  while (client.available()) {
+    String line = client.readStringUntil('\n');
+    if (line.startsWith("HTTP/1.1")) {
+      Serial.println(line);
+      if (line.indexOf("200") > 0) {
+        Serial.println("写真アップロード成功");
+      }
+    }
+  }
+
+  client.stop();
+  esp_camera_fb_return(fb);
+  esp_camera_deinit();
+  Serial.println("写真撮影完了");
+}
+
+String getCommandFromServer(GateState state, String token, bool* takePhoto, int* sensorId) {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("WiFi未接続");
     return "NONE";
@@ -184,6 +342,7 @@ String getCommandFromServer(GateState state, String token) {
   int httpCode = http.POST(requestBody);
 
   String command = "NONE";
+  *takePhoto = false;
 
   if (httpCode == HTTP_CODE_OK) {
     String payload = http.getString();
@@ -200,6 +359,13 @@ String getCommandFromServer(GateState state, String token) {
         command = String(cmd);
         Serial.print("コマンド取得: ");
         Serial.println(command);
+      }
+      
+      // take_photoフラグ取得
+      if (responseDoc.containsKey("take_photo")) {
+        *takePhoto = responseDoc["take_photo"].as<bool>();
+        Serial.print("写真撮影: ");
+        Serial.println(*takePhoto ? "YES" : "NO");
       }
     } else {
       Serial.print("JSONパースエラー: ");
@@ -339,7 +505,7 @@ void goToDeepSleep() {
 
 void setup() {
   Serial.begin(115200);
-  delay(1000);  // シリアル初期化待ち(シリアル無しでも動作)
+  delay(1000);  // シリアル初期化待ち
 
   // USER_LED
   pinMode(USER_LED_PIN, OUTPUT);
@@ -359,16 +525,18 @@ void setup() {
     digitalWrite(USER_LED_PIN, LOW);  // LED点灯
 
     initGGWave();
-    Serial.println(F("Waiting for S<ssid> / P<pass> / T<Token> ..."));
+    Serial.println(F("Waiting for S<ssid> / P<pass> / T<Token> / I<SensorID> ..."));
 
     char ssid[17] = {};
     char pass[17] = {};
     char CamToken[17] = {};
+    char sensorIdStr[17] = {};
     bool gotSSID = false;
     bool gotPass = false;
     bool gotCamToken = false;
+    bool gotSensorId = false;
 
-    while (!(gotSSID && gotPass && gotCamToken)) {
+    while (!(gotSSID && gotPass && gotCamToken && gotSensorId)) {
       // --- 1フレーム分読み込み ---
       int bytesRead = 0;
       while (bytesRead < BYTES_PER_FRAME) {
@@ -401,7 +569,7 @@ void setup() {
       Serial.print(F("Received: "));
       Serial.println(str);
 
-      // 先頭文字でSSID/Pass/Tokenを振り分け
+      // 先頭文字でSSID/Pass/Token/SensorIDを振り分け
       switch (str[0]) {
         case 'S':
           strncpy(ssid, str + 1, 15);
@@ -421,15 +589,22 @@ void setup() {
           Serial.print(F("  -> Token: "));
           Serial.println(CamToken);
           break;
+        case 'I':
+          strncpy(sensorIdStr, str + 1, 15);
+          gotSensorId = true;
+          Serial.print(F("  -> SensorID: "));
+          Serial.println(sensorIdStr);
+          break;
         default:
           Serial.println(F("  -> Unknown prefix, ignored."));
           break;
       }
 
       // 受信状況を表示
-      Serial.printf("  [%s] SSID  %s\n", gotSSID ? "OK" : "--", gotSSID ? ssid : "");
-      Serial.printf("  [%s] Pass  %s\n", gotPass ? "OK" : "--", gotPass ? "****" : "");
-      Serial.printf("  [%s] Token %s\n", gotCamToken ? "OK" : "--", gotCamToken ? CamToken : "");
+      Serial.printf("  [%s] SSID     %s\n", gotSSID ? "OK" : "--", gotSSID ? ssid : "");
+      Serial.printf("  [%s] Pass     %s\n", gotPass ? "OK" : "--", gotPass ? "****" : "");
+      Serial.printf("  [%s] Token    %s\n", gotCamToken ? "OK" : "--", gotCamToken ? CamToken : "");
+      Serial.printf("  [%s] SensorID %s\n", gotSensorId ? "OK" : "--", gotSensorId ? sensorIdStr : "");
     }
 
     // --- NVSに保存 ---
@@ -437,6 +612,7 @@ void setup() {
     prefs.putString("ssid", ssid);
     prefs.putString("pass", pass);
     prefs.putString("CamToken", CamToken);
+    prefs.putString("sensorId", sensorIdStr);
     prefs.end();
 
     Serial.println(F("=== Saved to NVS. Rebooting... ==="));
@@ -455,6 +631,7 @@ void setup() {
     String ssid = prefs.getString("ssid", "");
     String pass = prefs.getString("pass", "");
     String CamToken = prefs.getString("CamToken", "");
+    String sensorIdStr = prefs.getString("sensorId", "");
     prefs.end();
 
     if (ssid.isEmpty()) {
@@ -463,10 +640,14 @@ void setup() {
       return;
     }
 
+    int sensorId = sensorIdStr.toInt();
+
     Serial.print(F("SSID : "));
     Serial.println(ssid);
     Serial.print(F("Token: "));
     Serial.println(CamToken);
+    Serial.print(F("SensorID: "));
+    Serial.println(sensorId);
 
     // ピン初期化
     pinMode(SWITCH_OPEN, INPUT_PULLUP);
@@ -509,7 +690,8 @@ void setup() {
     }
 
     // サーバーからコマンド取得
-    String command = getCommandFromServer(currentState, CamToken);
+    bool takePhoto = false;
+    String command = getCommandFromServer(currentState, CamToken, &takePhoto, &sensorId);
 
     // コマンド実行
     executeCommand(command, CamToken);
@@ -517,6 +699,11 @@ void setup() {
     // 最終的な状態を取得して完了報告
     GateState finalState = getCurrentState();
     reportCommandComplete(finalState, CamToken);
+
+    // 写真撮影
+    if (takePhoto && sensorId > 0) {
+      takeAndUploadPhoto(sensorId, CamToken);
+    }
 
     // WiFi切断
     WiFi.disconnect(true);
