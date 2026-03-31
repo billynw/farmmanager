@@ -343,6 +343,7 @@ String getCommandFromServer(GateState state, String token, bool* takePhoto, int*
 
   String command = "NONE";
   *takePhoto = false;
+  *sensorId = 0;
 
   if (httpCode == HTTP_CODE_OK) {
     String payload = http.getString();
@@ -366,6 +367,13 @@ String getCommandFromServer(GateState state, String token, bool* takePhoto, int*
         *takePhoto = responseDoc["take_photo"].as<bool>();
         Serial.print("写真撮影: ");
         Serial.println(*takePhoto ? "YES" : "NO");
+      }
+      
+      // sensor_id取得
+      if (responseDoc.containsKey("sensor_id")) {
+        *sensorId = responseDoc["sensor_id"].as<int>();
+        Serial.print("SensorID: ");
+        Serial.println(*sensorId);
       }
     } else {
       Serial.print("JSONパースエラー: ");
@@ -525,18 +533,16 @@ void setup() {
     digitalWrite(USER_LED_PIN, LOW);  // LED点灯
 
     initGGWave();
-    Serial.println(F("Waiting for S<ssid> / P<pass> / T<Token> / I<SensorID> ..."));
+    Serial.println(F("Waiting for S<ssid> / P<pass> / T<Token> ..."));
 
     char ssid[17] = {};
     char pass[17] = {};
     char CamToken[17] = {};
-    char sensorIdStr[17] = {};
     bool gotSSID = false;
     bool gotPass = false;
     bool gotCamToken = false;
-    bool gotSensorId = false;
 
-    while (!(gotSSID && gotPass && gotCamToken && gotSensorId)) {
+    while (!(gotSSID && gotPass && gotCamToken)) {
       // --- 1フレーム分読み込み ---
       int bytesRead = 0;
       while (bytesRead < BYTES_PER_FRAME) {
@@ -569,7 +575,7 @@ void setup() {
       Serial.print(F("Received: "));
       Serial.println(str);
 
-      // 先頭文字でSSID/Pass/Token/SensorIDを振り分け
+      // 先頭文字でSSID/Pass/Tokenを振り分け
       switch (str[0]) {
         case 'S':
           strncpy(ssid, str + 1, 15);
@@ -589,22 +595,15 @@ void setup() {
           Serial.print(F("  -> Token: "));
           Serial.println(CamToken);
           break;
-        case 'I':
-          strncpy(sensorIdStr, str + 1, 15);
-          gotSensorId = true;
-          Serial.print(F("  -> SensorID: "));
-          Serial.println(sensorIdStr);
-          break;
         default:
           Serial.println(F("  -> Unknown prefix, ignored."));
           break;
       }
 
       // 受信状況を表示
-      Serial.printf("  [%s] SSID     %s\n", gotSSID ? "OK" : "--", gotSSID ? ssid : "");
-      Serial.printf("  [%s] Pass     %s\n", gotPass ? "OK" : "--", gotPass ? "****" : "");
-      Serial.printf("  [%s] Token    %s\n", gotCamToken ? "OK" : "--", gotCamToken ? CamToken : "");
-      Serial.printf("  [%s] SensorID %s\n", gotSensorId ? "OK" : "--", gotSensorId ? sensorIdStr : "");
+      Serial.printf("  [%s] SSID  %s\n", gotSSID ? "OK" : "--", gotSSID ? ssid : "");
+      Serial.printf("  [%s] Pass  %s\n", gotPass ? "OK" : "--", gotPass ? "****" : "");
+      Serial.printf("  [%s] Token %s\n", gotCamToken ? "OK" : "--", gotCamToken ? CamToken : "");
     }
 
     // --- NVSに保存 ---
@@ -612,7 +611,6 @@ void setup() {
     prefs.putString("ssid", ssid);
     prefs.putString("pass", pass);
     prefs.putString("CamToken", CamToken);
-    prefs.putString("sensorId", sensorIdStr);
     prefs.end();
 
     Serial.println(F("=== Saved to NVS. Rebooting... ==="));
@@ -631,7 +629,6 @@ void setup() {
     String ssid = prefs.getString("ssid", "");
     String pass = prefs.getString("pass", "");
     String CamToken = prefs.getString("CamToken", "");
-    String sensorIdStr = prefs.getString("sensorId", "");
     prefs.end();
 
     if (ssid.isEmpty()) {
@@ -640,14 +637,10 @@ void setup() {
       return;
     }
 
-    int sensorId = sensorIdStr.toInt();
-
     Serial.print(F("SSID : "));
     Serial.println(ssid);
     Serial.print(F("Token: "));
     Serial.println(CamToken);
-    Serial.print(F("SensorID: "));
-    Serial.println(sensorId);
 
     // ピン初期化
     pinMode(SWITCH_OPEN, INPUT_PULLUP);
@@ -691,6 +684,7 @@ void setup() {
 
     // サーバーからコマンド取得
     bool takePhoto = false;
+    int sensorId = 0;
     String command = getCommandFromServer(currentState, CamToken, &takePhoto, &sensorId);
 
     // コマンド実行
