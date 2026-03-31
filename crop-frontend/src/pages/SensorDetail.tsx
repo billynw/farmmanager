@@ -92,9 +92,35 @@ export default function SensorDetail() {
     chartPath = 'M' + pts.join(' L')
     chartArea = chartPath + ` L${(W - pad).toFixed(1)},${(H - pad).toFixed(1)} L${pad},${(H - pad).toFixed(1)} Z`
   }
-  const chartLabels = chartRange === '24h'
-    ? ['0:00', '6:00', '12:00', '18:00', '24:00']
-    : ['7日前', '6日前', '5日前', '4日前', '3日前', '2日前', '昨日', '今日']
+
+  // 時間軸ラベルを実際のデータから生成
+  let chartLabels: string[] = []
+  if (chartData.length >= 2) {
+    const firstTime = new Date(chartData[0].recorded_at)
+    const lastTime = new Date(chartData[chartData.length - 1].recorded_at)
+    
+    if (chartRange === '24h') {
+      // 24h: 0時、6時、12時、18時、24時の5ポイント
+      const labelCount = 5
+      chartLabels = Array.from({ length: labelCount }, (_, i) => {
+        const t = new Date(firstTime.getTime() + (lastTime.getTime() - firstTime.getTime()) * i / (labelCount - 1))
+        return `${t.getHours()}:00`
+      })
+    } else {
+      // 7d: 開始日から終了日まで
+      const labelCount = 8
+      chartLabels = Array.from({ length: labelCount }, (_, i) => {
+        const t = new Date(firstTime.getTime() + (lastTime.getTime() - firstTime.getTime()) * i / (labelCount - 1))
+        return `${t.getMonth() + 1}/${t.getDate()}`
+      })
+    }
+  } else {
+    // データが少ない場合はデフォルト
+    chartLabels = chartRange === '24h'
+      ? ['0:00', '6:00', '12:00', '18:00', '24:00']
+      : ['7日前', '6日前', '5日前', '4日前', '3日前', '2日前', '昨日', '今日']
+  }
+
   const selectedFeatureType = featureTypeByKey[selectedMetric]
 
   return (
