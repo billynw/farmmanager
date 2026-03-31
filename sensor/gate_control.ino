@@ -17,11 +17,10 @@ const unsigned long DEEP_SLEEP_TIME = 300;  // 5分 = 300秒
 #define DIR_PIN D2
 #define SWITCH_OPEN D0
 #define SWITCH_CLOSE D1
-
-static const int8_t PDM_CLK_PIN = 42;
-static const int8_t PDM_DATA_PIN = 41;
-static const int8_t CONFIG_PIN = 7;     // D8
-static const int8_t USER_LED_PIN = 21;  // XIAO ESP32S3 USER_LED
+#define PDM_CLK_PIN 42
+#define PDM_DATA_PIN 41
+#define CONFIG_PIN 7     // D8
+#define USER_LED_PIN 21  // XIAO ESP32S3 USER_LED
 
 // ----- オーディオ設定 -----
 static const uint32_t SAMPLE_RATE = 48000;
@@ -263,10 +262,8 @@ void executeCommand(String command, String token) {
 
   if (command == "OPEN") {
     openGate();
-    reportCommandComplete(OPEN, token);
   } else if (command == "CLOSE") {
     closeGate();
-    reportCommandComplete(CLOSE, token);
   } else if (command == "NONE" || command == "") {
     Serial.println("コマンドなし");
   } else {
@@ -286,7 +283,7 @@ void goToDeepSleep() {
 
 void setup() {
   Serial.begin(115200);
-  delay(1000);  // シリアル初期化待ち（シリアル無しでも動作）
+  delay(1000);  // シリアル初期化待ち(シリアル無しでも動作)
 
   // USER_LED
   pinMode(USER_LED_PIN, OUTPUT);
@@ -453,8 +450,12 @@ void setup() {
     // サーバーからコマンド取得
     String command = getCommandFromServer(currentState, CamToken);
 
-    // コマンド実行（完了報告含む）
+    // コマンド実行
     executeCommand(command, CamToken);
+
+    // 最終的な状態を取得して完了報告
+    GateState finalState = getCurrentState();
+    reportCommandComplete(finalState, CamToken);
 
     // WiFi切断
     WiFi.disconnect(true);
