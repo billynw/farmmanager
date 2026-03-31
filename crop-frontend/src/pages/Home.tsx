@@ -20,11 +20,8 @@ const FEATURE_TO_METRIC: Record<number, string | null> = {
 const STATUS_LABEL: Record<string, string> = { growing: '栽培中', finished: '終了' }
 const STATUS_COLOR: Record<string, string> = { growing: '#2d7a4f', finished: '#888' }
 
-// UTC文字列をローカル時刻に変換してフォーマット
 function formatDate(dateStr: string) {
-  // サーバーから来るタイムスタンプがUTCの場合、Zサフィックスを付けて明示的にUTCとして扱う
-  const utcStr = dateStr.endsWith('Z') ? dateStr : dateStr + 'Z'
-  const d = new Date(utcStr)
+  const d = new Date(dateStr)
   return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
@@ -52,11 +49,7 @@ export default function Home() {
 
   const recentItems = [...items]
     .filter(item => item.latest_work_log)
-    .sort((a, b) => {
-      const aTime = a.latest_work_log!.worked_at.endsWith('Z') ? a.latest_work_log!.worked_at : a.latest_work_log!.worked_at + 'Z'
-      const bTime = b.latest_work_log!.worked_at.endsWith('Z') ? b.latest_work_log!.worked_at : b.latest_work_log!.worked_at + 'Z'
-      return new Date(bTime).getTime() - new Date(aTime).getTime()
-    })
+    .sort((a, b) => new Date(b.latest_work_log!.worked_at).getTime() - new Date(a.latest_work_log!.worked_at).getTime())
     .slice(0, 5)
 
   return (
