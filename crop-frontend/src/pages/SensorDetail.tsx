@@ -54,11 +54,13 @@ export default function SensorDetail() {
     queryKey: ['readings', activeSensorId, selectedMetric, chartRange],
     queryFn: () => sensorsApi.readings(activeSensorId!, selectedMetric, chartRange === '24h' ? 24 : 168).then(r => r.data),
     enabled: !!activeSensorId,
+    refetchInterval: 60000, // 1分ごとに自動更新
   })
   const { data: allReadings = [] } = useQuery<SensorReadingOut[]>({
     queryKey: ['readings-all', activeSensorId],
     queryFn: () => sensorsApi.readings(activeSensorId!, undefined, 200).then(r => r.data),
     enabled: !!activeSensorId,
+    refetchInterval: 60000, // 1分ごとに自動更新
   })
   const latestByMetric = new Map<string, SensorReadingOut>()
   for (const r of [...allReadings].reverse()) latestByMetric.set(r.metric, r)
@@ -69,6 +71,7 @@ export default function SensorDetail() {
     queryKey: ['sensor-photos', activeSensorId],
     queryFn: () => sensorsApi.photos(activeSensorId!).then(r => r.data),
     enabled: !!activeSensorId,
+    refetchInterval: 60000, // 1分ごとに自動更新
   })
   const activePhoto = photos.find(p => p.id === selectedPhotoId) ?? photos[0] ?? null
 
