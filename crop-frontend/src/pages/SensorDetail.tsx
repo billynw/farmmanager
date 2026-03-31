@@ -5,11 +5,8 @@ import type { Field, SensorOut, SensorReadingOut, SensorPhotoOut, SensorFeatureT
 import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
 
-// UTC文字列をローカル時刻に変換してフォーマット
 function formatDate(dateStr: string) {
-  // サーバーから来るタイムスタンプがUTCの場合、Zサフィックスを付けて明示的にUTCとして扱う
-  const utcStr = dateStr.endsWith('Z') ? dateStr : dateStr + 'Z'
-  const d = new Date(utcStr)
+  const d = new Date(dateStr)
   return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
@@ -96,11 +93,11 @@ export default function SensorDetail() {
     chartArea = chartPath + ` L${(W - pad).toFixed(1)},${(H - pad).toFixed(1)} L${pad},${(H - pad).toFixed(1)} Z`
   }
 
-  // 時間軸ラベルを実際のデータから生成（UTC→ローカル時刻変換）
+  // 時間軸ラベルを実際のデータから生成
   let chartLabels: string[] = []
   if (chartData.length >= 2) {
-    const firstTime = new Date(chartData[0].recorded_at.endsWith('Z') ? chartData[0].recorded_at : chartData[0].recorded_at + 'Z')
-    const lastTime = new Date(chartData[chartData.length - 1].recorded_at.endsWith('Z') ? chartData[chartData.length - 1].recorded_at : chartData[chartData.length - 1].recorded_at + 'Z')
+    const firstTime = new Date(chartData[0].recorded_at)
+    const lastTime = new Date(chartData[chartData.length - 1].recorded_at)
     
     if (chartRange === '24h') {
       // 24h: 開始〜終了を5等分
