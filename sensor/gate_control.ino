@@ -197,9 +197,20 @@ bool initCamera() {
   config.pin_reset    = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-  config.frame_size   = FRAMESIZE_SVGA;  // 800x600
-  config.jpeg_quality = 12;
-  config.fb_count     = 1;
+  
+  // PSRAMチェックしてサイズ調整
+  if (psramFound()) {
+    config.frame_size = FRAMESIZE_SVGA;  // 800x600
+    config.jpeg_quality = 12;
+    config.fb_count = 2;
+    config.fb_location = CAMERA_FB_IN_PSRAM;  // PSRAM使用を明示
+    config.grab_mode = CAMERA_GRAB_LATEST;
+  } else {
+    config.frame_size = FRAMESIZE_VGA;   // 640x480
+    config.jpeg_quality = 12;
+    config.fb_count = 1;
+    config.fb_location = CAMERA_FB_IN_DRAM;
+  }
 
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
@@ -208,6 +219,11 @@ bool initCamera() {
   }
   
   Serial.println("カメラ初期化成功");
+  if (psramFound()) {
+    Serial.println("PSRAM使用中");
+  } else {
+    Serial.println("WARNING: PSRAM未検出 - 低解像度モード");
+  }
   return true;
 }
 
@@ -697,6 +713,11 @@ void setup() {
     // 写真撮影
     if (takePhoto && sensorId > 0) {
       takeAndUploadPhoto(sensorId, CamToken);
+    }
+
+    // Deep Sleep前にNTP再取得（写真撮影後に時刻がずれている可能性）
+    if (WiFi.status() == WL_CONNECTED) {
+      syncNTP();
     }
 
     // WiFi切断
