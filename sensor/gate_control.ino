@@ -6,11 +6,17 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <time.h>
 
 // ----- API設定 -----
 const char* API_URL = "https://norawork.jp/api/v1/device/command";
 const char* COMPLETE_URL = "https://norawork.jp/api/v1/device/command/complete";
-const unsigned long DEEP_SLEEP_TIME = 300;  // 5分 = 300秒
+const unsigned long WAKE_INTERVAL_MINUTES = 5;  // 起動間隔(分) ※cronでいう*/5の5
+
+// NTP設定
+const char* NTP_SERVER = "ntp.nict.jp";
+const long GMT_OFFSET_SEC = 9 * 3600;  // JST = UTC+9
+const int DAYLIGHT_OFFSET_SEC = 0;
 
 // ----- ピン設定 -----
 #define STEP_PIN D3
@@ -127,6 +133,25 @@ void connectWiFi(String ssid, String pass) {
     delay(1000); 
   } else {
     Serial.println("\nWiFi接続失敗");
+  }
+}
+
+void syncNTP() {
+  Serial.println("NTP時刻同期中...");
+  configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
+  
+  struct tm timeinfo;
+  int retry = 0;
+  while (!getLocalTime(&timeinfo) && retry < 10) {
+    delay(500);
+    retry++;
+  }
+  
+  if (retry < 10) {
+    Serial.print("現在時刻: ");
+    Serial.println(&timeinfo, "%Y-%m-%d %H:%M:%S");
+  } else {
+    Serial.println("NTP同期失敗");
   }
 }
 
@@ -272,12 +297,43 @@ void executeCommand(String command, String token) {
 }
 
 void goToDeepSleep() {
-  Serial.print("Deep Sleep for ");
-  Serial.print(DEEP_SLEEP_TIME);
-  Serial.println(" seconds...");
-  delay(100);
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    // NTP同期失敗時は固定間隔でスリープ
+    Serial.println("時刻取得失敗 - 固定間隔でスリープ");
+    unsigned long sleepTime = WAKE_INTERVAL_MINUTES * 60;
+    Serial.print("Deep Sleep for ");
+    Serial.print(sleepTime);
+    Serial.println(" seconds...");
+    delay(100);
+    esp_sleep_enable_timer_wakeup(sleepTime * 1000000ULL);
+    esp_deep_sleep_start();
+    return;
+  }
 
-  esp_sleep_enable_timer_wakeup(DEEP_SLEEP_TIME * 1000000ULL);  // マイクロ秒単位
+  // 現在の分を取得
+  int currentMinute = timeinfo.tm_min;
+  int currentSecond = timeinfo.tm_sec;
+  
+  // 次の起動タイミングまでの分数を計算
+  int minutesUntilNextWake = WAKE_INTERVAL_MINUTES - (currentMinute % WAKE_INTERVAL_MINUTES);
+  
+  // 秒単位でのスリープ時間を計算
+  unsigned long sleepSeconds = (minutesUntilNextWake * 60) - currentSecond;
+  
+  Serial.print("現在: ");
+  Serial.print(timeinfo.tm_hour);
+  Serial.print(":");
+  Serial.print(currentMinute);
+  Serial.print(":");
+  Serial.println(currentSecond);
+  
+  Serial.print("次回起動まで ");
+  Serial.print(sleepSeconds);
+  Serial.println(" 秒スリープ");
+  
+  delay(100);
+  esp_sleep_enable_timer_wakeup(sleepSeconds * 1000000ULL);
   esp_deep_sleep_start();
 }
 
@@ -447,6 +503,11 @@ void setup() {
     // WiFi接続
     connectWiFi(ssid, pass);
 
+    // NTP時刻同期
+    if (WiFi.status() == WL_CONNECTED) {
+      syncNTP();
+    }
+
     // サーバーからコマンド取得
     String command = getCommandFromServer(currentState, CamToken);
 
@@ -461,7 +522,7 @@ void setup() {
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
 
-    // Deep Sleep
+    // Deep Sleep (NTPベースの次回起動タイミング計算)
     goToDeepSleep();
   }
 }
