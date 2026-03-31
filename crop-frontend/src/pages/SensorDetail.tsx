@@ -132,43 +132,52 @@ export default function SensorDetail() {
   const chartData = [...readings].reverse()
   const W = 320, H = 80, pad = 10
   let chartPath = '', chartArea = '', chartColor = '#378ADD'
-  if (chartData.length >= 2) {
+  
+  // 時間軸固定: 現在時刻から24時間前または7日前
+  const now = new Date()
+  const timeRangeMs = chartRange === '24h' ? 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000
+  const startTime = new Date(now.getTime() - timeRangeMs)
+  
+  if (chartData.length >= 1) {
     const ft = selectedMetric ? featureTypeByKey[selectedMetric] : null
     chartColor = ft?.color ?? '#378ADD'
     const vals = chartData.map(r => r.value)
     const minV = Math.min(...vals) - 1
     const maxV = Math.max(...vals) + 1
-    const pts = vals.map((v, i) => {
-      const x = pad + (i / (vals.length - 1)) * (W - pad * 2)
-      const y = H - pad - ((v - minV) / (maxV - minV)) * (H - pad * 2)
+    
+    // 時間軸に基づいてX座標を計算
+    const pts = chartData.map(r => {
+      const recordedTime = new Date(r.recorded_at).getTime()
+      const ratio = (recordedTime - startTime.getTime()) / timeRangeMs
+      const x = pad + ratio * (W - pad * 2)
+      const y = H - pad - ((r.value - minV) / (maxV - minV)) * (H - pad * 2)
       return `${x.toFixed(1)},${y.toFixed(1)}`
     })
-    chartPath = 'M' + pts.join(' L')
-    chartArea = chartPath + ` L${(W - pad).toFixed(1)},${(H - pad).toFixed(1)} L${pad},${(H - pad).toFixed(1)} Z`
+    
+    if (pts.length >= 2) {
+      chartPath = 'M' + pts.join(' L')
+      chartArea = chartPath + ` L${(W - pad).toFixed(1)},${(H - pad).toFixed(1)} L${pad},${(H - pad).toFixed(1)} Z`
+    } else if (pts.length === 1) {
+      // 1点のみの場合は小さな円で表示
+      const [x, y] = pts[0].split(',')
+      chartPath = `M${x},${y} m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0`
+    }
   }
 
+  // 時間軸ラベル: 固定された時間範囲を表示
   let chartLabels: string[] = []
-  if (chartData.length >= 2) {
-    const firstTime = new Date(chartData[0].recorded_at)
-    const lastTime = new Date(chartData[chartData.length - 1].recorded_at)
-    
-    if (chartRange === '24h') {
-      const labelCount = 5
-      chartLabels = Array.from({ length: labelCount }, (_, i) => {
-        const t = new Date(firstTime.getTime() + (lastTime.getTime() - firstTime.getTime()) * i / (labelCount - 1))
-        return `${t.getHours()}:00`
-      })
-    } else {
-      const labelCount = 8
-      chartLabels = Array.from({ length: labelCount }, (_, i) => {
-        const t = new Date(firstTime.getTime() + (lastTime.getTime() - firstTime.getTime()) * i / (labelCount - 1))
-        return `${t.getMonth() + 1}/${t.getDate()}`
-      })
-    }
+  if (chartRange === '24h') {
+    // 24h: 現在から24時間前まで（6時間刻み）
+    chartLabels = Array.from({ length: 5 }, (_, i) => {
+      const t = new Date(startTime.getTime() + (timeRangeMs * i / 4))
+      return `${t.getHours()}:00`
+    })
   } else {
-    chartLabels = chartRange === '24h'
-      ? ['0:00', '6:00', '12:00', '18:00', '24:00']
-      : ['7日前', '6日前', '5日前', '4日前', '3日前', '2日前', '昨日', '今日']
+    // 7d: 現在から7日前まで
+    chartLabels = Array.from({ length: 8 }, (_, i) => {
+      const t = new Date(startTime.getTime() + (timeRangeMs * i / 7))
+      return `${t.getMonth() + 1}/${t.getDate()}`
+    })
   }
 
   const selectedFeatureType = selectedMetric ? featureTypeByKey[selectedMetric] : null
