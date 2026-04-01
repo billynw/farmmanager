@@ -526,6 +526,10 @@ void executeCommand(String command, String token) {
 }
 
 void goToDeepSleep() {
+  // NTP同期直後でもタイムゾーン設定を再適用
+  configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
+  delay(100);  // 設定反映待ち
+  
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo)) {
     // NTP同期失敗時は固定間隔でスリープ
