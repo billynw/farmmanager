@@ -682,6 +682,9 @@ void setup() {
     // 通常動作モード
     // ======================================================
     Serial.println(F("=== NORMAL MODE ==="));
+    
+    // Deep Sleep復帰後すぐにタイムゾーン設定を復元
+    configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
 
     // NVSから設定読み込み
     prefs.begin("config", true);  // read-only
