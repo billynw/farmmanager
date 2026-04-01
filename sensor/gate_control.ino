@@ -157,22 +157,63 @@ void connectWiFi(String ssid, String pass) {
 }
 
 void syncNTP() {
-  Serial.println("NTP時刻同期中...");
+  Serial.println("=== NTP DEBUG START ===");
+  
+  // NTP同期前の時刻を取得
+  struct tm timeinfoBefore;
+  bool hasTimeBefore = getLocalTime(&timeinfoBefore);
+  if (hasTimeBefore) {
+    Serial.print("[BEFORE] 同期前の時刻: ");
+    Serial.println(&timeinfoBefore, "%Y-%m-%d %H:%M:%S");
+    Serial.print("[BEFORE] UNIXタイム: ");
+    Serial.println(mktime(&timeinfoBefore));
+  } else {
+    Serial.println("[BEFORE] 時刻未設定");
+  }
+  
+  Serial.println("NTP時刻同期開始...");
+  Serial.print("NTPサーバー: ");
+  Serial.println(NTP_SERVER);
+  Serial.print("タイムゾーンオフセット: GMT+");
+  Serial.print(GMT_OFFSET_SEC / 3600);
+  Serial.println("時間");
+  
   configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
   
   struct tm timeinfo;
   int retry = 0;
-  while (!getLocalTime(&timeinfo) && retry < 10) {
+  Serial.print("NTP応答待機中");
+  while (!getLocalTime(&timeinfo) && retry < 20) {  // リトライ回数を20に増加
     delay(500);
+    Serial.print(".");
     retry++;
   }
+  Serial.println();
   
-  if (retry < 10) {
-    Serial.print("現在時刻: ");
+  if (retry < 20) {
+    Serial.print("[AFTER] リトライ回数: ");
+    Serial.println(retry);
+    Serial.print("[AFTER] 同期後の時刻: ");
     Serial.println(&timeinfo, "%Y-%m-%d %H:%M:%S");
+    Serial.print("[AFTER] UNIXタイム: ");
+    Serial.println(mktime(&timeinfo));
+    Serial.print("[AFTER] 年: ");
+    Serial.print(timeinfo.tm_year + 1900);
+    Serial.print(", 月: ");
+    Serial.print(timeinfo.tm_mon + 1);
+    Serial.print(", 日: ");
+    Serial.println(timeinfo.tm_mday);
+    Serial.print("[AFTER] 時: ");
+    Serial.print(timeinfo.tm_hour);
+    Serial.print(", 分: ");
+    Serial.print(timeinfo.tm_min);
+    Serial.print(", 秒: ");
+    Serial.println(timeinfo.tm_sec);
   } else {
-    Serial.println("NTP同期失敗");
+    Serial.println("NTP同期失敗 - 応答タイムアウト");
   }
+  
+  Serial.println("=== NTP DEBUG END ===");
 }
 
 bool initCamera() {
