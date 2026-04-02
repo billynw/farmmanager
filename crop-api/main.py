@@ -20,6 +20,47 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def add_jst_timezone_suffix(request: Request, call_next):
+    """
+    APIレスポンス内の全てのdatetime文字列に+09:00サフィックスを追加
+    フロントエンドがどのタイムゾーンでもJSTとして正しく解釈できるようにする
+    """
+    response = await call_next(request)
+    
+    # JSONレスポンスのみ処理
+    if not response.headers.get("content-type", "").startswith("application/json"):
+        return response
+    
+    # レスポンスボディを読み取り
+    body = b""
+    async for chunk in response.body_iterator:
+        body += chunk
+    
+    try:
+        content = body.decode("utf-8")
+        # ISO 8601形式のdatetime文字列を検出: YYYY-MM-DDTHH:MM:SS (タイムゾーンなし)
+        # 既にタイムゾーンがある場合(Z, +HH:MM, -HH:MM で終わる)は除外
+        pattern = r'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?![Z\+\-])'
+        modified = re.sub(pattern, r'\1+09:00', content)
+        
+        return Response(
+            content=modified,
+            status_code=response.status_code,
+            headers=dict(response.headers),
+            media_type=response.media_type,
+        )
+    except Exception:
+        # エラー時は元のレスポンスを返す
+        return Response(
+            content=body,
+            status_code=response.status_code,
+            headers=dict(response.headers),
+            media_type=response.media_type,
+        )
+
+
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(items.router)
