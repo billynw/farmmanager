@@ -289,7 +289,7 @@ export default function SensorDetail() {
                       ))}
                     </div>
                   </div>
-                  <svg viewBox={`0 0 ${W} ${H}`} width="100%" xmlns="http://www.w3.org/2000/svg">
+                  <svg viewBox={`0 0 ${W} ${H}`} width="100%" xmlns="http://www.w3.org/2000/svg" key={`chart-${chartRange}-${selectedMetric}-${now.getTime()}`}>
                     <defs>
                       <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor={chartColor} stopOpacity="0.18" />
@@ -301,8 +301,9 @@ export default function SensorDetail() {
                     {chartPath && <path d={chartPath} stroke={chartColor} strokeWidth="1.5" fill="none" strokeLinejoin="round" strokeLinecap="round" />}
                     {chartData.length === 0 && <text x={W/2} y={H/2} fontSize="10" fill="#ccc" textAnchor="middle">データなし</text>}
                     {chartLabels.map((l, i) => {
-                      const x = pad + (i / (chartLabels.length - 1)) * (W - pad * 2)
-                      return <text key={l} x={x.toFixed(1)} y={H} fontSize="8" fill="#bbb" textAnchor="middle">{l}</text>
+                      const numLabels = chartLabels.length
+                      const x = pad + (i / (numLabels - 1)) * (W - pad * 2)
+                      return <text key={`${l}-${i}`} x={x.toFixed(1)} y={H} fontSize="8" fill="#bbb" textAnchor="middle">{l}</text>
                     })}
                   </svg>
                 </div>
