@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
@@ -10,6 +10,14 @@ import schemas
 import math
 
 router = APIRouter(prefix="/api/v1", tags=["device-control"])
+
+# JST = UTC+9
+JST = timezone(timedelta(hours=9))
+
+
+def now_jst() -> datetime:
+    """JSTの現在時刻を返す（タイムゾーン情報なしのnaive datetime）"""
+    return datetime.now(JST).replace(tzinfo=None)
 
 
 class DeviceStateRequest(BaseModel):
@@ -37,11 +45,8 @@ def is_daytime(dt: datetime, latitude: float = 35.1815, longitude: float = 136.9
     簡易計算: 日の出を6:00、日没を18:00とする
     より正確な計算が必要な場合はastralライブラリなどを使用
     """
-    # JST (UTC+9)
-    jst_hour = (dt.hour + 9) % 24
-    
-    # 6:00〜18:00を日中とする
-    return 6 <= jst_hour < 18
+    # 6:00〜18:00を日中とする（既にJST）
+    return 6 <= dt.hour < 18
 
 
 @router.post("/device/command", response_model=DeviceCommandResponse)
@@ -74,7 +79,7 @@ def get_device_command(
         raise HTTPException(status_code=404, detail="Sensor not found")
     
     # pending状態で有効期限内の命令を取得（最新1件）
-    now = datetime.utcnow()
+    now = now_jst()
     command = (
         db.query(models.DeviceCommand)
         .filter(
@@ -158,12 +163,12 @@ def complete_device_command(
         sensor_id=sensor.id,
         metric=feature_type.key,  # gate_supply または gate_drain
         value=state_value,
-        recorded_at=datetime.utcnow()
+        recorded_at=now_jst()
     )
     db.add(reading)
     
     # deliveredステータスのコマンドをcompletedに変更
-    now = datetime.utcnow()
+    now = now_jst()
     command = (
         db.query(models.DeviceCommand)
         .filter(
@@ -211,7 +216,7 @@ def send_device_command(
         sensor_id=body.sensor_id,
         command=body.command,
         status=models.DeviceCommandStatus.pending,
-        expires_at=datetime.utcnow() + timedelta(hours=24)
+        expires_at=now_jst() + timedelta(hours=24)
     )
     db.add(command)
     db.commit()
