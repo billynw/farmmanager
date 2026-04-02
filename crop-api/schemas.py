@@ -1,7 +1,10 @@
-from datetime import datetime, date
+from datetime import datetime, date, timezone, timedelta
 from typing import Optional, List, Any
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, field_validator, model_validator, model_serializer
 from models import UserFieldRole, ItemStatus, DeviceCommandStatus
+
+# JST タイムゾーン
+JST = timezone(timedelta(hours=9))
 
 # --- Auth ---
 class Token(BaseModel):
@@ -240,6 +243,19 @@ class SensorReadingOut(BaseModel):
     unit: Optional[str] = None
     recorded_at: datetime
     model_config = {"from_attributes": True}
+    
+    @model_serializer
+    def ser_model(self) -> dict:
+        # DBから取得したnaive datetimeをJSTとして扱い、タイムゾーン情報を付与
+        recorded_at_jst = self.recorded_at.replace(tzinfo=JST) if self.recorded_at.tzinfo is None else self.recorded_at
+        return {
+            "id": self.id,
+            "sensor_id": self.sensor_id,
+            "metric": self.metric,
+            "value": self.value,
+            "unit": self.unit,
+            "recorded_at": recorded_at_jst,
+        }
 
 # --- SensorPhoto ---
 class SensorPhotoOut(BaseModel):
@@ -248,12 +264,32 @@ class SensorPhotoOut(BaseModel):
     file_path: str
     taken_at: datetime
     model_config = {"from_attributes": True}
+    
+    @model_serializer
+    def ser_model(self) -> dict:
+        taken_at_jst = self.taken_at.replace(tzinfo=JST) if self.taken_at.tzinfo is None else self.taken_at
+        return {
+            "id": self.id,
+            "sensor_id": self.sensor_id,
+            "file_path": self.file_path,
+            "taken_at": taken_at_jst,
+        }
 
 class SensorLatestReading(BaseModel):
     metric: str
     value: float
     unit: Optional[str]
     recorded_at: datetime
+    
+    @model_serializer
+    def ser_model(self) -> dict:
+        recorded_at_jst = self.recorded_at.replace(tzinfo=JST) if self.recorded_at.tzinfo is None else self.recorded_at
+        return {
+            "metric": self.metric,
+            "value": self.value,
+            "unit": self.unit,
+            "recorded_at": recorded_at_jst,
+        }
 
 class SensorWithLatest(BaseModel):
     id: int
