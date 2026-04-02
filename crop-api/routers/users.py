@@ -1,5 +1,5 @@
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
@@ -11,6 +11,14 @@ import smtplib
 from email.mime.text import MIMEText
 
 router = APIRouter(prefix="/api/v1/users", tags=["users"])
+
+# JST = UTC+9
+JST = timezone(timedelta(hours=9))
+
+
+def now_jst() -> datetime:
+    """JSTの現在時刻を返す（タイムゾーン情報なしのnaive datetime）"""
+    return datetime.now(JST).replace(tzinfo=None)
 
 
 def send_email(to: str, subject: str, body: str):
@@ -98,7 +106,7 @@ def invite_user(
     if db.query(models.EmailVerification).filter(
         models.EmailVerification.email == data.email,
         models.EmailVerification.used == False,
-        models.EmailVerification.expires_at > datetime.utcnow()
+        models.EmailVerification.expires_at > now_jst()
     ).first():
         raise HTTPException(400, "このメールアドレスはメール確認待ちです")
 
@@ -110,7 +118,7 @@ def invite_user(
     db.flush()
 
     # 圃場ごとにトークンを発行し、最初のトークンをメールに記載する
-    expires_at = datetime.utcnow() + timedelta(hours=24)
+    expires_at = now_jst() + timedelta(hours=24)
     first_token = None
     field_names = []
     for fi in data.fields:

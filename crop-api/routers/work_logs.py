@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import os, uuid, shutil
 from PIL import Image
 from database import get_db
@@ -10,6 +10,15 @@ from auth import get_current_user
 from config import settings
 
 router = APIRouter(prefix="/api/v1/work-logs", tags=["work_logs"])
+
+# JST = UTC+9
+JST = timezone(timedelta(hours=9))
+
+
+def now_jst() -> datetime:
+    """JSTの現在時刻を返す（タイムゾーン情報なしのnaive datetime）"""
+    return datetime.now(JST).replace(tzinfo=None)
+
 
 def save_photo(file: UploadFile, log_id: int) -> str:
     os.makedirs(settings.PHOTO_DIR, exist_ok=True)
@@ -61,7 +70,7 @@ def create_log(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    worked_at = data.worked_at or datetime.utcnow()
+    worked_at = data.worked_at or now_jst()
     log = models.WorkLog(
         item_id=data.item_id,
         work_type_id=data.work_type_id,

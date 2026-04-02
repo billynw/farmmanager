@@ -2,13 +2,21 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 from typing import Optional
-from datetime import datetime, date
+from datetime import datetime, date, timezone, timedelta
 import csv, io
 from database import get_db
 import models
 from auth import get_current_user
 
 router = APIRouter(prefix="/api/v1/export", tags=["export"])
+
+# JST = UTC+9
+JST = timezone(timedelta(hours=9))
+
+
+def now_jst() -> datetime:
+    """JSTの現在時刻を返す（タイムゾーン情報なしのnaive datetime）"""
+    return datetime.now(JST).replace(tzinfo=None)
 
 
 def _csv_response(rows: list[list], headers: list[str], filename: str) -> StreamingResponse:
@@ -66,7 +74,7 @@ def export_work_logs(
             log.user.name if log.user else "",
         ])
 
-    ts = datetime.now().strftime("%Y%m%d")
+    ts = now_jst().strftime("%Y%m%d")
     return _csv_response(rows, headers, f"work_logs_{ts}.csv")
 
 
@@ -103,5 +111,5 @@ def export_harvests(
             h.memo or "",
         ])
 
-    ts = datetime.now().strftime("%Y%m%d")
+    ts = now_jst().strftime("%Y%m%d")
     return _csv_response(rows, headers, f"harvests_{ts}.csv")
