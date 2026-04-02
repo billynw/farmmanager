@@ -130,8 +130,8 @@ export default function SensorDetail() {
   const activePhoto = photos.find(p => p.id === selectedPhotoId) ?? photos[0] ?? null
 
   const chartData = [...readings].reverse()
-  const W = 320, H = 80, pad = 10
-  let chartPath = '', chartArea = '', chartColor = '#378ADD'
+  const W = 320, H = 80, padLeft = 20, padRight = 10, padTop = 2, padBottom = 10
+  let chartPath = '', chartArea = '', chartColor = '#378ADD', yMin = 0, yMax = 100
   
   // 時間軸固定: 現在時刻から24時間前または7日前
   const now = new Date()
@@ -142,21 +142,26 @@ export default function SensorDetail() {
     const ft = selectedMetric ? featureTypeByKey[selectedMetric] : null
     chartColor = ft?.color ?? '#378ADD'
     const vals = chartData.map(r => r.value)
-    const minV = Math.min(...vals) - 1
-    const maxV = Math.max(...vals) + 1
+    const dataMin = Math.min(...vals)
+    const dataMax = Math.max(...vals)
+    const range = dataMax - dataMin
+    const minV = dataMin - (range > 0 ? range * 0.1 : 1)
+    const maxV = dataMax + (range > 0 ? range * 0.1 : 1)
+    yMin = minV
+    yMax = maxV
     
     // 時間軸に基づいてX座標を計算
     const pts = chartData.map(r => {
       const recordedTime = new Date(r.recorded_at).getTime()
       const ratio = (recordedTime - startTime.getTime()) / timeRangeMs
-      const x = pad + ratio * (W - pad * 2)
-      const y = H - pad - ((r.value - minV) / (maxV - minV)) * (H - pad * 2)
+      const x = padLeft + ratio * (W - padLeft - padRight)
+      const y = H - padBottom - ((r.value - minV) / (maxV - minV)) * (H - padTop - padBottom)
       return `${x.toFixed(1)},${y.toFixed(1)}`
     })
     
     if (pts.length >= 2) {
       chartPath = 'M' + pts.join(' L')
-      chartArea = chartPath + ` L${(W - pad).toFixed(1)},${(H - pad).toFixed(1)} L${pad},${(H - pad).toFixed(1)} Z`
+      chartArea = chartPath + ` L${(W - padRight).toFixed(1)},${(H - padBottom).toFixed(1)} L${padLeft},${(H - padBottom).toFixed(1)} Z`
     } else if (pts.length === 1) {
       // 1点のみの場合は小さな円で表示
       const [x, y] = pts[0].split(',')
@@ -299,13 +304,20 @@ export default function SensorDetail() {
                         <stop offset="100%" stopColor={chartColor} stopOpacity="0" />
                       </linearGradient>
                     </defs>
-                    <line x1={pad} y1={H-pad} x2={W-pad} y2={H-pad} stroke="#eee" strokeWidth="0.5" />
+                    {/* Y軸ラベル（最大値・最小値） */}
+                    {chartData.length >= 1 && (
+                      <>
+                        <text x="0" y={padTop + 6} fontSize="7" fill="#999" textAnchor="start">{yMax.toFixed(1)}</text>
+                        <text x="0" y={H - padBottom - 1} fontSize="7" fill="#999" textAnchor="start">{yMin.toFixed(1)}</text>
+                      </>
+                    )}
+                    <line x1={padLeft} y1={H-padBottom} x2={W-padRight} y2={H-padBottom} stroke="#eee" strokeWidth="0.5" />
                     {chartArea && <path d={chartArea} fill="url(#cg)" />}
                     {chartPath && <path d={chartPath} stroke={chartColor} strokeWidth="1.5" fill="none" strokeLinejoin="round" strokeLinecap="round" />}
                     {chartData.length === 0 && <text x={W/2} y={H/2} fontSize="10" fill="#ccc" textAnchor="middle">データなし</text>}
                     {chartLabels.map((l, i) => {
                       const numLabels = chartLabels.length
-                      const x = pad + (i / (numLabels - 1)) * (W - pad * 2)
+                      const x = padLeft + (i / (numLabels - 1)) * (W - padLeft - padRight)
                       const lines = l.split('\n')
                       if (lines.length === 2) {
                         // 日付+時刻の2行表示
