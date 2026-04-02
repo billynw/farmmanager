@@ -167,10 +167,13 @@ export default function SensorDetail() {
   // 時間軸ラベル: 固定された時間範囲を表示
   let chartLabels: string[] = []
   if (chartRange === '24h') {
-    // 24h: 現在から24時間前まで（6時間刻み）
+    // 24h: 日付+時刻で表示（6時間刻み）
     chartLabels = Array.from({ length: 5 }, (_, i) => {
       const t = new Date(startTime.getTime() + (timeRangeMs * i / 4))
-      return `${t.getHours()}:00`
+      const dateStr = `${t.getMonth() + 1}/${t.getDate()}`
+      const timeStr = `${t.getHours()}:00`
+      // 最初と最後は日付+時刻、中間は時刻のみ
+      return i === 0 || i === 4 ? `${dateStr}\n${timeStr}` : timeStr
     })
   } else {
     // 7d: 現在から7日前まで
@@ -289,7 +292,7 @@ export default function SensorDetail() {
                       ))}
                     </div>
                   </div>
-                  <svg viewBox={`0 0 ${W} ${H}`} width="100%" xmlns="http://www.w3.org/2000/svg" key={`chart-${chartRange}-${selectedMetric}-${now.getTime()}`}>
+                  <svg viewBox={`0 0 ${W} ${H + 6}`} width="100%" xmlns="http://www.w3.org/2000/svg" key={`chart-${chartRange}-${selectedMetric}-${now.getTime()}`}>
                     <defs>
                       <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor={chartColor} stopOpacity="0.18" />
@@ -303,7 +306,18 @@ export default function SensorDetail() {
                     {chartLabels.map((l, i) => {
                       const numLabels = chartLabels.length
                       const x = pad + (i / (numLabels - 1)) * (W - pad * 2)
-                      return <text key={`${l}-${i}`} x={x.toFixed(1)} y={H} fontSize="8" fill="#bbb" textAnchor="middle">{l}</text>
+                      const lines = l.split('\n')
+                      if (lines.length === 2) {
+                        // 日付+時刻の2行表示
+                        return (
+                          <g key={`${l}-${i}`}>
+                            <text x={x.toFixed(1)} y={H - 1} fontSize="7" fill="#bbb" textAnchor="middle">{lines[0]}</text>
+                            <text x={x.toFixed(1)} y={H + 6} fontSize="7" fill="#bbb" textAnchor="middle">{lines[1]}</text>
+                          </g>
+                        )
+                      }
+                      // 時刻のみの1行表示
+                      return <text key={`${l}-${i}`} x={x.toFixed(1)} y={H + 2} fontSize="8" fill="#bbb" textAnchor="middle">{l}</text>
                     })}
                   </svg>
                 </div>
