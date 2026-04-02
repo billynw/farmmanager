@@ -7,6 +7,14 @@ import BottomNav from '../components/BottomNav'
 
 interface AgroRow { product_name: string; quantity: string; dilution: string; unit: string }
 
+// JST現在時刻をdatetime-local形式で取得
+function nowJST(): string {
+  const now = new Date()
+  // UTC時刻に+9時間してJSTに変換
+  const jstDate = new Date(now.getTime() + 9 * 60 * 60 * 1000)
+  return jstDate.toISOString().slice(0, 16)
+}
+
 export default function WorkLogNew() {
   const { id } = useParams<{ id: string }>()
   const itemId = Number(id)
@@ -14,7 +22,7 @@ export default function WorkLogNew() {
   const qc = useQueryClient()
 
   const [workTypeId, setWorkTypeId] = useState<number | undefined>()
-  const [workedAt, setWorkedAt] = useState(() => new Date().toISOString().slice(0, 16))
+  const [workedAt, setWorkedAt] = useState(() => nowJST())
   const [memo, setMemo] = useState('')
   const [showAgro, setShowAgro] = useState(false)
   const [agroRows, setAgroRows] = useState<AgroRow[]>([{ product_name: '', quantity: '', dilution: '', unit: 'L' }])
