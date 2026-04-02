@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
@@ -11,14 +11,6 @@ from config import settings
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 bearer_scheme = HTTPBearer()
 
-# JST = UTC+9
-JST = timezone(timedelta(hours=9))
-
-
-def now_jst() -> datetime:
-    """JSTの現在時刻を返す（タイムゾーン情報なしのnaive datetime）"""
-    return datetime.now(JST).replace(tzinfo=None)
-
 
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
@@ -29,7 +21,8 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 def create_access_token(user_id: int) -> str:
-    expire = now_jst() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    # JWT exp claim must be UTC Unix timestamp per RFC 7519
+    expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     return jwt.encode(
         {"sub": str(user_id), "exp": expire},
         settings.SECRET_KEY, algorithm="HS256"
