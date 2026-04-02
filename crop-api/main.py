@@ -20,54 +20,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ミドルウェア: datetime文字列にZサフィックスを追加
-@app.middleware("http")
-async def add_utc_suffix_middleware(request: Request, call_next):
-    response = await call_next(request)
-    
-    # JSONレスポンスのみ処理
-    if response.headers.get("content-type", "").startswith("application/json"):
-        # レスポンスボディを読み取る
-        body = b""
-        async for chunk in response.body_iterator:
-            body += chunk
-        
-        try:
-            # JSONをデコード
-            content = body.decode("utf-8")
-            # ISO 8601形式のdatetimeにZサフィックスを追加（既にZがある場合は除外）
-            # パターン: "2026-03-31T03:30:13" -> "2026-03-31T03:30:13Z"
-            content = re.sub(
-                r'"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?)"',
-                r'"\1Z"',
-                content
-            )
-            
-            # 新しいボディをバイトに変換
-            new_body = content.encode("utf-8")
-            
-            # ヘッダーを更新（Content-Lengthを新しいボディサイズに合わせる）
-            headers = dict(response.headers)
-            headers["content-length"] = str(len(new_body))
-            
-            # 新しいレスポンスを作成
-            return Response(
-                content=new_body,
-                status_code=response.status_code,
-                headers=headers,
-                media_type=response.media_type
-            )
-        except:
-            # エラーの場合は元のレスポンスをそのまま返す
-            return Response(
-                content=body,
-                status_code=response.status_code,
-                headers=dict(response.headers),
-                media_type=response.media_type
-            )
-    
-    return response
-
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(items.router)
