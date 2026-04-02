@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from sqlalchemy import (
     Column, Integer, String, Text, DateTime, Date,
     Boolean, Numeric, ForeignKey, Enum, Float, JSON
@@ -6,6 +6,14 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from database import Base
 import enum
+
+# JST = UTC+9
+JST = timezone(timedelta(hours=9))
+
+
+def now_jst():
+    """JSTの現在時刻を返す（タイムゾーン情報なしのnaive datetime）"""
+    return datetime.now(JST).replace(tzinfo=None)
 
 
 class UserFieldRole(str, enum.Enum):
@@ -42,7 +50,7 @@ class User(Base):
     name = Column(String(100), nullable=False)
     email = Column(String(255), nullable=True, unique=True)
     password_hash = Column(String(255), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=now_jst)
     work_logs = relationship("WorkLog", back_populates="user")
     user_fields = relationship("UserField", back_populates="user", cascade="all, delete-orphan")
     reset_tokens = relationship("PasswordResetToken", back_populates="user", cascade="all, delete-orphan")
@@ -73,7 +81,7 @@ class PasswordResetToken(Base):
     token = Column(String(64), nullable=False, unique=True)
     expires_at = Column(DateTime, nullable=False)
     used = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=now_jst)
     user = relationship("User", back_populates="reset_tokens")
 
 
@@ -85,7 +93,7 @@ class EmailVerification(Base):
     token = Column(String(64), nullable=False, unique=True)
     expires_at = Column(DateTime, nullable=False)
     used = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=now_jst)
 
 
 class InviteVerification(Base):
@@ -98,7 +106,7 @@ class InviteVerification(Base):
     token = Column(String(64), nullable=False, unique=True)
     expires_at = Column(DateTime, nullable=False)
     used = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=now_jst)
     field = relationship("Field")
 
 
@@ -108,7 +116,7 @@ class Field(Base):
     name = Column(String(100), nullable=False)
     area = Column(Numeric(6, 2), nullable=True)
     location_note = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=now_jst)
     items = relationship("Item", back_populates="field")
     user_fields = relationship("UserField", back_populates="field", cascade="all, delete-orphan")
     sensors = relationship("Sensor", back_populates="field", cascade="all, delete-orphan")
@@ -134,7 +142,7 @@ class Item(Base):
     variety = Column(String(100), nullable=True)
     planted_at = Column(Date, nullable=True)
     status = Column(Enum(ItemStatus), default=ItemStatus.growing)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=now_jst)
     field = relationship("Field", back_populates="items")
     work_logs = relationship("WorkLog", back_populates="item", order_by="WorkLog.worked_at.desc()", cascade="all, delete-orphan")
     harvests = relationship("Harvest", back_populates="item", order_by="Harvest.harvested_at.desc()", cascade="all, delete-orphan")
@@ -146,9 +154,9 @@ class WorkLog(Base):
     item_id = Column(Integer, ForeignKey("items.id"), nullable=False)
     work_type_id = Column(Integer, ForeignKey("work_types.id"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    worked_at = Column(DateTime, default=datetime.utcnow)
+    worked_at = Column(DateTime, default=now_jst)
     memo = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=now_jst)
     item = relationship("Item", back_populates="work_logs")
     work_type = relationship("WorkType", back_populates="work_logs")
     user = relationship("User", back_populates="work_logs")
@@ -173,7 +181,7 @@ class Photo(Base):
     log_id = Column(Integer, ForeignKey("work_logs.id"), nullable=False)
     file_path = Column(String(500), nullable=False)
     taken_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=now_jst)
     work_log = relationship("WorkLog", back_populates="photos")
 
 
@@ -209,7 +217,7 @@ class Sensor(Base):
     token        = Column(String(15), nullable=False)
     features     = Column(JSON, nullable=False, default=list)
     show_on_home = Column(JSON, nullable=False, default=list)
-    created_at   = Column(DateTime, default=datetime.utcnow)
+    created_at   = Column(DateTime, default=now_jst)
     field    = relationship("Field", back_populates="sensors")
     readings = relationship("SensorReading", back_populates="sensor", cascade="all, delete-orphan")
     photos   = relationship("SensorPhoto",   back_populates="sensor", cascade="all, delete-orphan")
@@ -222,7 +230,7 @@ class SensorReading(Base):
     sensor_id   = Column(Integer, ForeignKey("sensors.id"), nullable=False)
     metric      = Column(String(50), nullable=False)
     value       = Column(Float, nullable=False)
-    recorded_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    recorded_at = Column(DateTime, default=now_jst, nullable=False)
     sensor = relationship("Sensor", back_populates="readings")
 
 
@@ -231,8 +239,8 @@ class SensorPhoto(Base):
     id         = Column(Integer, primary_key=True)
     sensor_id  = Column(Integer, ForeignKey("sensors.id"), nullable=False)
     file_path  = Column(String(500), nullable=False)
-    taken_at   = Column(DateTime, default=datetime.utcnow, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    taken_at   = Column(DateTime, default=now_jst, nullable=False)
+    created_at = Column(DateTime, default=now_jst)
     sensor = relationship("Sensor", back_populates="photos")
 
 
@@ -242,7 +250,7 @@ class DeviceCommand(Base):
     sensor_id = Column(Integer, ForeignKey("sensors.id"), nullable=False)
     command = Column(String(10), nullable=False)
     status = Column(Enum(DeviceCommandStatus), default=DeviceCommandStatus.pending, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=now_jst)
     delivered_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     expires_at = Column(DateTime, nullable=False)
