@@ -45,10 +45,15 @@ async def add_jst_timezone_suffix(request: Request, call_next):
         pattern = r'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?![Z\+\-])'
         modified = re.sub(pattern, r'\1+09:00', content)
         
+        # Content-Lengthを更新
+        modified_bytes = modified.encode("utf-8")
+        headers = dict(response.headers)
+        headers["content-length"] = str(len(modified_bytes))
+        
         return Response(
-            content=modified,
+            content=modified_bytes,
             status_code=response.status_code,
-            headers=dict(response.headers),
+            headers=headers,
             media_type=response.media_type,
         )
     except Exception:
