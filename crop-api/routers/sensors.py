@@ -1,7 +1,7 @@
 import os
 import uuid
 import shutil
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.orm import Session
@@ -14,9 +14,6 @@ import schemas
 import random
 
 router = APIRouter(prefix="/api/v1", tags=["sensors"])
-
-# JST = UTC+9
-JST = timezone(timedelta(hours=9))
 
 
 def get_sensor_photo_dir(sensor_id: int) -> str:
@@ -162,14 +159,12 @@ def post_reading(
         raise HTTPException(status_code=404, detail="Sensor not found")
     verify_sensor_token(sensor, body.token)
     
-    # DBにはJSTで保存されているため、JSTで現在時刻を取得
-    now_jst = datetime.now(JST).replace(tzinfo=None)
-    
+    # システムタイムゾーン(JST)でローカル時刻を取得（タイムゾーン情報なし）
     reading = models.SensorReading(
         sensor_id=sensor_id,
         metric=body.metric,
         value=body.value,
-        recorded_at=body.recorded_at or now_jst,
+        recorded_at=body.recorded_at or datetime.now(),
     )
     db.add(reading)
     db.commit()
@@ -204,10 +199,9 @@ def get_readings(
         q = q.filter(models.SensorReading.metric == metric)
     
     # hours が指定されている場合は時間範囲でフィルタ
-    # DBにはJSTで保存されているため、JSTベースで計算
+    # システムタイムゾーン(JST)でローカル時刻を使用
     if hours:
-        now_jst = datetime.now(JST).replace(tzinfo=None)
-        cutoff = now_jst - timedelta(hours=hours)
+        cutoff = datetime.now() - timedelta(hours=hours)
         q = q.filter(models.SensorReading.recorded_at >= cutoff)
     
     readings = q.order_by(models.SensorReading.recorded_at.desc()).limit(limit).all()
@@ -248,10 +242,7 @@ async def upload_sensor_photo(
 
     photo_dir = get_sensor_photo_dir(sensor_id)
     ext = os.path.splitext(file.filename or "")[1].lower() or ".jpg"
-    
-    # JSTで現在時刻を取得
-    now_jst = datetime.now(JST).replace(tzinfo=None)
-    timestamp = (taken_at or now_jst).strftime("%Y%m%d%H%M%S")
+    timestamp = (taken_at or datetime.now()).strftime("%Y%m%d%H%M%S")
     filename = f"{timestamp}{ext}"
     file_path = os.path.join(photo_dir, filename)
 
@@ -262,7 +253,7 @@ async def upload_sensor_photo(
     photo = models.SensorPhoto(
         sensor_id=sensor_id,
         file_path=url_path,
-        taken_at=taken_at or now_jst,
+        taken_at=taken_at or datetime.now(),
     )
     db.add(photo)
     db.commit()
@@ -378,9 +369,7 @@ def seed_sensor_dummy(
 
     created_sensors = 0
     created_readings = 0
-    
-    # JSTで現在時刻を取得
-    now_jst = datetime.now(JST).replace(tzinfo=None)
+    now = datetime.now()
 
     for field in fields:
         existing = db.query(models.Sensor).filter(models.Sensor.field_id == field.id).first()
@@ -407,7 +396,7 @@ def seed_sensor_dummy(
             ("soil_moisture", 65.0, 10.0),
         ]
         for hours_ago in range(24, -1, -1):
-            recorded_at = now_jst - timedelta(hours=hours_ago)
+            recorded_at = now - timedelta(hours=hours_ago)
             for metric, base, spread in metrics:
                 value = round(base + random.uniform(-spread, spread), 1)
                 db.add(models.SensorReading(
