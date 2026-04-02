@@ -1,5 +1,5 @@
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import get_db
@@ -10,6 +10,14 @@ import smtplib
 from email.mime.text import MIMEText
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+
+# JST = UTC+9
+JST = timezone(timedelta(hours=9))
+
+
+def now_jst() -> datetime:
+    """JSTの現在時刻を返す（タイムゾーン情報なしのnaive datetime）"""
+    return datetime.now(JST).replace(tzinfo=None)
 
 
 def send_email(to: str, subject: str, body: str):
@@ -53,7 +61,7 @@ def register(req: schemas.RegisterRequest, db: Session = Depends(get_db)):
     if db.query(models.EmailVerification).filter(
         models.EmailVerification.email == req.email,
         models.EmailVerification.used == False,
-        models.EmailVerification.expires_at > datetime.utcnow()
+        models.EmailVerification.expires_at > now_jst()
     ).first():
         raise HTTPException(400, "このメールアドレスはメール確認待ちです。メールをご確認ください")
 
@@ -66,7 +74,7 @@ def register(req: schemas.RegisterRequest, db: Session = Depends(get_db)):
         db.flush()
 
     token = secrets.token_hex(32)
-    expires_at = datetime.utcnow() + timedelta(hours=24)
+    expires_at = now_jst() + timedelta(hours=24)
     db.add(models.EmailVerification(name=req.name, email=req.email, token=token, expires_at=expires_at))
     db.commit()
 
@@ -89,7 +97,7 @@ def verify_email(req: schemas.VerifyEmailRequest, db: Session = Depends(get_db))
     verification = db.query(models.EmailVerification).filter(
         models.EmailVerification.token == req.token,
         models.EmailVerification.used == False,
-        models.EmailVerification.expires_at > datetime.utcnow()
+        models.EmailVerification.expires_at > now_jst()
     ).first()
     if not verification:
         raise HTTPException(400, "無効または期限切れのリンクです。再度登録をお試しください。")
@@ -114,7 +122,7 @@ def accept_invite(req: schemas.AcceptInviteRequest, db: Session = Depends(get_db
     invite = db.query(models.InviteVerification).filter(
         models.InviteVerification.token == req.token,
         models.InviteVerification.used == False,
-        models.InviteVerification.expires_at > datetime.utcnow()
+        models.InviteVerification.expires_at > now_jst()
     ).first()
     if not invite:
         raise HTTPException(400, "無効または期限切れの招待リンクです。")
@@ -125,7 +133,7 @@ def accept_invite(req: schemas.AcceptInviteRequest, db: Session = Depends(get_db
     all_invites = db.query(models.InviteVerification).filter(
         models.InviteVerification.email == invite.email,
         models.InviteVerification.used == False,
-        models.InviteVerification.expires_at > datetime.utcnow()
+        models.InviteVerification.expires_at > now_jst()
     ).all()
 
     # ユーザーが既に存在する場合（招待リンクを複数回クリックした場合など）
@@ -179,7 +187,7 @@ def request_password_reset(req: schemas.PasswordResetRequest, db: Session = Depe
             models.PasswordResetToken.used == False
         ).update({"used": True})
         token = secrets.token_hex(32)
-        expires_at = datetime.utcnow() + timedelta(hours=1)
+        expires_at = now_jst() + timedelta(hours=1)
         db.add(models.PasswordResetToken(user_id=user.id, token=token, expires_at=expires_at))
         db.commit()
         reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
@@ -200,7 +208,7 @@ def confirm_password_reset(req: schemas.PasswordResetConfirm, db: Session = Depe
     reset_token = db.query(models.PasswordResetToken).filter(
         models.PasswordResetToken.token == req.token,
         models.PasswordResetToken.used == False,
-        models.PasswordResetToken.expires_at > datetime.utcnow()
+        models.PasswordResetToken.expires_at > now_jst()
     ).first()
     if not reset_token:
         raise HTTPException(400, "無効または期限切れのトークンです")
