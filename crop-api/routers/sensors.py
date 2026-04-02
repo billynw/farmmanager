@@ -190,7 +190,7 @@ def get_readings(
     sensor_id: int,
     metric: Optional[str] = None,
     hours: Optional[int] = None,
-    limit: int = 200,
+    limit: int = 500,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
