@@ -1,7 +1,12 @@
 import os
 import uuid
 import shutil
+import smtplib
 from datetime import datetime, timedelta, timezone
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email.mime.text import MIMEText
+from email import encoders
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.orm import Session
@@ -232,12 +237,61 @@ def get_readings(
 # 写真のアップロード・取得
 # ----------------------------------------------------------------
 
-@router.post("/sensors/{sensor_id}/photos", response_model=schemas.SensorPhotoOut)
+def _send_gate_photo_email(
+    sensor: models.Sensor,
+    field: models.Field,
+    gate_state: Optional[str],
+    taken_at: datetime,
+    file_bytes: bytes,
+    ext: str,
+    recipients: list,
+):
+    state_label = "開きました" if gate_state == "OPEN" else "閉まりました"
+    subject = f"[{field.name}] {sensor.name} がゲートを{state_label}"
+    body = (
+        f"センサー名 : {sensor.name}\n"
+        f"圃場     : {field.name}\n"
+        f"状態     : {'開' if gate_state == 'OPEN' else '閉'}\n"
+        f"日時     : {taken_at.strftime('%Y-%m-%d %H:%M:%S')}"
+    )
+    attachment_filename = f"gate_{taken_at.strftime('%Y%m%d%H%M%S')}{ext}"
+
+    for user in recipients:
+        if not user.email:
+            continue
+        msg = MIMEMultipart()
+        msg["Subject"] = subject
+        msg["From"] = settings.SMTP_FROM
+        msg["To"] = user.email
+        msg.attach(MIMEText(body, "plain", "utf-8"))
+
+        part = MIMEBase("image", "jpeg")
+        part.set_payload(file_bytes)
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", f'attachment; filename="{attachment_filename}"')
+        msg.attach(part)
+
+        try:
+            if settings.SMTP_TLS:
+                smtp = smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT)
+            else:
+                smtp = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
+            if settings.SMTP_USER and settings.SMTP_PASSWORD:
+                smtp.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            smtp.sendmail(settings.SMTP_FROM, [user.email], msg.as_string())
+            smtp.quit()
+        except Exception as e:
+            print(f"ゲートメール送信失敗 ({user.email}): {e}")
+
+
+@router.post("/sensors/{sensor_id}/photos")
 async def upload_sensor_photo(
     sensor_id: int,
     token: str = Query(..., description="センサートークン"),
     file: UploadFile = File(...),
     taken_at: Optional[datetime] = None,
+    send_email: bool = Query(False, description="trueのとき写真を保存せずメール送信"),
+    gate_state: Optional[str] = Query(None, description="ゲート状態 OPEN or CLOSE"),
     db: Session = Depends(get_db),
 ):
     sensor = db.query(models.Sensor).filter(models.Sensor.id == sensor_id).first()
@@ -245,20 +299,37 @@ async def upload_sensor_photo(
         raise HTTPException(status_code=404, detail="Sensor not found")
     verify_sensor_token(sensor, token)
 
-    photo_dir = get_sensor_photo_dir(sensor_id)
+    file_bytes = await file.read()
     ext = os.path.splitext(file.filename or "")[1].lower() or ".jpg"
-    timestamp = (taken_at or now_jst()).strftime("%Y%m%d%H%M%S")
+    photo_taken_at = taken_at or now_jst()
+
+    if send_email:
+        field = db.query(models.Field).filter(models.Field.id == sensor.field_id).first()
+        recipients = (
+            db.query(models.User)
+            .join(models.UserField, models.User.id == models.UserField.user_id)
+            .filter(
+                models.UserField.field_id == sensor.field_id,
+                models.UserField.role.in_([models.UserFieldRole.owner, models.UserFieldRole.manager]),
+            )
+            .all()
+        )
+        _send_gate_photo_email(sensor, field, gate_state, photo_taken_at, file_bytes, ext, recipients)
+        return {"ok": True}
+
+    photo_dir = get_sensor_photo_dir(sensor_id)
+    timestamp = photo_taken_at.strftime("%Y%m%d%H%M%S")
     filename = f"{timestamp}{ext}"
     file_path = os.path.join(photo_dir, filename)
 
     with open(file_path, "wb") as f:
-        f.write(await file.read())
+        f.write(file_bytes)
 
     url_path = f"/sensor-photos/{sensor_id}/{filename}"
     photo = models.SensorPhoto(
         sensor_id=sensor_id,
         file_path=url_path,
-        taken_at=taken_at or now_jst(),
+        taken_at=photo_taken_at,
     )
     db.add(photo)
     db.commit()
