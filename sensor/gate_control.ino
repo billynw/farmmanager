@@ -269,9 +269,9 @@ bool initCamera() {
 }
 
 
-void takeAndUploadPhoto(int sensorId, String token) {
+void takeAndUploadPhoto(int sensorId, String token, bool sendEmail = false, String gateState = "") {
   Serial.println("写真撮影開始");
-  
+
   if (!initCamera()) {
     Serial.println("カメラ初期化失敗 - 撮影スキップ");
     return;
@@ -295,7 +295,11 @@ void takeAndUploadPhoto(int sensorId, String token) {
 
   // URLにtokenをクエリパラメータとして追加
   char url[256];
-  snprintf(url, sizeof(url), "https://norawork.jp/api/v1/sensors/%d/photos?token=%s", sensorId, token.c_str());
+  if (sendEmail && gateState.length() > 0) {
+    snprintf(url, sizeof(url), "https://norawork.jp/api/v1/sensors/%d/photos?token=%s&send_email=true&gate_state=%s", sensorId, token.c_str(), gateState.c_str());
+  } else {
+    snprintf(url, sizeof(url), "https://norawork.jp/api/v1/sensors/%d/photos?token=%s", sensorId, token.c_str());
+  }
   
   Serial.print("アップロードURL: ");
   Serial.println(url);
@@ -751,7 +755,12 @@ void setup() {
     GateState finalState = getCurrentState();
     reportCommandComplete(finalState, CamToken);
 
-    // 写真撮影
+    // ゲート操作後の写真撮影（メール送信あり）
+    if (command != "NONE" && command != "" && sensorId > 0) {
+      takeAndUploadPhoto(sensorId, CamToken, true, getStateString(finalState));
+    }
+
+    // 定期写真撮影（メール送信なし）
     if (takePhoto && sensorId > 0) {
       takeAndUploadPhoto(sensorId, CamToken);
     }
