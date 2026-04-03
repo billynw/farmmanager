@@ -310,7 +310,7 @@ async def upload_sensor_photo(
             .join(models.UserField, models.User.id == models.UserField.user_id)
             .filter(
                 models.UserField.field_id == sensor.field_id,
-                models.UserField.role.in_([models.UserFieldRole.owner, models.UserFieldRole.manager]),
+                models.UserField.role.in_(["owner", "manager"]),
             )
             .all()
         )
