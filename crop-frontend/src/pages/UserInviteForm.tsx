@@ -71,15 +71,17 @@ export default function UserInviteForm() {
       if (res.data.found) {
         if (res.data.name) setName(res.data.name)
         if (res.data.fields && res.data.fields.length > 0) {
-          setFieldSelections(prev => {
-            const updated = { ...prev }
-            res.data.fields!.forEach(fi => {
-              if (updated[fi.field_id] !== undefined) {
-                updated[fi.field_id] = { checked: true, role: fi.field_role }
-              }
-            })
-            return updated
-          })
+          setFieldSelections(
+            Object.fromEntries(
+              manageableFields.map(f => {
+                const match = res.data.fields!.find(fi => fi.field_id === f.id)
+                return [f.id, match
+                  ? { checked: true, role: match.field_role }
+                  : { checked: false, role: 'member' as UserFieldRole }
+                ]
+              })
+            )
+          )
           setLookupDone(true)
         }
       }
