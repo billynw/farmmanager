@@ -166,6 +166,8 @@ export const authApi = {
 
 export const usersApi = {
   list: (field_id: number) => api.get<User[]>('/users', { params: { field_id } }),
+  lookup: (email: string) =>
+    api.get<{ found: boolean; name?: string; fields?: FieldInviteItem[] }>('/users/lookup', { params: { email } }),
   invite: (data: { name: string; email: string; fields: FieldInviteItem[] }) =>
     api.post<User>('/users', data),
   update: (id: number, data: { name?: string; email?: string }) =>

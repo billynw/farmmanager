@@ -27,6 +27,7 @@ export default function UserInviteForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
+  const [lookupDone, setLookupDone] = useState(false)
 
   const { data: fields = [] } = useQuery({
     queryKey: ['fields'],
@@ -61,6 +62,30 @@ export default function UserInviteForm() {
 
   const toggleRole = (fieldId: number) => {
     setFieldSelections(prev => ({ ...prev, [fieldId]: { ...sel(fieldId), role: sel(fieldId).role === 'manager' ? 'member' : 'manager' } }))
+  }
+
+  const handleEmailBlur = async () => {
+    if (!email) return
+    try {
+      const res = await usersApi.lookup(email)
+      if (res.data.found) {
+        if (res.data.name) setName(res.data.name)
+        if (res.data.fields && res.data.fields.length > 0) {
+          setFieldSelections(prev => {
+            const updated = { ...prev }
+            res.data.fields!.forEach(fi => {
+              if (updated[fi.field_id] !== undefined) {
+                updated[fi.field_id] = { checked: true, role: fi.field_role }
+              }
+            })
+            return updated
+          })
+          setLookupDone(true)
+        }
+      }
+    } catch {
+      // 検索失敗は無視
+    }
   }
 
   const submit = async () => {
@@ -119,7 +144,8 @@ export default function UserInviteForm() {
           </div>
           <div>
             <label style={labelStyle}>メールアドレス <span style={{ color: '#c0392b' }}>*</span></label>
-            <input style={inputStyle} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="example@email.com" />
+            <input style={inputStyle} type="email" value={email} onChange={e => { setEmail(e.target.value); setLookupDone(false) }} onBlur={handleEmailBlur} placeholder="example@email.com" />
+            {lookupDone && <p style={{ fontSize: 12, color: '#1a5fa8', marginTop: 4 }}>登録済みユーザーの圃場と権限を反映しました</p>}
           </div>
         </div>
 

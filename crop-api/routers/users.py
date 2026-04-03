@@ -53,6 +53,23 @@ def require_owner_or_manager(field_id: int, current_user: models.User, db: Sessi
         raise HTTPException(403, "圃場のownerまたはmanagerのみ操作できます")
 
 
+@router.get("/lookup")
+def lookup_user(
+    email: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if not user:
+        return {"found": False}
+    user_fields = db.query(models.UserField).filter(models.UserField.user_id == user.id).all()
+    return {
+        "found": True,
+        "name": user.name,
+        "fields": [{"field_id": uf.field_id, "field_role": uf.role} for uf in user_fields],
+    }
+
+
 @router.get("", response_model=List[schemas.UserOut])
 def list_users(
     field_id: int,
