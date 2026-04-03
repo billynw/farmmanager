@@ -105,11 +105,15 @@ def invite_user(
     existing_user = db.query(models.User).filter(models.User.email == data.email).first()
     if existing_user:
         for fi in data.fields:
+            my_role = get_my_field_role(fi.field_id, current_user.id, db)
             uf = db.query(models.UserField).filter(
                 models.UserField.user_id == existing_user.id,
                 models.UserField.field_id == fi.field_id
             ).first()
             if uf:
+                # managerはownerのロールを変更不可
+                if my_role == models.UserFieldRole.manager and uf.role == models.UserFieldRole.owner:
+                    raise HTTPException(403, "managerはownerの権限を変更できません")
                 uf.role = fi.field_role
             else:
                 db.add(models.UserField(
