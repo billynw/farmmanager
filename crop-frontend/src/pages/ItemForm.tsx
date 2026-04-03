@@ -47,7 +47,7 @@ export default function ItemForm() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: '#f5f5f0' }}>
       <AppHeader backTo={isEdit ? `/items/${itemId}` : '/items'} title={isEdit ? '作物を編集' : '作物を追加'} />
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 16, paddingBottom: 80 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 16, paddingBottom: 'calc(80px + 56px + env(safe-area-inset-bottom))' }}>
         <div style={{ background: '#fff', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <label style={labelStyle}>作物名 *</label>
@@ -80,7 +80,7 @@ export default function ItemForm() {
         </div>
       </div>
 
-      <div style={{ padding: '12px 16px', background: '#fff', borderTop: '1px solid #eee', paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}>
+      <div style={{ position: 'fixed', bottom: 'calc(56px + env(safe-area-inset-bottom))', left: 0, right: 0, padding: '12px 16px', background: '#fff', borderTop: '1px solid #eee' }}>
         <button onClick={() => mutation.mutate()} disabled={!name || mutation.isPending}
           style={{ display: 'block', width: '100%', padding: '14px', background: name ? '#2d7a4f' : '#ccc', color: '#fff', border: 'none', borderRadius: 10, fontSize: 16, fontWeight: 600, cursor: name ? 'pointer' : 'not-allowed' }}>
           {mutation.isPending ? '保存中...' : '保存する'}
