@@ -94,7 +94,7 @@ def get_device_command(
     # 写真撮影判定: テスト用に常にTrue
     #take_photo = True  # 一時的に常に撮影
     take_photo = (0 <= now.minute < 5 and is_daytime(now))
-    
+
     if command:
         # 現在の状態と同じコマンドなら不要
         if request.state == command.command:
@@ -104,13 +104,13 @@ def get_device_command(
             command.completed_at = now
             db.commit()
             return DeviceCommandResponse(command=None, take_photo=take_photo, sensor_id=sensor.id)
-        
+
         # 配信済みにマーク
         command.status = models.DeviceCommandStatus.delivered
         command.delivered_at = now
         db.commit()
         return DeviceCommandResponse(command=command.command, take_photo=take_photo, sensor_id=sensor.id)
-    
+
     return DeviceCommandResponse(command=None, take_photo=take_photo, sensor_id=sensor.id)
 
 
